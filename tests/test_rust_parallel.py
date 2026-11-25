@@ -1,6 +1,7 @@
 """Worker count preserves generated source, diagnostics, permissions and runtime results."""
 import json
 import os
+from pathlib import Path
 import unittest
 from tests import test_rust_compiler as native
 
@@ -57,7 +58,7 @@ class RustParallelTests(unittest.TestCase):
             result, _ = self.profiled(workers, flags=['-json-errors'])
             self.assertEqual(result.returncode, 1, result.stderr)
             packet = json.loads(result.stderr)
-            self.assertTrue(all(item['pos']['file'].endswith('/a.thor') for item in packet['errors']))
+            self.assertTrue(all(Path(item['pos']['file']).name=='a.thor' for item in packet['errors']))
             outputs.append((result.stdout, result.stderr))
         self.assertEqual(outputs[1:], outputs[:1]*2)
 
@@ -197,7 +198,7 @@ fmt.println(f"{NEXT} {TWICE} {copied[2]}")
             result,profile=self.profiled(workers,flags=['-json-errors'])
             self.assertNotEqual(result.returncode,0)
             packet=json.loads(result.stderr)
-            self.assertTrue(all(e['pos']['file'].endswith('/a.thor') for e in packet['errors']),packet)
+            self.assertTrue(all(Path(e['pos']['file']).name=='a.thor' for e in packet['errors']),packet)
             self.assertNotIn('Thor expression',result.stderr)
             if baseline is None:baseline=(result.stdout,result.stderr)
             else:self.assertEqual((result.stdout,result.stderr),baseline)

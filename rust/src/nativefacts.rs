@@ -2,6 +2,86 @@
 use super::*;
 
 impl Project {
+    /// Native-only syntax need not load SDK facts during ordinary lowering.
+    /// Lifetime vet needs actual return declarations before calling a scalar
+    /// result an unknown reference. Load only unresolved call/result packages,
+    /// never recursively inspect foreign implementation bodies.
+    pub(super) fn discover_lifetime_result_facts(&mut self) -> Result<()> {
+        let _phase=crate::profile::span("vet.lifetime_result_facts");
+        let runtime=self.options.root.join("runtime");
+        let mut sites=self.sources.iter().enumerate().filter(|(_,s)|s.thor && !s.shared_native && !s.excluded && !s.path.starts_with(&runtime))
+            .flat_map(|(file,s)|s.nodes.iter().enumerate().filter(|(_,n)|n.kind=="Call")
+                .map(move |(i,_)|crate::semantics::Ref{file,node:crate::ast::NodeId(i)})).collect::<Vec<_>>();
+        crate::profile::count("lifetime.result_fact_calls",sites.len() as u64);
+        // Qualified runtime globals can carry retained references even when no
+        // native procedure result is needed (for example free(os.stdin)). Load
+        // only packages actually referenced as values, not all SDK imports.
+        let values=self.sources.iter().enumerate().filter(|(_,s)|s.thor && !s.shared_native && !s.excluded && !s.path.starts_with(&runtime))
+            .flat_map(|(file,s)|s.nodes.iter().enumerate().filter(|(i,n)|n.kind=="Selector"
+                && !n.parent.is_some_and(|p|s.node(p).kind=="Call" && s.role(p,"callee")==Some(crate::ast::NodeId(*i))))
+                .map(move |(i,_)|crate::semantics::Ref{file,node:crate::ast::NodeId(i)})).collect::<Vec<_>>();
+        let using_statements=self.sources.iter().map(|s|s.nodes.iter().enumerate().filter(|(_,n)|n.kind=="Using")
+            .map(|(i,_)|crate::ast::NodeId(i)).collect::<Vec<_>>()).collect::<Vec<_>>();
+        let mut inspected=BTreeSet::new();
+        for _ in 0..8 {
+            let mut resolver=self.resolver();
+            let mut packages=BTreeSet::new();
+            let mut seen=HashSet::new();
+            let mut pending=Vec::new();
+            for site in &values {
+                if resolver.symbol(*site).is_some() || !resolver.active_definition(*site) {continue;}
+                let source=&resolver.sources[site.file];
+                if source.role(site.node,"expr").is_some_and(|node| source.node(node).kind=="Ident"
+                    && !resolver.namespace_imports(site.file,source.text(node)).is_empty()) {
+                    Self::referenced_packages(&resolver,*site,&mut seen,&mut packages)?;
+                }
+            }
+            for site in &sites {
+                if !resolver.active_definition(*site) {
+                    crate::profile::count("lifetime.result_fact_inactive",1);
+                    continue;
+                }
+                crate::profile::count("lifetime.result_fact_queries",1);
+                if !resolver.type_of(*site).is_unknown() {continue;}
+                let source=&resolver.sources[site.file];
+                if let Some(signature)=resolver.call_signature(*site) {
+                    // A void call has no result metadata to refine on retry.
+                    if resolver.fields(signature,"results").is_empty(){continue;}
+                    pending.push(*site);
+                    for (_,typ) in resolver.fields(signature,"results") {
+                        if let Some(typ)=typ {Self::referenced_packages(&resolver,typ,&mut seen,&mut packages)?;}
+                    }
+                } else if let Some(callee)=source.role(site.node,"callee") {
+                    pending.push(*site);
+                    Self::referenced_packages(&resolver,crate::semantics::Ref{node:callee,..*site},&mut seen,&mut packages)?;
+                    // Import namespaces promoted by lexical `using` cannot be
+                    // resolved until their package has been inspected.
+                    let scopes=source.ancestors(site.node).collect::<HashSet<_>>();
+                    for id in &using_statements[site.file] {
+                        let node=source.node(*id);
+                        if node.span.end>source.node(site.node).span.start || !scopes.contains(&crate::semantics::scope(source,*id)) || !resolver.active_definition(crate::semantics::Ref{node:*id,..*site}) {continue;}
+                        for value in source.group(*id,"values") {
+                            let r=crate::semantics::Ref{file:site.file,node:*value};
+                            if source.node(*value).kind!="Ident" || resolver.lookup(r,source.text(*value)).is_some(){continue;}
+                            for path in resolver.namespace_imports(site.file,source.text(*value)) {
+                                if let Some(directory)=Self::referenced_directory(source,path){packages.insert(directory);}
+                            }
+                        }
+                    }
+                }
+            }
+            packages.retain(|p|!inspected.contains(p)&&!self.sources.iter().any(|s|s.path.parent()==Some(p)));
+            if packages.is_empty(){self.retain_resolver(resolver);break;}
+            crate::profile::count("lifetime.result_fact_packages",packages.len() as u64);
+            inspected.extend(packages.iter().cloned());
+            sites=pending;
+            drop(resolver);
+            // This is result metadata, not a new general effect-analysis pass.
+            // Do not load unrelated imports or unused runtime helper bodies.
+            self.discover_type_facts_selected(packages,false)?;
+        }
+        Ok(())
+    }
     /// Vet needs declaration identity for aliases such as `Value :: time.Duration`.
     /// Inspect only packages named by unresolved constant values, following alias
     /// chains on demand. This runs after native checking, never for plain builds.

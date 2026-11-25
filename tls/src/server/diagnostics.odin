@@ -18,9 +18,27 @@ DiagnosticType :: enum {
 diagnostics: [DiagnosticType]map[string][dynamic]Diagnostic
 diagnostic_mutex: sync.Mutex
 
+// VS Code normalizes Windows drive letters. Separate keys for C: and c: would
+// publish two replacement lists for the same document, allowing an empty list
+// from one diagnostic channel to erase errors from another. Preserve component
+// case and editor aliases; only normalize the drive letter in file URIs.
+diagnostic_uri :: proc(uri:string)->string {
+	when ODIN_OS==.Windows {
+		if len(uri)>9 && strings.has_prefix(uri,"file:///") && uri[8]>='a' && uri[8]<='z' &&
+		   (uri[9]==':' || strings.has_prefix(uri[9:],"%3A") || strings.has_prefix(uri[9:],"%3a")) {
+			copy:=strings.clone(uri,context.temp_allocator)
+			bytes:=transmute([]u8)copy
+			bytes[8]&=~u8(32)
+			return copy
+		}
+	}
+	return uri
+}
+
 @(private = "file")
 remove_diagnostics_locked :: proc(type: DiagnosticType, uri: string) {
 	spall.trace(#procedure, uri)
+	uri:=diagnostic_uri(uri)
 
 	diagnostic_type := &diagnostics[type]
 	if diagnostic_type == nil {
@@ -49,6 +67,7 @@ remove_diagnostics_locked :: proc(type: DiagnosticType, uri: string) {
 
 add_diagnostics :: proc(type: DiagnosticType, uri: string, diagnostic: Diagnostic) {
 	spall.trace(#procedure, uri)
+	uri:=diagnostic_uri(uri)
 
 	if !common.config.enable_diagnostics {
 		return
@@ -92,6 +111,7 @@ add_diagnostics :: proc(type: DiagnosticType, uri: string, diagnostic: Diagnosti
 }
 
 ensure_diagnostic_path :: proc(type: DiagnosticType, uri: string) {
+	uri:=diagnostic_uri(uri)
 	sync.lock(&diagnostic_mutex)
 	defer sync.unlock(&diagnostic_mutex)
 	if _, found := diagnostics[type][uri]; !found {

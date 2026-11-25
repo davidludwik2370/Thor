@@ -175,9 +175,10 @@ impl Scheduler<'_> {
                     } else {
                         match self
                             .resolver
-                            .constant_value(arg, &Substitutions::new(), None)
+                            .constant_value(arg, &plan.bindings, Some(&typ))
                         {
-                            Some(crate::semantics::Constant::Integer(value)) => {
+                            Some(crate::semantics::Constant::Integer(value)
+                                | crate::semantics::Constant::Enum(_, value)) => {
                                 json!({"kind":"integer","value":value.to_string()})
                             }
                             Some(crate::semantics::Constant::Boolean(value)) => {

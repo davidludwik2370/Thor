@@ -199,7 +199,7 @@ impl EvaluationCache {
     }
     pub fn clear(&self) {
         for directory in std::iter::once(self.directory.clone()).chain(
-            ["prepared-v1", "identity-v1", "scalar-v1", "request-v1"]
+            ["prepared-v1", "identity-v1", "scalar-v1", "request-v1", "lifetime-v1"]
                 .map(|name| self.directory.parent().unwrap().join(name)),
         ) {
             if let Ok(entries) = fs::read_dir(directory) {

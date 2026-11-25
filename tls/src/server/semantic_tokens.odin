@@ -500,7 +500,7 @@ visit_value_decl :: proc(value_decl: ast.Value_Decl, builder: ^SemanticTokenBuil
 	modifiers: SemanticTokenModifiers = value_decl.is_mutable && !thor_is_immutable(value_decl.attributes[:]) ? {} : {.ReadOnly}
 
 	for attribute in value_decl.attributes {
-		if !thor_is_immutable([]^ast.Attribute{attribute}) { visit_node(attribute, builder) }
+		if !thor_is_immutable([]^ast.Attribute{attribute}) && !thor_is_scoped([]^ast.Attribute{attribute},attribute.pos.offset) { visit_node(attribute, builder) }
 	}
 
 	for name in value_decl.names {

@@ -34,28 +34,80 @@ pub(crate) fn rules(
     }
     let mut result = HashSet::new();
     for item in items {
-        let value = source.role(item, "value").and_then(|node| {
-            resolver.constant_value(Ref { file, node }, &Substitutions::new(), None)
-        });
-        let Some(Constant::Text(text)) = value else {
+        let Some(mut value) = source.role(item, "value") else {
             return Err(Error::at(
                 source,
                 source.node(item).span,
-                "@(vet_ignore) requires a nonempty constant string of vet check names.",
+                "@(vet_ignore) requires a nonempty set of vet rules, e.g. {.unused, .immutable}.",
             ));
         };
-        if text.trim().is_empty() {
-            return Err(Error::at(
-                source,
-                source.node(item).span,
-                "@(vet_ignore) requires at least one vet check name.",
-            ));
+        while source.node(value).kind == "Paren" {
+            let Some(inner) = source.role(value, "expr") else {
+                break;
+            };
+            value = inner;
         }
-        for name in text.split(',').map(str::trim) {
-            let name = if name == "fn" { "pure" } else { name };
-            if !crate::vet::CHECKS.contains(&name) {
-                return Err(Error::at(source,source.node(item).span,
-                format!("Unknown vet check '{name}' in @(vet_ignore). Expected immutable, pure (or fn), unused, or semicolon.")));
+        let entries = if source.node(value).kind == "Compound"
+            && source.role(value, "type").is_none()
+        {
+            let elems = source.group(value, "elems");
+            if elems.is_empty() {
+                return Err(Error::at(
+                    source,
+                    source.node(value).span,
+                    "@(vet_ignore) requires at least one vet rule.",
+                ));
+            }
+            let mut entries = Vec::with_capacity(elems.len());
+            for elem in elems {
+                let node = source.node(*elem);
+                let field = (node.kind == "ImplicitSelector")
+                    .then(|| {
+                        source.role(*elem, "field").or_else(|| {
+                            node.children
+                                .iter()
+                                .copied()
+                                .find(|child| source.node(*child).kind == "Ident")
+                        })
+                    })
+                    .flatten()
+                    .filter(|field| source.node(*field).kind == "Ident");
+                let Some(field) = field else {
+                    return Err(Error::at(source, node.span,
+                        "Each @(vet_ignore) set entry must be a vet rule written as .name, e.g. .unused."));
+                };
+                entries.push((source.text(field).to_string(), node.span));
+            }
+            entries
+        } else {
+            // Retain existing constant-string annotations for source compatibility.
+            // Set members are metadata labels and never resolve ordinary symbols.
+            let constant =
+                resolver.constant_value(Ref { file, node: value }, &Substitutions::new(), None);
+            let Some(Constant::Text(text)) = constant else {
+                return Err(Error::at(source, source.node(value).span,
+                    "@(vet_ignore) requires a nonempty rule set, e.g. {.unused, .immutable}. Existing constant strings are also accepted."));
+            };
+            if text.trim().is_empty() {
+                return Err(Error::at(
+                    source,
+                    source.node(value).span,
+                    "@(vet_ignore) requires at least one vet rule.",
+                ));
+            }
+            text.split(',')
+                .map(|name| (name.trim().to_string(), source.node(item).span))
+                .collect()
+        };
+        for (name, span) in entries {
+            let name = if name == "fn" { "pure" } else { &name };
+            if !crate::vet::CHECKS.contains(&name) || matches!(name, "lifetime" | "leak") {
+                if crate::vet::UNKNOWN_CHECKS.contains(&name) {
+                    result.insert(name.to_string());
+                    continue;
+                }
+                return Err(Error::at(source,span,
+                format!("Unknown vet check '{name}' in @(vet_ignore). Expected immutable, pure (or fn), unused, semicolon, lifetime_unknown, or leak_unknown. Definite lifetime and leak issues cannot be suppressed.")));
             }
             result.insert(name.to_string());
         }

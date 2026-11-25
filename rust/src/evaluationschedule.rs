@@ -791,7 +791,7 @@ impl<'p> Scheduler<'p> {
                 }
                 return Ok(true);
             }
-            "Paren" | "Unary" | "Cast" => {
+            "Paren" | "Unary" | "CaseComparison" | "Cast" => {
                 if ast.kind == "Unary" && ast.op == "&" {
                     return Ok(false);
                 }

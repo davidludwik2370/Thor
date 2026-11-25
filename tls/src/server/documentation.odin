@@ -27,11 +27,12 @@ build_documentation :: proc(ast_context: ^AstContext, symbol: ^Symbol, short_sig
 	}
 }
 
-build_markup_content :: proc(symbol_info: string, doc: string, allocator := context.temp_allocator, language := "odin") -> (content: MarkupContent) {
+build_markup_content :: proc(symbol_info: string, doc: string, allocator := context.temp_allocator, language := "odin", size_info := "") -> (content: MarkupContent) {
 
 	if symbol_info != "" {
 		content.kind = "markdown"
 		code := fmt.aprintf("```%s\n%s\n```", language, symbol_info, allocator=allocator)
+		if size_info != "" {code = strings.concatenate({code, "\n\n<!-- thor-hover-size -->\n", size_info}, allocator)}
 		content.value = strings.concatenate({code, DOC_SECTION_DELIMITER, doc}, allocator) if doc != "" else code
 	} else {
 		content.kind = "plaintext"
@@ -355,6 +356,7 @@ write_short_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, sy
 		write_node(sb, ast_context, v.expr, "", short_signature = true)
 		return
 	case SymbolMatrixValue:
+        if v.row_major {strings.write_string(sb,"#row_major ")}
 		fmt.sbprintf(sb, "%smatrix[", pointer_prefix)
 		build_string_node(v.x, sb, false)
 		strings.write_string(sb, ",")
@@ -1207,7 +1209,7 @@ directive_docs: map[string]string = {
 
 attribute_docs: map[string]string = {
     "no_alloc" = "```thor\n@(no_alloc)\n```\n\nRequires provably allocation-free ordinary execution, including reachable calls and omitted defaults. Fatal panic/trap reporting and failure-only assertion formatting may allocate. Caller-written check arguments are still evaluated and checked normally; `or_panic` still checks its producer. A `-> !` type alone is not an exemption. Growing collections, unknown callbacks and uninspectable foreign procedures are rejected. This checked contract adds no runtime instrumentation. `#+vet no_alloc` applies it to every procedure and runtime initializer in the file.",
-    "vet_ignore" = "Suppress selected Thor vet advice and its automatic corrections for this declaration. A nonempty comma-separated string accepts immutable, pure (alias fn), unused, and semicolon. Compiler errors and other declarations remain checked.",
+    "vet_ignore" = "Suppress selected Thor vet advice and its automatic corrections for this declaration. Use a nonempty rule set, for example `@(vet_ignore={.immutable, .unused})`. Supported rules are .immutable, .pure (alias .fn), .unused, .semicolon, .lifetime_unknown, and .leak_unknown. Members are contextual labels; no global enum or runtime collection is created. TLS offers rules after a dot and omits already selected rules. Existing constant-string annotations remain accepted for compatibility. The two unknown rules acknowledge unverified reference/allocator effects rooted in this declaration; they do not establish a trusted contract, hide definite lifetime/leak issues, or add cleanup. Compiler errors and other declarations remain checked.",
 	// Visibility
 	"private"                    = "```odin\n@(private)\n// or\n@(private=\"file\")\n// or\n@(private=\"package\")\n```\n\nRestricts the visibility of a declaration. `@(private)` alone is equivalent to `@(private=\"package\")`: the entity is visible within its own package but not exported. `@(private=\"file\")` narrows it further to the file it is declared in.",
 	"export"                     = "```odin\n@(export)\n// or\n@(export=<boolean>)\n```\n\nExports the symbol from the compiled object, making it visible to other languages and linkers. Useful when building a shared library.",

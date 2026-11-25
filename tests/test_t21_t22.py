@@ -1,6 +1,7 @@
 """Persistent helper caching and independently owned pure results."""
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ import unittest
 
 from tests import test_thor as base
 from thorlang.cache import EvaluationCache
+from tests.native_paths import native_test_compiler
 
 
 class CacheStorageTests(unittest.TestCase):
@@ -62,16 +64,13 @@ class CacheStorageTests(unittest.TestCase):
         library=toolchain/'core';library.mkdir()
         stdlib=library/'math.odin';stdlib.write_text('package math\n')
         runtime=support/'runtime/pure.odin';runtime.write_text('package pure\n')
-        compiler=toolchain/'odin'
-        compiler.write_text('#!/usr/bin/env python3\nimport sys\n'+
-            f'print({str(toolchain)!r} if sys.argv[1]=="root" else "test compiler")\n')
-        compiler.chmod(0o755)
+        compiler=native_test_compiler(toolchain,'identity',sdk=str(toolchain))
         def identity():return EvaluationCache(self.root).identity(str(compiler),support)
         before=identity();stdlib.write_text('package math\nPI::3\n')
         self.assertNotEqual(before,identity())
         before=identity();runtime.write_text('package pure\nSCHEMA::2\n')
         self.assertNotEqual(before,identity())
-        before=identity();compiler.write_text(compiler.read_text()+'# locally rebuilt compiler\n')
+        before=identity();compiler.write_bytes(compiler.read_bytes()+b'# locally rebuilt compiler\n')
         self.assertNotEqual(before,identity())
 
 
@@ -159,6 +158,12 @@ VALUE::#run work()
             ' print("helper build blocked by test",file=sys.stderr);sys.exit(1)\n'
             f'os.execv({shutil.which("odin")!r},[{shutil.which("odin")!r},*sys.argv[1:]])\n')
         wrapper.chmod(0o755)
+        if os.name=='nt':
+            from tests.native_paths import native_test_compiler
+            actual=shutil.which('odin')
+            sdk=subprocess.check_output([actual,'root'],text=True).strip()
+            wrapper=native_test_compiler(root,'frontend_guard',sdk=sdk,odin=actual,
+                frontend=str(root/'unused-frontend'),block_marker=str(marker))
         self.assertEqual(self.report(self.again(root,flags=['--odin',str(wrapper)]))['writes'],1)
         marker.touch()
         self.assertEqual(self.report(self.again(root,flags=['--odin',str(wrapper)]))['hits'],1)

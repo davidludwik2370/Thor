@@ -2,6 +2,7 @@ package tests
 
 import "core:strings"
 import "core:testing"
+import "core:fmt"
 
 import test "src:testing"
 
@@ -194,12 +195,15 @@ hover_layout_enums :: proc(t: ^testing.T) {
 
 @(test)
 hover_layout_mats :: proc(t: ^testing.T) {
-	expect_type_layout(t, "Mats", "size=192, align=8")
+	expect_type_layout(t, "Mats", "size=208, align=16")
 }
 
 @(test)
 hover_layout_simd :: proc(t: ^testing.T) {
-	expect_type_layout(t, "Simd", "size=64, align=16")
+    Native :: struct {a:#simd[4]f32,b:#simd[8]f32,c:#simd[2]f64}
+    expected:=fmt.aprintf("size=%d, align=%d",size_of(Native),align_of(Native))
+    defer delete(expected)
+	expect_type_layout(t, "Simd", expected)
 }
 
 @(test)

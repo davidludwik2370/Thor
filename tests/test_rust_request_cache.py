@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import unittest
 from tests import test_rust_compiler as native
+from tests.native_paths import EXE_SUFFIX
 
 
 class RustRequestCacheTests(unittest.TestCase):
@@ -77,15 +78,15 @@ if a.value!=2 || b.value!=3 || c.value!=4 {panic("requests")}
 
     def test_output_path_changes_do_not_rebuild_evaluation_helpers(self):
         self.source.write_text(self.box())
-        self.profile(flags=['-out:'+str(self.root/'first')])
-        warm=self.profile(flags=['-out:'+str(self.root/'second')])
+        self.profile(flags=['-out:'+str(self.root/('first'+EXE_SUFFIX))])
+        warm=self.profile(flags=['-out:'+str(self.root/('second'+EXE_SUFFIX))])
         self.assertGreater(self.count(warm,'evaluation.request_hits'),0)
         self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
 
     def test_cold_helpers_reuse_source_facts_with_explicit_output_flags(self):
         self.source.write_text(self.box(extra='if MODE!=2{panic("define")}').replace('package main',
             'package main\nMODE::#config(MODE,1)'))
-        cold=self.profile(command='build',flags=['-out:'+str(self.root/'program'),'-define:MODE=2'])
+        cold=self.profile(command='build',flags=['-out:'+str(self.root/('program'+EXE_SUFFIX)),'-define:MODE=2'])
         self.assertGreater(self.count(cold,'evaluation.helper_compilations'),0)
         self.assertGreater(self.count(cold,'analysis.inherited_source_facts'),0)
 

@@ -1339,7 +1339,7 @@
     "core/unicode/utf8/utf8string/string.odin": "8180bce989917a67e479eeeacc26a7f31b4b1ed03d1a2e9e37c3f04304f8ae0f"
   },
   "thor": {
-    "basic/basic.thor": "cdb0b76b98b8f924e7907b58e145cbbb82cdc9513c08ece65b9f127aa74ae083",
+    "basic/basic.thor": "fd12c5900f106a3db60eeee79970ffa9deefec5128bcef05d0a76cd4cd5962c6",
     "format/format.odin": "a148eceb852dad89deeecb3a9e93faed34909bf317cdebe4f5f9c352960e6208"
   }
 }

@@ -5,9 +5,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from urllib.parse import unquote, urlparse
+from tests.native_paths import file_uri_path
 
-from tests.test_tls import Client, ROOT
+from tests.test_tls import Client, ROOT, THOR
 
 
 class RenameTests(unittest.TestCase):
@@ -163,8 +163,8 @@ main::proc(){_=read({},0)}
     def apply(self, root, files, edit):
         output = dict(files)
         for uri, edits in edit['changes'].items():
-            path = Path(unquote(urlparse(uri).path))
-            name = str(path.relative_to(root))
+            path = file_uri_path(uri)
+            name = path.relative_to(root).as_posix()
             self.assertIn(name, output, 'Rename escaped the test sources')
             original = output[name]
             lines = original.splitlines(keepends=True)
@@ -181,7 +181,7 @@ main::proc(){_=read({},0)}
     def assert_builds(self, root, files):
         for name, text in files.items():
             (root/name).write_text(text)
-        result = subprocess.run([str(ROOT/'thor'), 'check', str(root), '-no-entry-point',
+        result = subprocess.run([str(THOR), 'check', str(root), '-no-entry-point',
                                  '--output-dir', str(root/'generated')], capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
 

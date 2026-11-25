@@ -73,7 +73,7 @@ main :: proc() {
     }
 }
 '''
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         for engine in compiler_engines():
             self.assertEqual(self.findings(engine, '--vet=semicolon'), [])
             self.invoke(engine, '--vet=semicolon', '--apply')
@@ -97,7 +97,7 @@ literal;`)
     fmt.println(value)
 }
 '''
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         for engine in compiler_engines():
             errors = self.findings(engine, '--vet=semicolon')
             expected = [text.encode().index(b'return value;')+len(b'return value'),

@@ -260,6 +260,7 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
             append(&p.edits,..nested.edits[:])
             append(&p.optional_semicolons,..nested.optional_semicolons[:])
             append(&p.features,..nested.features[:])
+            p.case_comparisons = p.case_comparisons || nested.case_comparisons
             append(&args,expr)
         }
     }
@@ -294,6 +295,35 @@ parse_set_type :: proc(p: ^Parser) -> ^ast.Expr {
     return call
 }
 
+// Comparison prefixes are case syntax, never general unary operators.
+thor_case_comparison :: proc(kind: tokenizer.Token_Kind) -> bool {
+    return kind == .Lt || kind == .Lt_Eq || kind == .Gt || kind == .Gt_Eq || kind == .Not_Eq
+}
+thor_case_list :: proc(p: ^Parser, selector: bool = true, type_switch: bool = false) -> []^ast.Expr {
+    list := make([dynamic]^ast.Expr)
+    for {
+        value: ^ast.Expr
+        if thor_case_comparison(p.curr_tok.kind) {
+            op := advance_token(p)
+            p.case_comparisons = true
+            if !selector || type_switch {
+                error(p, op.pos, "Comparison case prefixes require a value switch selector")
+            }
+            operand := parse_expr(p, false)
+            comparison := ast.new(ast.Unary_Expr, op.pos, operand)
+            comparison.op, comparison.expr = op, operand
+            value = comparison
+        } else if p.curr_tok.kind == .Cmp_Eq {
+            op := advance_token(p)
+            error(p, op.pos, "Use 'case value:' for equality; 'case == value:' is not supported")
+            value = parse_expr(p, false)
+        } else { value = parse_expr(p, false) }
+        append(&list, value)
+        if !allow_token(p, .Comma) { break }
+    }
+    return list[:]
+}
+
 parse_switch_expression :: proc(p: ^Parser, partial: tokenizer.Token = {}) -> ^ast.Expr {
     token := advance_token(p)
     start := partial.pos if partial.kind == .Hash else token.pos
@@ -315,7 +345,7 @@ parse_switch_expression :: proc(p: ^Parser, partial: tokenizer.Token = {}) -> ^a
         if p.curr_tok.kind != .Colon {
             old_range,old_in := p.allow_range,p.allow_in_expr
             p.allow_range,p.allow_in_expr = true,true
-            matches = parse_rhs_expr_list(p)
+            matches = thor_case_list(p, selector != nil)
             p.allow_range,p.allow_in_expr = old_range,old_in
         }
         expect_token(p,.Colon)

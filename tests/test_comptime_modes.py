@@ -1,6 +1,8 @@
 """Native execution policy, source eligibility, and unchanged runtime ownership."""
 import json
+import hashlib
 import os
+from pathlib import Path
 import subprocess
 import unittest
 from tests import test_rust_compiler as native
@@ -12,6 +14,37 @@ class ComptimeModeTests(unittest.TestCase):
     setUpClass=classmethod(native.RustCompilerTests.setUpClass.__func__)
     setUp=setup.RustVetTests.setUp
     write=setup.RustVetTests.write
+
+    def test_implicit_enum_constant_parameters_keep_their_annotation(self):
+        self.write('''package main
+Kind::enum{first=-3,second=11}
+Alias::Kind
+unrelated::fn(c:byte)->bool{return c==0}
+choose::fn($kind:Alias)->int{when kind==.first{return 7}else{return 9}}
+main::proc(){
+ check::proc($kind:Alias,expected:int){value::choose(kind);if value!=expected{panic("enum")}}
+ check(.first,7);check(kind=.second,expected=9)
+ if #run choose(.second)!=9{panic("explicit run")}
+}
+''')
+        for mode in MODES:
+            for flags in [[],native.UNCHECKED]:
+                with self.subTest(mode=mode,flags=flags):self.call(*flags,mode=mode)
+
+    def test_imported_implicit_enum_specializations_and_invalid_members(self):
+        (self.app/'kinds').mkdir()
+        (self.app/'kinds'/'kinds.thor').write_text('package kinds\nKind::enum{first=5,second=17}\n')
+        text='''package main
+import "kinds"
+unrelated::fn(c:byte)->bool{return c==0}
+main::proc(){check::proc($kind:kinds.Kind){when kind==.first{value::int(kind);if value!=5{panic("enum")}}};check(.first);check(.second)}
+'''
+        self.write(text)
+        for mode in MODES:self.call(mode=mode)
+        self.write(text.replace('check(.second)','check(.absent)'))
+        for mode in MODES:
+            result,_=self.call(command='check',mode=mode,status=1)
+            self.assertIn('absent',result.stderr)
 
     def call(self,*flags,command='run',status=0,args=(),mode='normal',cache=False):
         profile=self.root/'profile.json'
@@ -279,12 +312,30 @@ main::proc(){
                 self.assertNotIn('__thor_',result.stderr)
 
     def test_panic_during_automatic_execution_is_an_error_at_the_call(self):
+        sdk=Path(subprocess.check_output([os.environ.get('THOR_ODIN','odin'),'root'],text=True).strip())
+        name='noalloc-io-sdk-windows.json' if os.name=='nt' else 'noalloc-io-sdk.json'
+        reviewed=json.loads((native.ROOT/'rust/data'/name).read_text())['sdk']
+        fatal=['base/runtime/core.odin','base/runtime/core_builtin.odin']
+        if any(hashlib.sha256((sdk/name).read_bytes().replace(b'\r\n',b'\n')).hexdigest()!=reviewed[name] for name in fatal):
+            self.skipTest('Ordinary-call folding needs the reviewed fatal-reporting SDK profile; explicit #run remains supported.')
         self.write('package main\nwork::proc(x:int)->int{if x==7{panic("policy panic")};return x}\nmain::proc(){_=work(7)}\n')
         for mode in ['aggressive','override']:
             result,_=self.call(mode=mode,status=1,command='check')
             data=json.loads(result.stderr)
             self.assertEqual(data['errors'][0]['pos']['line'],3,data)
             self.assertIn('policy panic',result.stderr)
+
+    def test_unreviewed_fatal_reporting_sdk_keeps_ordinary_calls_at_runtime(self):
+        sdk=Path(subprocess.check_output([os.environ.get('THOR_ODIN','odin'),'root'],text=True).strip())
+        original=sdk/'base/runtime/core_builtin.odin'
+        replacement=self.root/'changed-sdk.odin'
+        replacement.write_bytes(original.read_bytes()+b'\n// unreviewed SDK snapshot\n')
+        overlay=self.root/'sdk-overlay.json'
+        overlay.write_text(json.dumps({'Replace':{str(original):str(replacement)}}))
+        self.write('package main\nwork::proc(x:int)->int{if x==7{panic("policy panic")};return x}\nmain::proc(){_=work(7)}\n')
+        for mode in ['aggressive','override']:
+            _,counts=self.call('--overlay',str(overlay),command='check',mode=mode)
+            self.assertEqual(counts.get('evaluation.helper_compilations',0),0,counts)
 
     def test_help_documents_all_modes_without_loading_a_project(self):
         result=subprocess.run([str(native.RUST),'help','build'],cwd=self.root,capture_output=True,text=True,timeout=15)

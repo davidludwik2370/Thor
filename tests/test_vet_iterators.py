@@ -20,6 +20,7 @@ class IteratorVetTests(unittest.TestCase):
             with self.subTest(engine=engine):
                 self.write(text)
                 self.source.chmod(0o640)
+                original_mode=stat.S_IMODE(self.source.stat().st_mode)
                 _,warnings=self.invoke(engine,'--vet=unused')
                 self.assertEqual(self.source.read_bytes(),text.encode())
                 self.assertTrue(warnings)
@@ -28,7 +29,7 @@ class IteratorVetTests(unittest.TestCase):
                 _,remaining=self.invoke(engine,'--vet=unused','--apply')
                 self.assertEqual(remaining,[])
                 self.assertEqual(self.source.read_bytes(),expected.encode())
-                self.assertEqual(stat.S_IMODE(self.source.stat().st_mode),0o640)
+                self.assertEqual(stat.S_IMODE(self.source.stat().st_mode),original_mode)
                 _,second=self.invoke(engine,'--vet=unused','--apply')
                 self.assertEqual(second,[])
                 if flags:self.invoke(engine,*flags,command='run')

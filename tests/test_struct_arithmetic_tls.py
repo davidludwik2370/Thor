@@ -12,6 +12,14 @@ class StructArithmeticTLSTests(unittest.TestCase):
     semantic_spans=base.TLSTests.semantic_spans
     assert_original_identifier_tokens=base.TLSTests.assert_original_identifier_tokens
 
+    def test_native_bitset_default_keeps_its_context(self):
+        text='package main\nKind::enum{one,two}\nread::proc(v:bit_set[Kind]=~{})->bit_set[Kind]{return v}\nPair::struct{a,b:int}\npower::proc(v:=Pair{2,3}**{3,2})->Pair{return v}\nmain::proc(){_=read();_=power().a}\n'
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        hover=self.hover(client,path,text,'read();')
+        self.assertIn('bit_set',json.dumps(hover))
+        self.assertIn('Pair',json.dumps(self.hover(client,path,text,'power().a')))
+
     def test_result_hover_completion_literal_fields_and_readonly(self):
         text='''package main
 Foo::struct{alpha,beta:int}

@@ -13,6 +13,39 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Native runtime reports use forward slashes even when a Windows source/map
+// key uses backslashes. Match only known source paths, preserving component
+// case and POSIX literal backslashes. This runs only after helper failure.
+fn runtime_path_suffix<'a>(line:&'a str,path:&Path)->Option<&'a str> {
+    let native=path.to_string_lossy();
+    if let Some(start)=line.find(native.as_ref()) {return line.get(start+native.len()..);}
+    let bytes=native.as_bytes();
+    if !cfg!(windows) && !(bytes.len()>2 && bytes[0].is_ascii_alphabetic() && bytes[1]==b':') {return None;}
+    let forward=native.replace('\\',"/");
+    for mut spelling in [forward.clone(),forward.replace('/',"\\")] {
+        if let Some(start)=line.find(&spelling) {return line.get(start+spelling.len()..);}
+        if spelling.as_bytes().get(1)==Some(&b':') {
+            let drive=spelling.as_bytes()[0];
+            let alternate=if drive.is_ascii_lowercase(){drive.to_ascii_uppercase()}else{drive.to_ascii_lowercase()};
+            spelling.replace_range(..1,&char::from(alternate).to_string());
+            if let Some(start)=line.find(&spelling) {return line.get(start+spelling.len()..);}
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod runtime_path_tests {
+    use super::*;
+    #[test]
+    fn windows_runtime_paths_keep_unicode_and_drive_aliases() {
+        let path=Path::new(r"C:\héllo\Main.thor");
+        assert_eq!(runtime_path_suffix("c:/héllo/Main.thor(3:17) panic: failed",path),Some("(3:17) panic: failed"));
+        assert_eq!(runtime_path_suffix("C:/héllo/main.thor(3:17)",path),None);
+        assert_eq!(runtime_path_suffix("other.thor(3:17)",path),None);
+    }
+}
+
 #[cfg(unix)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -425,6 +458,7 @@ impl Project {
                 vet: None,
                 vet_apply: false,
                 vet_ask: false,
+                unverified: Default::default(),
             },
             frontend: self.frontend.clone(),
             sources,
@@ -783,8 +817,7 @@ impl Project {
         for line in stderr.lines().filter(|line|line.contains("panic: unexpected failure")) {
             for source in &self.sources {
                 let path=source.path.to_string_lossy();
-                let Some(start)=line.find(path.as_ref()) else {continue;};
-                let tail=&line[start+path.len()..];
+                let Some(tail)=runtime_path_suffix(line,&source.path) else {continue;};
                 let coordinates=tail.strip_prefix('(').and_then(|tail|tail.split(')').next())
                     .or_else(||tail.strip_prefix(':').map(|tail|tail.split(": ").next().unwrap_or(tail)));
                 let Some((row,column))=coordinates.and_then(|pair|pair.split_once(':')) else {continue;};
@@ -803,11 +836,10 @@ impl Project {
     fn evaluation_failure_origin(&self, stderr: &str) -> Option<crate::emit::Origin> {
         for line in stderr.lines() {
             for source in &self.sources {
-                let pattern = format!("{}(", source.path.display());
-                let Some(start) = line.find(&pattern) else {
+                let Some(tail) = runtime_path_suffix(line,&source.path).and_then(|tail|tail.strip_prefix('(')) else {
                     continue;
                 };
-                let Some(pair) = line[start + pattern.len()..]
+                let Some(pair) = tail
                     .split(')')
                     .next()
                     .and_then(|value| value.split_once(':').or_else(|| value.split_once(',')))
@@ -846,11 +878,10 @@ impl Project {
                 }
             }
             for (path, (_, emitted)) in &self.outputs {
-                let pattern = format!("{}(", path.display());
-                let Some(start) = line.find(&pattern) else {
+                let Some(tail) = runtime_path_suffix(line,path).and_then(|tail|tail.strip_prefix('(')) else {
                     continue;
                 };
-                let pair = line[start + pattern.len()..]
+                let pair = tail
                     .split(')')
                     .next()?
                     .split_once(':')?;

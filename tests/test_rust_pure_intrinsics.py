@@ -89,7 +89,7 @@ work::fn(n:f64)->f64{return intrinsics.sqrt(n)}
         output=self.root/'rust'
         manifest=json.loads((output/'thor-manifest.json').read_text())
         helper=next(output/name for name in manifest['generated']
-                    if name.endswith('fake-base/intrinsics/main.odin'))
+                    if name.replace('\\','/').endswith('fake-base/intrinsics/main.odin'))
         self.assertIn('conditional_pure_error_',helper.read_text())
         # A supported user collection provides the same full source diagnostic
         # through both compilers, even with the intrinsics alias and member name.

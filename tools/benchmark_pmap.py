@@ -262,6 +262,7 @@ def main():
     parser.add_argument('--thor', type=Path, default=ROOT/'thor')
     parser.add_argument('--odin', default='odin')
     parser.add_argument('--samples', type=int, default=7)
+    parser.add_argument('--compiler-threads', type=int, help='use this Odin compiler worker count for both builds')
     parser.add_argument('--workers', type=int, default=os.cpu_count() or 1)
     parser.add_argument('--artifacts', type=Path)
     parser.add_argument('--save', type=Path)
@@ -272,7 +273,9 @@ def main():
     parser.add_argument('--native-pmap', action='store_true', help='also call the native pmap engine directly from both frontends')
     options = parser.parse_args()
     if options.samples < 1 or options.workers < 1: parser.error('samples and workers must be positive')
+    if options.compiler_threads is not None and options.compiler_threads<1:parser.error('compiler threads must be positive')
     flags=['-o:speed'] if options.checked else FLAGS
+    if options.compiler_threads is not None:flags=[*flags,f'-thread-count:{options.compiler_threads}']
     kernel = game_source(options.hilo, options.pmap_project)
     cases = [
         ('hilo-balanced', 'hilo', options.workers, max(1,1_000_000//options.workers), options.workers, 1, 0),

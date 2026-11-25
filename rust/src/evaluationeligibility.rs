@@ -94,10 +94,7 @@ fn library_seen(
     }
     let source = &r.sources[callee.file];
     let suffix = path.strip_prefix("thor:")?;
-    let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()?
-        .join("runtime")
-        .join(suffix);
+    let expected = r.runtime_root().join(suffix);
     let actual = source.collection_roots.get("thor")?.join(suffix);
     if r.canonical_path(&actual)? != r.canonical_path(&expected)? {
         return None;

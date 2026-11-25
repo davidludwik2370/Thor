@@ -220,7 +220,7 @@ impl Project {
             .arg("build")
             .arg(target)
             .args(probe.native_flags())
-            .arg(format!("-out:{}", work.path.join("type-probe").display()))
+            .arg(format!("-out:{}", crate::native_compat::artifact_path(&work.path,"type-probe",&probe.native_flags()).display()))
             .arg("-json-errors")
             .arg("-max-error-count:10000");
         if probe.file_entry {

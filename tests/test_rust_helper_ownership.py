@@ -189,7 +189,7 @@ work::fn(input:[]int)->int{_=slice.clone(input,allocator=context.allocator);retu
 copy::proc(input:$T)->int{local:=input;local[0]=9;return local[0]}
 work::fn(input:$T)->int{return copy(input)}
 ''')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         result=self.invoke('rust',command='check',flags=['-json-errors'])
         self.assertEqual(result.returncode,1,result.stderr)
         errors=json.loads(result.stderr)['errors']
@@ -232,7 +232,7 @@ helper::proc(input:$T)->int{local:=input;local[0]=9;return local[0]}
 good::fn(input:[2]int)->int{return helper(input)}
 bad::fn(input:[]int)->int{'''+prefix+'''return helper(input)}
 ''')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         result=self.invoke('rust',command='check',flags=['-debug','-json-errors'])
         self.assertEqual(result.returncode,1,result.stderr)
         errors=json.loads(result.stderr)['errors']

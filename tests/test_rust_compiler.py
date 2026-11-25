@@ -10,11 +10,12 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from tests.native_paths import rust_binary
 from tests.test_thor import runtime_flags
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ROOT / 'thor-python'
-RUST = ROOT / 'rust/target/release/thor-rust'
+RUST = rust_binary()
 UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']
 
 
@@ -77,11 +78,11 @@ class RustCompilerTests(unittest.TestCase):
 
     def compare(self, source, *, files=None, command='run', flags=(), expected=None,
                 fail=None, directory=False, args=()):
-        self.source.write_text(source)
+        self.source.write_text(source,newline='')
         for name, content in (files or {}).items():
             path = self.app/name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content)
+            path.write_text(content,newline='')
         before = {p:p.read_bytes() for p in self.app.rglob('*') if p.is_file()}
         reference = self.invoke('python', command, flags, directory, args) if reference_enabled() else None
         rust = self.invoke('rust', command, flags, directory, args)
@@ -496,12 +497,35 @@ fmt.println("clean")
 
     def test_runtime_index_failure_reports_original_source_even_when_launched_directly(self):
         self.source.write_text(self.program('values:=[7,8];index:=-3;_=values[index]'))
-        result=self.invoke('rust',command='build',flags=['-out:'+str(self.root/'bounds')])
+        binary=self.root/('bounds.exe' if os.name=='nt' else 'bounds')
+        result=self.invoke('rust',command='build',flags=['-out:'+str(binary)])
         self.assertEqual(result.returncode,0,result.stderr)
-        result=subprocess.run([str(self.root/'bounds')],capture_output=True,text=True)
+        result=subprocess.run([str(binary)],capture_output=True,text=True)
         self.assertNotEqual(result.returncode,0)
         self.assertIn(str(self.source),result.stderr)
         self.assertNotIn(str(self.root/'rust'),result.stderr)
+
+    def test_format_contract_maps_support_views_and_native_path_spellings_to_the_field(self):
+        code='''package main
+render::fn(value:Rational)->string{return f"{value:.6g}"}
+main::proc(){
+ ratio:=Rational(1,3)
+ message:=f"😀 {ratio:g}"
+ delete(message);delete(ratio)
+}
+'''
+        for command,flags in [('check',[]),('build',UNCHECKED)]:
+            with self.subTest(command=command):
+                result=self.compare(code,command=command,flags=[*flags,'-json-errors'],
+                    fail='Rational g/G formatting requires explicit precision')
+                errors=json.loads(result.stderr)['errors']
+                self.assertEqual(len(errors),1,errors)
+                pos=errors[0]['pos']
+                self.assertEqual(pos['file'],str(self.source))
+                written=self.source.read_bytes()
+                self.assertEqual(pos['offset'],written.index(b'ratio:g'))
+                self.assertEqual(pos['end_offset'],pos['offset']+len('ratio'))
+                self.assertNotIn('runtime/',errors[0]['msgs'][0])
 
     def test_set_temporary_query_matches_reference(self):
         self.compare(self.program('if len(set[int]{1,2})!=2{panic("temporary query")}'))

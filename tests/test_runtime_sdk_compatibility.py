@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from tests.test_thor import ROOT
+from tests.native_paths import EXE_SUFFIX
 
 
 class RuntimeSdkCompatibilityTests(unittest.TestCase):
@@ -24,7 +25,7 @@ class RuntimeSdkCompatibilityTests(unittest.TestCase):
                             result = subprocess.run([compiler, 'test', str(ROOT/'runtime'/package),
                                 '-collection:thor='+str(ROOT/'runtime'), '-thread-count:1',
                                 '-define:ODIN_TEST_THREADS=1', '-warnings-as-errors',
-                                '-out:'+str(Path(temporary)/'tests'), *flags],
+                                '-out:'+str(Path(temporary)/('tests'+EXE_SUFFIX)), *flags],
                                 capture_output=True, text=True, timeout=90)
                             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                             self.assertRegex(result.stdout+result.stderr, r'Finished \d+ tests')

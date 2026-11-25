@@ -1,5 +1,8 @@
 """Compiler-inferred #mut hints and permission diagnostics over real LSP."""
 import json
+import os
+from pathlib import Path
+import tempfile
 import unittest
 
 from tests import test_tls as base
@@ -64,6 +67,29 @@ main::proc(){values :> []int{1};/* 😀 */change(values)}
         client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':corrected}]})
         client.diagnostic(path.as_uri(),empty=True)
         self.assertFalse(any('#mut' in hint['label'] for hint in self.hints(client,path)))
+
+    def test_unsaved_hints_follow_vscode_drive_uri_and_document_path(self):
+        temporary=tempfile.TemporaryDirectory(prefix='tls path héllo ')
+        self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name).resolve();path=root/'Main.thor'
+        path.write_text('package main\nmain::proc(){}\n',newline='')
+        client=base.Client(root,refresh=True);self.addCleanup(client.close)
+        uri=path.as_uri()
+        if os.name=='nt':
+            uri=uri[:8]+uri[8].lower()+'%3A'+uri[10:]
+        text='package main\ncopy_values::proc(source,destination:[]int){copy(destination,source)}\nmain::proc(){}\n'
+        client.send('textDocument/didOpen',{'textDocument':{'uri':uri,'languageId':'thor','version':1,'text':text}})
+        from tests.native_paths import normalize_lsp_uris
+        client.diagnostic(normalize_lsp_uris(uri),empty=True)
+        request={'textDocument':{'uri':uri},'range':{'start':{'line':0,'character':0},'end':{'line':99,'character':0}}}
+        hints=client.request('textDocument/inlayHint',request)
+        self.assertEqual([hint['position'] for hint in hints if '#mut' in hint['label']],
+            [self.position(text,'destination:',0)])
+        changed=text.replace('copy(destination,source)','_=source;_=destination')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(normalize_lsp_uris(uri),empty=True)
+        self.assertFalse(any('#mut' in hint['label'] for hint in client.request('textDocument/inlayHint',request)))
 
     def test_annotation_rename_preserves_directive_and_source_positions(self):
         text='package main\nwork::proc(a,#mut b:[]int){b[0]=a[0]}\nmain::proc(){}\n'

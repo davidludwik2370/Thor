@@ -21,6 +21,7 @@ pub(super) struct Guard {
 }
 struct Protection {
     name: String,
+    seed:Ref,
     predicates: Vec<Predicate>,
 }
 pub(super) struct NativeStorage {
@@ -254,7 +255,7 @@ impl Lower<'_, '_> {
                 .map(|id| self.resolver.symbols[id].clone());
             return Ok(owner.and_then(|owner|{
                 let marker=self.resolver.immutable_markers.get(&(owner.reference,owner.name.clone()));
-                (owner.immutable||marker.is_some()).then(||Protection{name:owner.name.clone(),predicates:marker.map(|name|vec![Predicate::Immutable(owner.reference,name.clone())]).unwrap_or_default()})
+                (owner.immutable||marker.is_some()).then(||Protection{name:owner.name.clone(),seed:Ref{file:owner.reference.file,node:owner.name_node},predicates:marker.map(|name|vec![Predicate::Immutable(owner.reference,name.clone())]).unwrap_or_default()})
             }));
         }
         if let Some(index) = self.resolver.symbol(self.reference(id)) {
@@ -265,7 +266,7 @@ impl Lower<'_, '_> {
                 && owner.role(sym.reference.node, "index_type").is_some();
             let marker=self.resolver.immutable_markers.get(&(sym.reference,sym.name.clone()));
             return Ok((sym.immutable||typed_index||marker.is_some()).then(||Protection{
-                name:sym.name.clone(),predicates:marker.map(|name|vec![Predicate::Immutable(sym.reference,name.clone())]).unwrap_or_default(),
+                name:sym.name.clone(),seed:Ref{file:sym.reference.file,node:sym.name_node},predicates:marker.map(|name|vec![Predicate::Immutable(sym.reference,name.clone())]).unwrap_or_default(),
             }));
         }
         if node.kind == "Deref" || !matches!(node.kind.as_str(), "Selector" | "Index" | "MatrixIndex") {
@@ -479,6 +480,7 @@ impl Lower<'_, '_> {
                     }
                 }
                 let message = format!("Cannot {action} immutable storage '{}'", protected.name);
+                self.storage_roots.insert(origin,protected.seed);
                 if protected.predicates.is_empty() {
                     self.blocked.insert(origin, message);
                     continue;
@@ -498,6 +500,13 @@ impl Lower<'_, '_> {
 
 impl Lower<'_, '_>{
     fn immutable_access(&mut self,owner:Ref,name:&str)->String{
+        let source=&self.resolver.sources[owner.file];
+        // A for initializer has one binding, not alternative declarations in
+        // its surrounding `when`. Its qualification is a literal fact. Emitting
+        // an extra marker declaration would split the native for header.
+        if source.node(owner.node).parent.is_some_and(|p|source.node(p).kind=="For"&&source.role(p,"init")==Some(owner.node)){
+            return source.node(owner.node).immutable.to_string();
+        }
         let directory=self.resolver.sources[owner.file].path.parent().unwrap();
         if self.source.path.parent()==Some(directory){return name.into();}
         for node in &self.source.nodes{if node.kind!="Import"{continue;}
@@ -520,6 +529,9 @@ impl Lower<'_, '_>{
         }
     }
     pub(super) fn immutable_declaration(&self,id:NodeId)->Code{
+        if self.source.node(id).parent.is_some_and(|p|self.source.node(p).kind=="For"&&self.source.role(p,"init")==Some(id)){
+            return Code::concat([]);
+        }
         let mut parts=vec![];
         for name in self.source.group(id,"names"){
             if let Some(marker)=self.resolver.immutable_markers.get(&(self.reference(id),self.source.text(*name).to_string())){

@@ -9,7 +9,11 @@ const cp = require('node:child_process');
 const crypto = require('node:crypto');
 
 function canonical(file) {
-    try { return fs.realpathSync(file); } catch { return path.resolve(file); }
+    let resolved;
+    try { resolved=fs.realpathSync(file); } catch { resolved=path.resolve(file); }
+    // VS Code lowercases the drive while compiler maps commonly retain C:.
+    // Preserve component case for case-sensitive Windows directories.
+    return process.platform==='win32'?resolved.replace(/^[A-Z]:/,drive=>drive.toLowerCase()):resolved;
 }
 function lineStarts(bytes) {
     const starts = [0];
@@ -256,6 +260,7 @@ class ThorDebugAdapter {
         this.breakpointIDs = new Map();
         this.frames = new Map();
         this.references = new Map();
+        this.referenceFrames = new Map();
         this.reference = 0x40000000;
         this.breakpointID = 0x20000000;
         this.exited = false;
@@ -398,7 +403,10 @@ class ThorDebugAdapter {
         }
         if (command === 'evaluate') {
             const frame = this.frames.get(args.frameId);
-            try { return await this.request(command, args); }
+            try {
+                const value = await this.request(command, args);
+                return await this.owningArgument(frame, args, value);
+            }
             catch (error) {
                 if (!frame?.base || frame.base.id === args.frameId) throw error;
                 return this.request(command, {...args, frameId: frame.base.id});
@@ -420,6 +428,28 @@ class ThorDebugAdapter {
             try { return await this.request(command, args); } finally { this.dispose(); }
         }
         return this.request(command, args);
+    }
+    async owningArgument(frame, args, value) {
+        // An owned fn body has a transparent compiler frame. PDB can report a
+        // successful-but-unavailable argument before its entry copies finish.
+        // Use the real owning argument only after LLDB identifies BOTH bindings
+        // as scalar procedure arguments. A shadowing local, optimized value, arbitrary
+        // expression or metadata failure must keep its original result.
+        if (value.result !== '<variable not available>' || !frame?.generated ||
+            !frame.base || frame.base.id === args.frameId ||
+            !/__thor_[a-f0-9]+_pure_\d+_body(?:-\d+-[a-f0-9]+)?(?:$|[:(])/.test(frame.raw?.name || '') ||
+            !/^[\p{ID_Start}_][\p{ID_Continue}]*$/u.test(args.expression || '')) return value;
+        const variable = 'lldb.frame.FindVariable(' + JSON.stringify(args.expression) + ')';
+        const query = '/py bool(' + variable + '.GetValueType() == lldb.eValueTypeVariableArgument and (' +
+            variable + '.GetType().GetCanonicalType().GetTypeClass() & (lldb.eTypeClassBuiltin | lldb.eTypeClassEnumeration)))';
+        try {
+            for (const frameId of [args.frameId,frame.base.id]) {
+                const kind = await this.request('evaluate',{frameId,expression:query,context:'watch'});
+                if (!/^(true|True)$/.test(kind.result)) return value;
+            }
+            const owner = await this.request('evaluate',{...args,frameId:frame.base.id});
+            return owner.result === '<variable not available>' ? value : owner;
+        } catch { return value; }
     }
     async setBreakpoints(args) {
         const file = args.source.path;
@@ -483,6 +513,12 @@ class ThorDebugAdapter {
             const basePoint = base?.source?.path && this.maps?.location(base.source.path, base.line, base.column);
             const mapped = {...frame, ...(point ? {source: this.presentSource(point.source), line: point.line, column: point.column} : {}),
                 name: checked(frame, point) ? point.procedure : generated && base ? (basePoint?.procedure || base.name) : frame.name};
+            // Some PDB/LLDB combinations label a CRT disassembly source with
+            // an unrelated compiler helper symbol. Keep the real frame and
+            // sourceReference; use its own name for the synthetic tab label.
+            if (mapped.source?.origin === 'disassembly' && /__thor_[a-f0-9]+_/.test(mapped.source.name || '')) {
+                mapped.source = {...mapped.source, name: '@' + mapped.name};
+            }
             if (mapped.source?.path && this.maps?.debugRoots?.some(root =>
                 canonical(mapped.source.path) === canonical(path.join(root,'parallel/pmap.thor')))) {
                 mapped.name = mapped.name.replace(/,\s*__thor_pmap_spread:\$\$(?:true|false)/g,'');
@@ -520,6 +556,7 @@ class ThorDebugAdapter {
         }
         return {scopes:[...groups.values()].map(({scope,references})=>{
             const ref=++this.reference;this.references.set(ref,references);
+            this.referenceFrames.set(ref,frameId);
             return {...scope,variablesReference:ref,namedVariables:undefined,indexedVariables:undefined};
         })};
     }
@@ -527,8 +564,15 @@ class ThorDebugAdapter {
         const variables = new Map();
         for (const reference of this.references.get(args.variablesReference)) {
             const body = await this.request('variables', {variablesReference: reference});
-            for (const variable of body.variables || []) {
+            for (let variable of body.variables || []) {
                 if (/__thor_[a-f0-9]{12}_/.test(variable.name) || variables.has(variable.name)) continue;
+                if (variable.value === '<variable not available>') {
+                    const frameId=this.referenceFrames.get(args.variablesReference);
+                    const owner=await this.owningArgument(this.frames.get(frameId),
+                        {frameId,expression:variable.name,context:'watch'},{result:variable.value});
+                    if (owner.result!==variable.value) variable={...variable,value:owner.result,
+                        type:owner.type || variable.type,variablesReference:owner.variablesReference || 0};
+                }
                 variables.set(variable.name, variable);
             }
         }
@@ -544,7 +588,13 @@ class ThorDebugAdapter {
             const detail = top && this.frames.get(top.id);
             const same = top && step.start && top.source?.path === step.start.source?.path && top.line === step.start.line;
             const sourcePath = detail?.point?.source?.path || raw[0]?.source?.path;
-            const runtimeLibrary = sourcePath && this.maps.debugRoots.some(root => canonical(sourcePath).startsWith(root+path.sep));
+            // Skip runtime internals when stepping from user code. An explicit
+            // library breakpoint gives that source the same stepping privileges
+            // as application code, including calls within the same runtime root.
+            const startPath = step.start?.source?.path;
+            const runtimeLibrary = sourcePath && this.maps.debugRoots.some(root =>
+                canonical(sourcePath).startsWith(root+path.sep) &&
+                !(startPath && canonical(startPath).startsWith(root+path.sep)));
             const sourceLess = raw[0] && !raw[0].source?.path && step.args.granularity !== 'instruction';
             const internal = detail?.point?.internal || runtimeLibrary || sourceLess;
             const sameFunction = top && step.start && top.name === step.start.name && top.source?.path === step.start.source?.path;
@@ -558,6 +608,7 @@ class ThorDebugAdapter {
         }
         this.step = undefined;
         this.references.clear();
+        this.referenceFrames?.clear();
         this.frames.clear();
         if (message.body.hitBreakpointIds) message = {...message, body: {...message.body,
             hitBreakpointIds: [...new Set(message.body.hitBreakpointIds.map(id => this.breakpointIDs.get(id) ?? id))]}};

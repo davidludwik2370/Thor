@@ -7,6 +7,7 @@ import subprocess
 import unittest
 
 from thorlang.pureborrow import Access,Permission,OWNED,READONLY
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -84,7 +85,7 @@ class RustPermissionTests(unittest.TestCase):
         for length in (23,24,25):
             requests.append({'project':[{'access':[0,1,0,[['item']]*length,'borrowed']},['field','x'],'location']})
         expected=[encode(evaluate(request)) for request in requests]
-        result=subprocess.run([str(native.ROOT/'rust/target/release/examples/permission_protocol')],
+        result=subprocess.run([str(rust_binary('permission_protocol', example=True))],
             input=json.dumps(requests),capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout),expected)

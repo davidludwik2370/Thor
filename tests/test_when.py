@@ -32,7 +32,7 @@ class NativeWhenTests(unittest.TestCase):
                     source = root/'main.thor'
                     text = '// 😀 original header\npackage main\n'
                     text += ('main::proc(){\n    '+body+'\n}\n') if local else body+'\nmain::proc(){}\n'
-                    source.write_text(text)
+                    source.write_text(text,newline='')
                     result = subprocess.run([str(base.THOR), 'check', str(source), '--diagnostic-format=json',
                                              '--output-dir', str(root/'output')], capture_output=True, text=True, timeout=40)
                     self.assertNotEqual(result.returncode, 0, result.stdout+result.stderr)

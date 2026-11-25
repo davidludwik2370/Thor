@@ -5,12 +5,18 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { isBuildOutput } = require('./workspace-files');
-const { findToolchain } = require('./toolchain');
+const { findToolchain, findCompiler, findBundledOdin } = require('./toolchain');
+const { formatHoverSize } = require('./hover-size');
 
 let client;
 let output;
 let watcher;
 let restarting = Promise.resolve();
+
+function hasThorDocuments() {
+    return vscode.workspace.textDocuments.some(document => document.languageId === 'thor'
+        && document.uri.scheme === 'file');
+}
 
 function sourceWatcher() {
     const raw=vscode.workspace.createFileSystemWatcher('**/*.{thor,odin}');
@@ -33,6 +39,7 @@ async function start(context) {
     watcher?.dispose();
     watcher = undefined;
     if (!vscode.workspace.isTrusted) return;
+    if (!hasThorDocuments()) return;
     const activeUri = vscode.window.activeTextEditor?.document.uri;
     const folder = (activeUri && vscode.workspace.getWorkspaceFolder(activeUri))
         || vscode.workspace.workspaceFolders?.[0];
@@ -54,6 +61,7 @@ async function start(context) {
         enable_parser_errors: true,
         enable_semantic_tokens: true,
         enable_hover: true,
+        enable_hover_size: config.get('hoverSize', true),
         enable_document_symbols: true,
         enable_references: true,
         enable_completions: true,
@@ -63,15 +71,18 @@ async function start(context) {
         enable_checker_workspace_diagnostics: false
     };
     if (config.get('vet', false)) initializationOptions.checker_args = '--vet';
+    const unverified = config.get('unverified', 'summary');
+    if (config.get('vet', false) && unverified !== 'summary') initializationOptions.checker_args =
+        [initializationOptions.checker_args, `--unverified=${unverified}`].filter(Boolean).join(' ');
     const comptime = config.get('comptime', 'normal');
     if (comptime !== 'normal') initializationOptions.checker_args =
         [initializationOptions.checker_args, `--comptime=${comptime}`].filter(Boolean).join(' ');
     const compilerPath = config.get('compiler.path', '');
     const compiler = compilerPath ? path.resolve(folder.uri.fsPath, compilerPath)
-        : path.resolve(path.dirname(executable), '..', '..', 'thor');
-    if (fs.existsSync(compiler)) initializationOptions.thor_command = compiler;
-    else output.appendLine(`Thor compiler not found at ${compiler}; set tls.compiler.path to enable compiler diagnostics.`);
-    const odinRoot = config.get('odinRoot', '');
+        : findCompiler(path.resolve(path.dirname(executable), '..', '..'));
+    if (compiler && fs.existsSync(compiler)) initializationOptions.thor_command = compiler;
+    else output.appendLine(`Thor compiler not found; set tls.compiler.path to enable compiler diagnostics.`);
+    const odinRoot = config.get('odinRoot', '') || findBundledOdin(toolchain);
     if (odinRoot) {
         initializationOptions.odin_root_override = path.resolve(folder.uri.fsPath, odinRoot);
         initializationOptions.odin_command = path.join(initializationOptions.odin_root_override,
@@ -82,6 +93,10 @@ async function start(context) {
         { command: executable, args: [], options }, {
             documentSelector: [{ scheme: 'file', language: 'thor' }],
             initializationOptions,
+            middleware: {
+                provideHover: async (document, position, token, next) =>
+                    formatHoverSize(await next(document, position, token), vscode)
+            },
             outputChannel: output,
             traceOutputChannel: output,
             synchronize: { fileEvents: watcher }
@@ -97,22 +112,30 @@ async function start(context) {
 }
 
 function activate(context) {
+    require('./terminal-environment').registerTerminalEnvironment(context);
+    require('./recommended-colors').registerRecommendedColors(context, vscode);
     require('./bracket-refresh').registerBracketRefresh(context, vscode);
     require('./constant-colors').registerConstantColors(context, vscode);
     require('./run-extension').activateRunning(context, vscode);
     require('./debug-extension').activateDebugging(context);
     output = vscode.window.createOutputChannel('Thor Language Server');
     context.subscriptions.push(output);
-    const restart = () => {
-        restarting = restarting.then(() => start(context)).catch(error => output.appendLine(error.stack || String(error)));
+    const queueStart = onlyWhenAbsent => {
+        restarting = restarting.then(() => {
+            if (!onlyWhenAbsent || !client) return start(context);
+        }).catch(error => output.appendLine(error.stack || String(error)));
         return restarting;
     };
+    const restart = () => queueStart(false);
     context.subscriptions.push(vscode.commands.registerCommand('tls.restart', restart));
     context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(restart));
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document => {
+        if (document.languageId === 'thor' && document.uri.scheme === 'file') void queueStart(true);
+    }));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('tls')) void restart();
     }));
-    return restart();
+    return queueStart(true);
 }
 
 async function deactivate() {

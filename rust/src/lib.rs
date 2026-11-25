@@ -26,6 +26,7 @@ pub mod frontend;
 pub mod kind;
 pub mod lower;
 pub mod memory;
+pub mod symbolizer;
 pub mod migrate;
 mod native_compat;
 pub mod permissions;
@@ -43,6 +44,8 @@ mod parallelcompile;
 pub mod specialization;
 pub mod values;
 pub mod vet;
+pub mod unverified;
+mod lifetime;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -55,3 +58,4 @@ mod unused_attributes;
 mod vet_attributes;
 mod caller_metadata;
 mod noalloc;
+mod scoped;

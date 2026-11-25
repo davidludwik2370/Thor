@@ -111,6 +111,64 @@ main :: proc() {
 }
 ''')
 
+    def test_private_odin_is_used_for_builds_and_queries_without_global_path_or_environment(self):
+        odin=shutil.which('odin')
+        self.assertIsNotNone(odin)
+        sdk=subprocess.run([odin,'root'],capture_output=True,text=True,check=True).stdout.strip()
+        (self.toolchain/'odin').symlink_to(Path(sdk),target_is_directory=True)
+        blocked=self.root/'blocked-tools'
+        sentinel=blocked/'odin'
+        sentinel.write_text('#!/bin/sh\nprintf "unexpected Odin PATH lookup\\n" >> "$THOR_TEST_DEPENDENCY_LOG"\nexit 97\n')
+        sentinel.chmod(0o755)
+        self.environment['PATH']=str(blocked)+os.pathsep+os.defpath
+        for key in ('THOR_ROOT','THOR_ODIN','ODIN_ROOT','THOR_FRONTEND_ODIN'):
+            self.environment.pop(key,None)
+        commands=self.root/'commands';commands.mkdir()
+        alias=commands/'thor';alias.symlink_to(self.compiler)
+        self.compiler=alias
+        queried=self.invoke('root')
+        self.assertEqual(Path(queried.stdout.strip()).resolve(),self.toolchain)
+        self.app.mkdir()
+        source=self.app/'main.thor'
+        source.write_text('package main\nimport "core:fmt"\nmain::proc(){fmt.println("private Odin OK")}\n')
+        for flags in ([],native.UNCHECKED):
+            result=self.invoke('run',source,*flags)
+            self.assertEqual(result.stdout.strip(),'private Odin OK')
+        self.invoke('report')
+
+    @unittest.skipUnless(sys.platform=='darwin','native macOS sanitizer linker/runtime')
+    def test_private_sdk_asan_uses_its_runtime_and_merges_user_linker_flags(self):
+        moved=self.root/'toolchain with spaces'
+        self.toolchain.rename(moved);self.toolchain=moved;self.compiler=moved/'thor'
+        odin=Path(shutil.which('odin'))
+        sdk=Path(subprocess.run([str(odin),'root'],capture_output=True,text=True,check=True).stdout.strip())
+        symbolizer=next((p for p in [Path('/opt/homebrew/opt/llvm/bin/llvm-symbolizer'),Path('/usr/local/opt/llvm/bin/llvm-symbolizer')] if p.is_file()),None)
+        if symbolizer is None:self.skipTest('LLVM resource fixture is not installed')
+        resources=sorted(symbolizer.resolve().parents[1].glob('lib/clang/*/lib/darwin'))
+        if not resources:self.skipTest('LLVM compiler-rt fixture is missing')
+        private=self.toolchain/'odin';private.mkdir()
+        shutil.copy2(odin,private/'odin')
+        for name in ('base','core','vendor','shared'):
+            if (sdk/name).exists():(private/name).symlink_to(sdk/name,target_is_directory=True)
+        resource=private/'clang-resource/lib';resource.mkdir(parents=True)
+        (resource/'darwin').symlink_to(resources[-1],target_is_directory=True)
+        (private/'libexec').mkdir();(private/'libexec/llvm-symbolizer').symlink_to(symbolizer)
+        shutil.copy2(native.ROOT/'llvm-symbolizer-thor',self.toolchain/'llvm-symbolizer-thor')
+        self.environment['PATH']=str(self.root/'blocked-tools')+os.pathsep+os.defpath
+        for key in ('THOR_ROOT','THOR_ODIN','ODIN_ROOT','THOR_FRONTEND_ODIN'):self.environment.pop(key,None)
+        self.app.mkdir();source=self.app/'main.thor';program=self.app/'program'
+        source.write_text('package main\nimport "core:fmt"\nmain::proc(){values:=make([]int,8);delete(values);fmt.println(values[2])}\n')
+        for flags in ([],native.UNCHECKED):
+            self.invoke('build',source,'-debug','--track-allocations=off','-extra-linker-flags:-Wl,-headerpad_max_install_names',
+                        '--output-dir',self.root/'asan-generated','-out:'+str(program),*flags)
+            manifest=json.loads((self.root/'asan-generated/thor-manifest.json').read_text())
+            linker=[f for f in manifest['odin_flags'] if f.startswith('-extra-linker-flags:')]
+            self.assertEqual(len(linker),1)
+            self.assertIn('-Wl,-headerpad_max_install_names',linker[0]);self.assertIn('clang-resource',linker[0])
+            result=subprocess.run([str(program)],env={**self.environment,'ASAN_OPTIONS':'abort_on_error=0'},capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(result.returncode,0,result.stderr)
+            self.assertIn(str(source),result.stderr)
+
     def test_default_output_cannot_replace_a_launcher_through_a_filesystem_alias(self):
         self.app.mkdir()
         (self.app/'main.thor').write_text('package main\nmain :: proc() {}\n')
@@ -204,3 +262,66 @@ works :: proc(t:^testing.T) { testing.expect(t, VALUE == 42) }
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RelocatedRuntimeIdentityTests(unittest.TestCase):
+    """Review contracts must follow the installed support collection, not Cargo."""
+    setUpClass = classmethod(native.RustCompilerTests.setUpClass.__func__)
+
+    def test_relocated_runtime_callbacks_types_and_comptime(self):
+        with tempfile.TemporaryDirectory(prefix='thor relocated runtime ') as directory:
+            root=Path(directory).resolve()
+            install=root/'installation';install.mkdir()
+            compiler=install/('thor.exe' if os.name=='nt' else 'thor')
+            shutil.copy2(native.RUST,compiler)
+            for name in ('frontend','runtime','templates'):
+                shutil.copytree(native.ROOT/name,install/name)
+            app=root/'project';app.mkdir()
+            (app/'main.thor').write_text('''package main
+import "thor:basic"
+import "thor:parallel"
+import "core:fmt"
+import sets "thor:sets"
+twice::proc(x:$T)->T{return x*2}
+runtime_callback:proc(int)->int=twice
+compute::fn(x:int)->int{
+    rows:=parallel.pmap([]int{x,x+1},twice,workers=2)
+    return rows[1]
+}
+VALUE::#run compute(7)
+@(no_alloc) show::proc(){basic.print(VALUE)}
+main::proc(){
+    rows:=parallel.pmap([]int{2,3},twice,workers=2);defer delete(rows)
+    runtime_rows:=parallel.pmap([]int{4,5},runtime_callback,workers=2);defer delete(runtime_rows)
+    named:=basic.pmap([]int{6},twice);defer delete(named)
+    view:>[]int{1,2}
+    basic.print(view)
+    if rows[1]!=6||runtime_rows[1]!=10||named[0]!=12||VALUE!=16{panic("relocated callback")}
+    unique:=sets.to_set([]int{2,2,3});defer delete(unique)
+    if len(unique)!=2||3 not_in unique{panic("relocated set type")}
+    huge:Integer=123456789012345678901234567890;defer delete(huge)
+    show();fmt.println(f"{huge}")
+}
+''',encoding='utf8',newline='')
+            env={**os.environ};env.pop('THOR_ROOT',None)
+            for flags in ([],native.UNCHECKED):
+                with self.subTest(flags=flags):
+                    result=subprocess.run([str(compiler),'run',str(app),'-thread-count:1',*flags],
+                        env=env,cwd=root,capture_output=True,text=True,timeout=90)
+                    self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                    self.assertEqual(result.stdout.strip(),'[1, 2]\n16\n123456789012345678901234567890')
+            # A user collection override must not inherit scheduler privileges.
+            custom=root/'custom';(custom/'parallel').mkdir(parents=True)
+            (custom/'parallel/pmap.thor').write_text('''package parallel
+state:int
+pmap::proc(value:int)->int{state+=1;return value}
+''',encoding='utf8')
+            (app/'main.thor').write_text('''package main
+import "thor:parallel"
+compute::fn(value:int)->int{return parallel.pmap(value)}
+main::proc(){_=compute(1)}
+''',encoding='utf8')
+            rejected=subprocess.run([str(compiler),'check',str(app),'-thread-count:1',
+                '-collection:thor='+str(custom)],env=env,cwd=root,capture_output=True,text=True,timeout=90)
+            self.assertNotEqual(rejected.returncode,0,rejected.stdout+rejected.stderr)
+            self.assertIn("runtime storage 'state' outside the function",rejected.stderr.lower())

@@ -215,7 +215,7 @@ for row in ([1]Row{frozen}) {next:=row+{[2]int{1,1}};next.values[0]=5}
 
     def test_restriction_diagnostics_keep_original_expression_and_field_path(self):
         source=self.program('// 😀\na:=S{}\n_=a+a','S::struct{inner:struct{values:[]int}}\n')
-        self.source.write_text(source)
+        self.source.write_text(source, newline='')
         for engine in compiler_engines():
             result=self.invoke(engine,command='check',flags=['-json-errors'])
             self.assertEqual(result.returncode,1,result.stderr)
@@ -229,7 +229,7 @@ for row in ([1]Row{frozen}) {next:=row+{[2]int{1,1}};next.values[0]=5}
     def test_generic_restrictions_point_to_the_operator(self):
         source=self.program('x:=Bad{};_=add(x,x)',
             '// 😀 header\nBad::struct{data:[]int}\nadd::proc(a,b:$T)->T{return a+b}\n')
-        self.source.write_text(source)
+        self.source.write_text(source, newline='')
         for engine in compiler_engines():
             result=self.invoke(engine,command='check',flags=['-json-errors'])
             self.assertEqual(result.returncode,1,result.stderr)
@@ -271,7 +271,10 @@ main::proc(){}
                 names={}
                 def rename(symbol):
                     return names.setdefault(symbol[0],'%v'+str(len(names)))
-                bodies.append(re.sub(r'%[\w.$-]+',rename,match[1]))
+                # Alias/debug metadata IDs differ between equivalent native
+                # specializations; compare the executable IR instructions.
+                body=re.sub(r', ![\w.]+ !\d+', '', match[1])
+                bodies.append(re.sub(r'%[\w.$-]+',rename,body))
             self.assertEqual(bodies[0],bodies[1])
             self.assertNotIn('call ',bodies[0])
 

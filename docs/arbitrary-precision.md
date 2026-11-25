@@ -153,7 +153,8 @@ package API, now with direct Thor numeric-copy ownership enabled.
   By-reference loop bindings can destroy their actual elements.
 - Named locals returned by value are copied before deferred cleanup; use
   `defer delete(local)` for their own storage. A bare return transfers an owned
-  named result. Final named values are never automatically destroyed at scope exit.
+  named result. Named values are not automatically destroyed at scope exit unless declared as
+  [scoped owners](scoped-owners.md), for example `number~ := Integer(123)`.
 - A whole aggregate copy, `copy` of aggregate elements, and `append(..slice)` keep
   native shallow ownership. Destroy contained numbers exactly once, then free the
   outer container if it owns storage. A fixed/stack-backed array has no outer

@@ -114,12 +114,13 @@ parse_file :: proc (p: ^parser.Parser, file: ^ast.File, allocator := context.all
 	clear(&p.selections)
 	clear(&p.edits)
 	clear(&p.immutables)
+	clear(&p.scoped)
 	clear(&p.mut_parameters)
 	clear(&p.ro_parameters)
 	clear(&p.auto_parameters)
 	clear(&p.features)
 	ok := parser.parse_file(p, file)
-	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_mark_parameters(p,file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
+	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_mark_scoped(p,file); thor_mark_parameters(p,file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
 	return ok
 }
 
@@ -1316,6 +1317,7 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		}
 		strings.write_string(builder, "}")
 	case ^ast.Tag_Expr:
+        if n.name=="row_major" || n.name=="column_major" {strings.write_string(builder,"#");strings.write_string(builder,n.name);strings.write_string(builder," ")}
 		build_string(n.expr, builder, remove_pointers)
 	case ^ast.Unary_Expr:
 		strings.write_string(builder, n.op.text)

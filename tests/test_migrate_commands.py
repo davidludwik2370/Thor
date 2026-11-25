@@ -1,4 +1,5 @@
 """Command translation is source independent and executable after migration."""
+from tests.native_paths import rust_binary
 from tests.test_rust_compiler import compiler_paths
 import json
 import os
@@ -43,6 +44,23 @@ class MigrationCommandTests(unittest.TestCase):
         self.assertEqual(result.stderr,'')
         self.assertEqual(set(self.root.iterdir()),before)
 
+    def test_absolute_windows_paths_are_literal_in_command_only_translation(self):
+        command=r'odin build C:\work\game -out:C:\build\game.exe -collection:local=C:\shared'
+        result=self.invoke('--command',command)
+        arguments=shlex.split(result.stdout)
+        self.assertEqual(arguments,['thor','build',r'C:\work\game',r'-out:C:\build\game.exe',
+            r'-collection:local=C:\shared','--odin-compatible'])
+
+    def test_windows_executable_extension_case_is_preserved(self):
+        compiler=r'C:\tools\Odin\odin.EXE'
+        result=self.invoke('--command',f'"{compiler}" build .')
+        self.assertEqual(shlex.split(result.stdout),['thor','build','.','--odin-compatible','--odin',compiler])
+
+    @unittest.skipUnless(os.name=='nt','Native Windows UNC command syntax')
+    def test_unc_paths_are_literal_without_contacting_the_share(self):
+        result=self.invoke('--command',r'odin build "\\server\share with spaces\game"')
+        self.assertEqual(shlex.split(result.stdout),['thor','build',r'\\server\share with spaces\game','--odin-compatible'])
+
     def test_literal_quoting_empty_arguments_unicode_and_runtime_boundary(self):
         command='odin run "my game/main.odin" -file -define:TEXT=\'hello "🌩" $HOME $(touch marker)\' -- "" "two words" --help "a\\q"'
         result=self.invoke('--command',command)
@@ -78,7 +96,7 @@ class MigrationCommandTests(unittest.TestCase):
         result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',f'odin build {shlex.quote(str(self.source))} -o:speed')
         self.assertTrue((self.output/'main.thor').is_file())
         self.assertFalse((self.output.parent/'main.thor').exists())
-        self.assertEqual(result.stdout,f'thor build {self.output} -o:speed --odin-compatible\n')
+        self.assertEqual(shlex.split(result.stdout),['thor','build',str(self.output),'-o:speed','--odin-compatible'])
         self.assertIn('Migrated',result.stderr)
         self.execute(result.stdout)
 
@@ -91,24 +109,26 @@ main::proc(){fmt.println(values.fn)}
 @(test) smoke::proc(t:^testing.T){testing.expect(t,values.fn==7)}
 ''',{'packages/values/lib.odin':'package values\nfn::#config(VALUE,7)\n'})
         flags='-collection:custom=original/sample/packages -define:VALUE=7'
-        build=f'odin build ./original/sample -o:speed {flags} -out:original/sample/program'
+        suffix='.exe' if os.name=='nt' else ''
+        build=f'odin build ./original/sample -o:speed {flags} -out:original/sample/program{suffix}'
         test=f'odin test ./original/sample {flags}'
         result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',build,'--command',test)
         lines=result.stdout.splitlines()
         self.assertEqual(len(lines),2)
-        self.assertIn('./converted/sample',lines[0])
-        self.assertIn('-collection:custom=converted/sample/packages',lines[0])
-        self.assertIn('-out:converted/sample/program',lines[0])
+        normalized=lines[0].replace('\\','/')
+        self.assertIn('./converted/sample',normalized)
+        self.assertIn('-collection:custom=converted/sample/packages',normalized)
+        self.assertIn('-out:converted/sample/program',normalized)
         self.execute(lines[0])
         self.execute(lines[1])
-        run=subprocess.run([str(self.output/'program')],capture_output=True,text=True,timeout=10)
+        run=subprocess.run([str(self.output/('program'+suffix))],capture_output=True,text=True,timeout=10)
         self.assertEqual((run.returncode,run.stdout),(0,'7\n'),run.stderr)
 
     def test_file_command_and_runtime_arguments_use_the_copied_source(self):
         self.write('package main\nimport "core:fmt"\nimport "core:os"\nmain::proc(){fmt.println(os.args[1:])}\n')
         command=f'odin run {self.source}/main.odin -file -- "two words" --help'
         result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',command)
-        self.assertIn('/main.thor',result.stdout)
+        self.assertIn('/main.thor',result.stdout.replace('\\','/'))
         actual=self.execute(result.stdout)
         self.assertIn('two words',actual.stdout)
         self.assertIn('--help',actual.stdout)
@@ -185,7 +205,7 @@ double::fn(x:int)->int{return x*2}
 main::proc(){fmt.println(f"answer {double(7)}")}
 ''')
         self.execute(result.stdout)
-        binary=self.root/'sample'
+        binary=self.root/('sample.exe' if os.name=='nt' else 'sample')
         self.assertTrue(binary.is_file())
         actual=subprocess.run([str(binary)],capture_output=True,text=True,timeout=10)
         self.assertEqual((actual.returncode,actual.stdout),(0,'answer 14\n'),actual.stderr)
@@ -194,7 +214,7 @@ main::proc(){fmt.println(f"answer {double(7)}")}
         self.write('package main\nmain::proc(){}\n')
         result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',f'odin build {self.source}/main.odin -file -thread-count:1')
         self.execute(result.stdout)
-        self.assertTrue((self.root/'main').is_file())
+        self.assertTrue((self.root/('main.exe' if os.name=='nt' else 'main')).is_file())
         directory=self.invoke('--command','odin build ./project.odin -o:speed').stdout
         self.assertIn('./project.odin',directory)
 
@@ -207,7 +227,7 @@ main::proc(){fmt.println(f"answer {double(7)}")}
         (self.source/'main').mkdir()
         commands=[shlex.join(['odin','build',str(self.source),'-thread-count:1']),
             shlex.join(['odin','build',str(self.source/'main.odin'),'-file','-thread-count:1'])]
-        outputs=[self.root/'spaced',self.root/'main.bin']
+        outputs=[self.root/('spaced.exe' if os.name=='nt' else 'spaced'),self.root/('main.exe' if os.name=='nt' else 'main.bin')]
         for command,output in zip(commands,outputs):
             native=subprocess.run(shlex.split(command),cwd=self.root,capture_output=True,text=True,timeout=45)
             self.assertEqual(native.returncode,0,native.stderr)
@@ -222,12 +242,25 @@ main::proc(){fmt.println(f"answer {double(7)}")}
     def test_default_library_object_and_assembly_outputs_match_native_names(self):
         self.write('package main\n@(export) exported::proc()->int{return 7}\nmain::proc(){}\n')
         self.migrate()
-        for mode,extension in [('dll','dylib' if os.uname().sysname=='Darwin' else 'so'),('static','a'),('obj','o'),('assembly','S')]:
+        extensions=[('dll','dll'),('static','lib'),('obj','obj'),('assembly','S')] if os.name=='nt' else [('dll','dylib' if os.uname().sysname=='Darwin' else 'so'),('static','a'),('obj','o'),('assembly','S')]
+        for mode,extension in extensions:
             with self.subTest(mode=mode):
-                command=f'odin build {self.output} -build-mode:{mode} -use-single-module -thread-count:1'
+                flags=[f'-build-mode:{mode}','-use-single-module','-thread-count:1']
+                control=self.root/f'native-control.{extension}'
+                baseline=subprocess.run([os.environ.get('THOR_ODIN','odin'),'build',str(self.source),
+                    *flags,'-out:'+str(control)],cwd=self.root,capture_output=True,text=True,timeout=60)
+                command=shlex.join(['odin','build',str(self.output),*flags])
                 result=self.invoke('--command',command)
-                self.execute(result.stdout)
-                self.assertTrue((self.root/f'sample.{extension}').is_file())
+                translated=self.execute(result.stdout,status=baseline.returncode)
+                if baseline.returncode==0:
+                    self.assertTrue(control.is_file())
+                    self.assertTrue((self.root/f'sample.{extension}').is_file())
+                else:
+                    # Some SDK/linker combinations cannot produce a given native
+                    # artifact. Preserve the failure instead of treating a Thor
+                    # invocation as a successful library build.
+                    self.assertIn('Error',baseline.stderr+baseline.stdout)
+                    self.assertIn('Error',translated.stderr+translated.stdout)
 
     def test_attribute_values_still_lower_thor_constant_expressions(self):
         self.write('package main\nmain::proc(){}\n')
@@ -323,7 +356,8 @@ main :: proc() {
                 if self.output.exists():
                     import shutil
                     shutil.rmtree(self.output)
-                command=f'odin build {self.source} {flags} -thread-count:1 -out:{self.root}/metadata-program'
+                suffix='.exe' if os.name=='nt' else ''
+                command=f'odin build {self.source} {flags} -thread-count:1 -out:{self.root}/metadata-program{suffix}'
                 result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',command)
                 self.execute(result.stdout)
 
@@ -372,7 +406,8 @@ main::proc(){
         self.write('package main\nimport "core:fmt"\nmain::proc(){fmt.println(ODIN_BUILD_PROJECT_NAME)}\n')
         alias=self.root/'alias'
         alias.symlink_to(self.source,target_is_directory=True)
-        command=f'odin run {alias} -thread-count:1 -out:{self.root}/alias-program'
+        suffix='.exe' if os.name=='nt' else ''
+        command=f'odin run {alias} -thread-count:1 -out:{self.root}/alias-program{suffix}'
         native=subprocess.run(shlex.split(command),cwd=self.root,capture_output=True,text=True,timeout=45)
         self.assertEqual(native.returncode,0,native.stderr)
         result=self.invoke(alias,'--output-dir',self.output.parent,'--command',command)
@@ -395,15 +430,16 @@ main::proc(){_=lib.value}
         for flags in ['-build-mode:obj -use-single-module','-build-mode:dll','-bedrock','-no-rtti -disable-init-fini -disable-non-constant-globals','-disallow-do']:
             with self.subTest(flags=flags):
                 (self.output/'main.thor').write_text('package main\n@(export) exported::proc()->int{return 7}\nmain::proc(){}\n')
-                command=f'odin build {self.output} {flags} -out:{self.root}/mode-output'
+                suffix=('.dll' if '-build-mode:dll' in flags else '.obj' if '-build-mode:obj' in flags else '.exe') if os.name=='nt' else ''
+                command=f'odin build {self.output} {flags} -out:{self.root}/mode-output{suffix}'
                 translated=self.invoke('--command',command).stdout
                 native_source=self.source/'main.odin'
                 native_source.write_text((self.output/'main.thor').read_text())
-                native=subprocess.run(['odin','build',str(self.source),*shlex.split(flags),'-out:'+str(self.root/'native-mode-output')],
+                native=subprocess.run(['odin','build',str(self.source),*shlex.split(flags),'-out:'+str(self.root/('native-mode-output'+suffix))],
                     cwd=self.root,capture_output=True,text=True,timeout=45)
                 self.execute(translated,status=0 if native.returncode==0 else 1)
 
-    @unittest.skipUnless(COMPILER==ROOT/'rust/target/release/thor-rust','Reference launcher uses the published release executable')
+    @unittest.skipUnless(COMPILER==rust_binary(),'Reference launcher uses the published release executable')
     def test_python_launcher_uses_the_same_source_independent_translation(self):
         result=subprocess.run([str(ROOT/'thor-python'),'migrate','--command','odin test ./missing -o:speed'],
             cwd=self.root,capture_output=True,text=True,timeout=10)

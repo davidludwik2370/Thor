@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const cp = require('node:child_process');
-const {activateRunning, runProject, runCommand} = require('../run-extension');
+const {activateRunning, runProject, runCommand,invocation} = require('../run-extension');
 
 function fixture({workspace = '/projects/my project', file = '/projects/my project/my-project.thor', saved = true} = {}) {
     const uri = name => ({fsPath:name, scheme:'file', toString:()=>`file://${name}`});
@@ -18,13 +18,25 @@ function fixture({workspace = '/projects/my project', file = '/projects/my proje
         window:{activeTextEditor:file ? {document:{uri:uri(file), languageId:'thor'}} : undefined,
             createTerminal:options=>{const value=terminal(options);calls.created.push(value);vscode.window.activeTerminal=value;return value;}},
         workspace:{isTrusted:true, workspaceFolders:folder ? [folder] : [], getWorkspaceFolder:()=>folder,
-            getConfiguration:()=>{throw new Error('Run must not query toolchain settings');},
+            getConfiguration:()=>({get:(_key,fallback)=>fallback}),
             saveAll:async()=>{calls.saved++; return saved;}},
         tasks:{fetchTasks:()=>{throw new Error('Run must not enumerate tasks');},
             executeTask:()=>{throw new Error('Run must not start a task');}}
     };
     return {vscode,calls,terminal};
 }
+
+test('configured compiler paths work without a terminal PATH entry',async()=>{
+    const {vscode}=fixture();
+    vscode.workspace.getConfiguration=()=>({get:()=>"/tools/Thor O'Brien/thor"});
+    const terminal=await runProject(vscode);
+    assert.equal(terminal.commands[0].text,"'/tools/Thor O'\\''Brien/thor' run .");
+});
+test('native installer paths use correct PowerShell and cmd quoting',()=>{
+    assert.equal(invocation({env:{shell:'powershell.exe'}},null,"C:/Thor O'Brien/thor.exe"),"& 'C:/Thor O''Brien/thor.exe' run .");
+    assert.equal(invocation({env:{shell:'cmd.exe'}},null,'C:/Thor tools/thor.exe'),'"C:/Thor tools/thor.exe" run .');
+    assert.throws(()=>invocation({env:{shell:'cmd.exe'}},null,'C:/%bad%/thor.exe'));
+});
 
 test('run saves changes and sends only thor run . when the terminal is already in the source directory',async()=>{
     const {vscode,calls,terminal}=fixture();

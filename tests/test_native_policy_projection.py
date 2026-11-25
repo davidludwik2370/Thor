@@ -1,4 +1,6 @@
 """Migrated build policies survive vet's fn/immutable source corrections."""
+from tests.native_paths import EXE_SUFFIX
+from tests.native_paths import native_test_compiler
 from tests.test_rust_compiler import compiler_paths
 import json
 import os
@@ -76,7 +78,7 @@ import "core:testing"
         result = self.call('check', self.source, '--odin-compatible', '-vet-cast', '-thread-count:1', '-json-errors', status=1)
         errors = json.loads(result.stderr)['errors']
         cast = next(error for error in errors if 'cast' in ' '.join(error['msgs']).lower())
-        text = target.read_text()
+        text = target.read_bytes().decode()
         expected = text.index('cast(int)') + len('cast(int)')
         self.assertEqual(cast['pos']['file'], str(target))
         self.assertEqual(cast['pos']['offset'], expected)
@@ -133,13 +135,17 @@ import "core:testing"
         for compiler in compiler_paths(support.COMPILER):
             with self.subTest(compiler=compiler):
                 source=self.source/'main.thor'
-                source.write_text(source.read_text().replace('triple :: fn','triple :: proc'))
+                source.write_text(source.read_text().replace('triple :: fn','triple :: proc'), newline='')
                 result=subprocess.run([str(compiler),'vet',str(source),'-file','-build-mode:test',
                     '-all-packages','--apply','-thread-count:1'],cwd=self.root,
                     capture_output=True,text=True,timeout=60)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                 self.assertIn('triple :: fn',source.read_text())
-        self.call('test',self.source/'main.thor','-file','-all-packages','-thread-count:1')
+                self.assertIn('import "checks"',source.read_text())
+                self.assertNotIn('Import \'checks\' is not used',result.stderr)
+        result=self.call('test',self.source/'main.thor','-file','-all-packages','-thread-count:1',
+            '-define:ODIN_TEST_FANCY=false','-define:ODIN_TEST_THREADS=1')
+        self.assertIn('Finished 1 test',result.stdout+result.stderr)
 
     def test_native_collection_contexts_and_pointer_index_types(self):
         source = '''package main
@@ -178,7 +184,7 @@ main :: proc() {
 }
 '''
         self.write(source)
-        binary = self.root/'oracle'
+        binary = self.root/('oracle'+EXE_SUFFIX)
         for flags in [[], support.UNCHECKED]:
             built = subprocess.run(['odin', 'build', str(self.source), '-thread-count:1',
                 *flags, '-out:'+str(binary)], capture_output=True, text=True, timeout=60)
@@ -209,7 +215,7 @@ main :: proc() {
     if storage[1] != 13 || storage[2] != 7 || storage[3] != 9 { panic("unchecked storage") }
 }
 ''')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         (self.source/'main.odin').rename(self.source/'main.thor')
         for flags in [[], support.UNCHECKED]:
             self.call('build', self.source, '-thread-count:1', *flags, '-out:'+str(binary))
@@ -230,7 +236,7 @@ main :: proc() {
     if rows[1].number != 11 { panic("column identity") }
 }
 ''')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         (self.source/'main.odin').rename(self.source/'main.thor')
         for flags in [[], support.UNCHECKED]:
             self.call('build', self.source, '-thread-count:1', *flags, '-out:'+str(binary))
@@ -262,7 +268,7 @@ main :: proc() {
     if value, ok := choices[index].(int); !ok || value != 9 { panic("pointer assertion") }
 }
 ''')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         (self.source/'main.odin').rename(self.source/'main.thor')
         for flags in [[], support.UNCHECKED]:
             self.call('build', self.source, '-thread-count:1', *flags, '-out:'+str(binary))
@@ -290,7 +296,7 @@ main :: proc() {
     if sets.count(owned) != 1 { panic("set activation") }
 }
 ''')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         (self.source/'main.odin').rename(self.source/'main.thor')
         for flags in [[], support.UNCHECKED]:
             self.call('build', self.source, '-thread-count:1', *flags, '-out:'+str(binary))
@@ -309,8 +315,10 @@ main :: proc() {
         wrapper.write_text('#!/bin/sh\n'
             'if [ "$1" = build ] && [ "$2" = '+shlex.quote(str(support.ROOT/'frontend'))+' ]; then exit 91; fi\n'
             'export ODIN_ROOT='+shlex.quote(str(selected))+'\n'
-            'exec '+shlex.quote(str(native))+' "$@"\n')
+            'exec '+shlex.quote(str(native))+' "$@"\n', newline='')
         wrapper.chmod(0o755)
+        if os.name=='nt':wrapper=native_test_compiler(self.root,'frontend_guard',
+            odin=str(native),sdk=str(selected),frontend=str(support.ROOT/'frontend'))
         self.write('package main\nimport "core:fmt"\nmain::proc(){fmt.println(7)}\n')
         (self.source/'main.odin').rename(self.source/'main.thor')
         environment = {**os.environ, 'THOR_FRONTEND_ODIN': str(native)}
@@ -348,7 +356,7 @@ main :: proc() {
     check_rows(rows[:], 1)
 }
 ''')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         native = subprocess.run(['odin', 'run', str(self.source), '-thread-count:1', '-out:'+str(binary)], capture_output=True, text=True, timeout=60)
         self.assertEqual(native.returncode, 0, native.stderr)
         (self.source/'main.odin').rename(self.source/'main.thor')
@@ -386,7 +394,7 @@ main :: proc() {
 }
 ''')
         (self.source/'main.odin').rename(self.source/'main.thor')
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         for flags in [[], support.UNCHECKED]:
             self.call('build', self.source, '-thread-count:1', *flags, '-out:'+str(binary))
             run=subprocess.run([str(binary)],capture_output=True,text=True,timeout=10)
@@ -399,7 +407,7 @@ main :: proc() {}
 ''', {'platform/platform.odin':'#+build windows\npackage platform\nvalue :: proc() -> int {return 7}\n'})
         self.call('migrate',self.source,'--output-dir',self.output.parent,
             '--command',shlex.join(['odin','build',str(self.source),'-thread-count:1']))
-        self.call('build',self.output,'-thread-count:1','-out:'+str(self.root/'program'))
+        self.call('build',self.output,'-thread-count:1','-out:'+str(self.root/('program'+EXE_SUFFIX)))
 
     def test_native_policy_checking_does_not_inject_platform_memory_tracking(self):
         self.write('package main\nbump::proc(x:int)->int{return x+1}\nmain::proc(){_=bump(7)}\n')
@@ -427,7 +435,7 @@ main :: proc() {
         self.call('vet',self.output,'--apply','-thread-count:1')
         self.call('check',self.output,'--odin-compatible','-vet','-thread-count:1')
         path=self.output/'main.thor'
-        path.write_text(path.read_text().replace('// thor-migrate #+vet','// Odin vet'))
+        path.write_text(path.read_text().replace('// thor-migrate #+vet','// Odin vet'), newline='')
         self.call('check',self.output,'--odin-compatible','-vet','-thread-count:1')
 
     def test_generic_do_assignments_and_implicit_map_keys(self):
@@ -453,7 +461,7 @@ main :: proc() {
     if !insert(&m)||m.values[{1,2}]!=7 {panic("implicit map key")}
 }
 ''')
-        binary=self.root/'program'
+        binary=self.root/('program'+EXE_SUFFIX)
         native=subprocess.run(['odin','run',str(self.source),'-thread-count:1','-out:'+str(binary)],capture_output=True,text=True,timeout=60)
         self.assertEqual(native.returncode,0,native.stderr)
         (self.source/'main.odin').rename(self.source/'main.thor')
@@ -519,7 +527,7 @@ main :: proc() {
     if rows[0].values[1]!=12 {panic("nested backing storage")}
 }
 ''')
-        binary=self.root/'program'
+        binary=self.root/('program'+EXE_SUFFIX)
         native=subprocess.run(['odin','run',str(self.source),'-thread-count:1','-out:'+str(binary)],capture_output=True,text=True,timeout=60)
         self.assertEqual(native.returncode,0,native.stderr)
         (self.source/'main.odin').rename(self.source/'main.thor')
@@ -552,9 +560,9 @@ main :: proc() {
         for value in ['false','true']:
             for flags in [[],support.UNCHECKED]:
                 self.call('run',self.source,'-define:WRITE='+value,'-thread-count:1',*flags)
-        path.write_text('package main\nwrapper::proc()->int{return platform_value()}\nmain::proc(){_=wrapper()}\n')
-        (self.source/'platform_posix.thor').write_text('#+build !windows\npackage main\nplatform_value::proc()->int{return 7}\n')
-        (self.source/'platform_windows.thor').write_text('package main\nplatform_value::proc()->int{return context.user_index}\n')
+        path.write_text('package main\nwrapper::proc()->int{return platform_value()}\nmain::proc(){_=wrapper()}\n', newline='')
+        (self.source/'platform_posix.thor').write_text('#+build !windows\npackage main\nplatform_value::proc()->int{return 7}\n', newline='')
+        (self.source/'platform_windows.thor').write_text('package main\nplatform_value::proc()->int{return context.user_index}\n', newline='')
         self.call('vet',self.source,'--apply','-thread-count:1')
         self.assertIn('wrapper::proc',path.read_text())
         result=subprocess.run([str(support.COMPILER),'check',str(self.source),'-thread-count:1','-target:windows_amd64'],
@@ -635,10 +643,10 @@ main :: proc() {
         for flags in [[],support.UNCHECKED]:
             self.call('run',self.source,'-thread-count:1',*flags)
         valid=path.read_text()
-        path.write_text(valid+'\nbad :: fn(value:Value)->int {switch item in value {case string:delete(item)};return 0}\n')
+        path.write_text(valid+'\nbad :: fn(value:Value)->int {switch item in value {case string:delete(item)};return 0}\n', newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('borrow',failed.stderr.lower())
-        path.write_text(valid.replace('union {int,string}','union {int,string,[]int}'))
+        path.write_text(valid.replace('union {int,string}','union {int,string,[]int}'), newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('read-only slice',failed.stderr)
 
@@ -683,7 +691,7 @@ main :: proc() {{
     result:=callback()
     result[0]=9
 }}
-''')
+''', newline='')
                     failed=self.call('check',self.source,'-thread-count:1',status=1)
                     self.assertIn('read-only slice',failed.stderr)
 
@@ -765,7 +773,7 @@ main :: proc() {
         (self.source/'main.odin').rename(path)
         for compiler in compiler_paths(support.COMPILER):
             with self.subTest(compiler=compiler):
-                path.write_text(source)
+                path.write_text(source, newline='')
                 profile=self.root/'profile.json'
                 result=subprocess.run([str(compiler),'vet',str(self.source),'--vet=pure','--apply','-thread-count:1'],
                     cwd=self.root,capture_output=True,text=True,timeout=90,
@@ -917,9 +925,9 @@ main :: proc() {
             self.assertIn('values[i]',generated)
         for flags in [[],support.UNCHECKED]:
             self.call('run',self.source,'-thread-count:1',*flags)
-        path.write_text(path.read_text().replace('0..<len(values)', '-3..<0'))
+        path.write_text(path.read_text().replace('0..<len(values)', '-3..<0'), newline='')
         self.call('run',self.source,'-thread-count:1')
-        path.write_text(path.read_text().replace('-3..<0','0..<i128(len(values))'))
+        path.write_text(path.read_text().replace('-3..<0','0..<i128(len(values))'), newline='')
         self.call('run',self.source,'-thread-count:1')
 
     def test_generic_union_arguments_preserve_reference_free_and_slice_variants(self):
@@ -955,7 +963,7 @@ main :: proc() {
     value :> Option([]int)([]int{1})
     write(value)
 }
-''')
+''', newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('read-only slice',failed.stderr)
 
@@ -1088,11 +1096,13 @@ main :: proc() {
         (self.source/'main.odin').rename(self.source/'main.thor')
         for flags in [[],support.UNCHECKED]:
             self.call('run',self.source,'-define:MODE=7','-thread-count:1',*flags)
-            report=self.root/'tests.json'
-            self.call('test',self.source,'-define:MODE=7',
-                '-define:ODIN_TEST_JSON_REPORT='+str(report),'-define:ODIN_TEST_THREADS=1',
+            # These runner-only defines still have to survive helper projection.
+            # The optional JSON writer has an independently reproduced SDK bug
+            # on the November nightly; it is unrelated to flag projection.
+            result=self.call('test',self.source,'-define:MODE=7',
+                '-define:ODIN_TEST_FANCY=false','-define:ODIN_TEST_THREADS=1',
                 '-thread-count:1',*flags)
-            self.assertEqual(json.loads(report.read_text())['success'],1)
+            self.assertIn('Finished 1 test',result.stdout+result.stderr)
         failed=self.call('check',self.source,'-define:MODE=7','-define:UNUSED=1','-warnings-as-errors',
             '-thread-count:1',status=1)
         self.assertIn('UNUSED',failed.stderr)
@@ -1133,7 +1143,7 @@ main :: proc() {
         (self.source/'main.odin').rename(path)
         for flags in [[],support.UNCHECKED]:
             self.call('run',self.source,'-thread-count:1',*flags)
-        path.write_text(path.read_text().replace('consume(value.mutable)','consume(value.readonly)'))
+        path.write_text(path.read_text().replace('consume(value.mutable)','consume(value.readonly)'), newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('read-only slice',failed.stderr)
 
@@ -1159,7 +1169,7 @@ main :: proc() {
         counters=json.loads(profile.read_text())['counters']
         self.assertLess(counters.get('permissions.values',0),20_000,counters)
         path.write_text(path.read_text().replace('node:=Node{&database,values[:]}',
-            'frozen :> values[:]\n    node:=Node{&database,frozen}'))
+            'frozen :> values[:]\n    node:=Node{&database,frozen}'), newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('read-only slice',failed.stderr)
 
@@ -1185,7 +1195,7 @@ main :: proc() {
         counters=json.loads(profile.read_text())['counters']
         self.assertLess(counters.get('permissions.values',0),30_000,counters)
         path.write_text(path.read_text().replace('result:=hop24(values[:])',
-            'frozen :> values[:]\n    result :> hop24(frozen)'))
+            'frozen :> values[:]\n    result :> hop24(frozen)'), newline='')
         failed=self.call('check',self.source,'-thread-count:1',status=1)
         self.assertIn('read-only slice',failed.stderr)
 

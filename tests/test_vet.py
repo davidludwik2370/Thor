@@ -72,11 +72,12 @@ class VetTests(unittest.TestCase):
         text = '// 😀 header\r\npackage main\r\nget :: proc(x:int)->int{return x+1}\r\nmain::proc(){\r\n    x /* note */ :=get(2)\r\n    a,b: int = 4,5\r\n    if x+a+b!=12{panic("result")}\r\n}\r\n'
         self.write(text)
         self.source.chmod(0o640)
+        original_mode=stat.S_IMODE(self.source.stat().st_mode)
         result = self.invoke('--apply')
         self.assertIn('Applied 3 corrections.', result.stdout)
         expected = text.replace(':: proc(', ':: fn(').replace(':=get', ':>get').replace(': int =', ': int >')
         self.assertEqual(self.source.read_bytes(), expected.encode())
-        self.assertEqual(stat.S_IMODE(self.source.stat().st_mode), 0o640)
+        self.assertEqual(stat.S_IMODE(self.source.stat().st_mode), original_mode)
         self.assertEqual(self.findings(), [])
         self.invoke(command='run')
         self.invoke('-o:speed','-disable-assert','-no-bounds-check','-no-type-assert', command='run')

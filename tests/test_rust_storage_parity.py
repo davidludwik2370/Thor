@@ -10,6 +10,18 @@ class RustStorageParityTests(unittest.TestCase):
     invoke=native.RustReferenceTests.invoke
     program=native.RustReferenceTests.program
 
+    def test_immutable_for_posts_keep_diagnostics_and_inactive_branch_semantics(self):
+        for post in ['index+=1','index=index+1']:
+            with self.subTest(post=post):
+                code=self.program('work(int)', 'work::proc($T:typeid){when T==int{for index:>0;index<2;'+post+'{}}}\n')
+                self.invoke(code,command='check',fail="immutable storage 'index'")
+        code=self.program('''work(f64)
+index:=0
+for marker:>7;index<3;index+=1{if marker!=7{panic("marker")}}
+if index!=3{panic("loop")}
+''','work::proc($T:typeid){when T==int{for index:>0;index<2;index+=1{}}}\n')
+        for flags in ([],compiler.UNCHECKED):self.invoke(code,flags=flags)
+
     def test_generic_pointer_fields_are_shallow_and_queries_do_not_run_indices(self):
         code=self.program('''
 cell:=Cell{}

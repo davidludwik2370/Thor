@@ -16,7 +16,10 @@ use std::{
 #[path = "vet_unused.rs"]
 mod unused;
 
-pub const CHECKS: &[&str] = &["immutable", "pure", "unused", "semicolon"];
+pub(crate) const VALIDATION_BUDGET_EXHAUSTED: &str = "Thor vet correction validation exceeded its mutability proof budget.";
+pub const CHECKS: &[&str] = &["immutable", "pure", "unused", "semicolon", "lifetime", "leak"];
+// Unknown effects are acknowledgements, not permission to hide proven faults.
+pub const UNKNOWN_CHECKS: &[&str] = &["lifetime_unknown", "leak_unknown"];
 #[derive(Clone, Debug)]
 pub struct Fix {
     file: usize,
@@ -400,8 +403,19 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 if let Some(declaration) = binding_storage(&mut resolver, Ref { file, node }) {
                     let at = Ref {file,node:id};
                     let uncertain = source.ancestors(id).filter(|owner| source.node(*owner).kind == "When")
-                        .any(|owner| source.role(owner,"cond").is_none_or(|node|
-                            resolver.condition(Ref {file,node}).is_none()));
+                        .any(|owner| {
+                            // A declaration and write in the same selected
+                            // branch do not have different configuration guards.
+                            // In particular, generic loop induction variables
+                            // remain written even inside an unresolved `when`.
+                            let shared_branch=declaration.file==file&&["body","else"].iter().any(|role|
+                                source.role(owner,role).is_some_and(|branch| {
+                                    let span=source.node(branch).span;
+                                    span.contains(source.node(id).span)&&span.contains(source.node(declaration.node).span)
+                                }));
+                            !shared_branch&&source.role(owner,"cond").is_none_or(|node|
+                                resolver.condition(Ref {file,node}).is_none())
+                        });
                     if !uncertain && resolver.active_definition(at) { written.insert(declaration); }
                     else { conditional_writes.insert(declaration); }
                 }
@@ -671,6 +685,7 @@ impl Drop for Scratch {
     }
 }
 enum Validation {
+    Inconclusive,
     Passed,
     Failed(Vec<Value>),
 }
@@ -678,6 +693,7 @@ struct Validator<'a> {
     project: &'a Project,
     directory: &'a Path,
     compiler: PathBuf,
+    unverified: std::cell::RefCell<Vec<Fix>>,
 }
 impl Validator<'_> {
     fn check(&self, fixes: &[Fix]) -> Result<Validation> {
@@ -703,6 +719,7 @@ impl Validator<'_> {
         )?;
         let mut command = Command::new(&self.compiler);
         command
+            .env("THOR_VET_VALIDATION_BUDGET", std::env::var("THOR_VET_VALIDATION_BUDGET").unwrap_or_else(|_| "200000".into()))
             .env("THOR_ROOT", &self.project.options.root)
             .arg(if self.project.frontend.test { "build" } else { "check" })
             .arg(&self.project.options.entry)
@@ -743,10 +760,14 @@ impl Validator<'_> {
                 && flag.as_str() != "-keep-executable"
         }));
         if self.project.frontend.test {
-            command.arg("-build-mode:test").arg(format!("-out:{}", self.directory.join("test-probe").display()));
+            command.arg("-build-mode:test").arg(format!("-out:{}", self.directory.join(format!("test-probe{}",std::env::consts::EXE_SUFFIX)).display()));
         }
         let result = command.output()?;
         if !result.status.success() {
+            if String::from_utf8_lossy(&result.stderr).contains(VALIDATION_BUDGET_EXHAUSTED) {
+                crate::profile::count("vet.validation_budget_fallback",1);
+                return Ok(Validation::Inconclusive);
+            }
             let packet: Value = serde_json::from_slice(&result.stderr).map_err(|_| {
                 Error::new(format!(
                     "Thor vet could not validate its proposed corrections (exit {}).\n{}{}",
@@ -780,7 +801,7 @@ impl Validator<'_> {
         let Some(end) = fix.highlight.end.checked_add_signed(delta) else { return false; };
         errors.iter().filter(|error| error["type"] == "error")
             .flat_map(|error| error["related"].as_array().into_iter().flatten())
-            .any(|related| related["message"] == "Read-only view declared here."
+            .any(|related| (related["message"] == "Read-only view declared here."||related["message"]=="Immutable storage declared here.")
                 && related["pos"]["file"].as_str().is_some_and(|path| Path::new(path) == source.path)
                 && related["pos"]["offset"].as_u64().is_some_and(|offset| (start..end).contains(&(offset as usize))))
     }
@@ -823,6 +844,7 @@ impl Validator<'_> {
         let mut combined = accepted.clone();
         combined.extend_from_slice(proposed);
         match self.check(&combined)? {
+            Validation::Inconclusive => self.unverified.borrow_mut().extend_from_slice(proposed),
             Validation::Passed => accepted.extend_from_slice(proposed),
             Validation::Failed(errors) => {
                 // Readonly seeds and pure call-chain roots identify the exact
@@ -957,12 +979,40 @@ where
     }
     result
 }
+// Ownership diagnostics can point into another source file. After convention
+// edits, keep related origin/call notes aligned just like the primary range.
+fn remap_finding_positions(value: &mut Value, updated: &BTreeMap<PathBuf, Vec<u8>>, fixes: &[Fix], sources: &[Source]) {
+    match value {
+        Value::Array(items) => for item in items { remap_finding_positions(item, updated, fixes, sources); },
+        Value::Object(object) => {
+            if let Some(pos) = object.get_mut("pos").and_then(Value::as_object_mut) {
+                if let Some(path) = pos.get("file").and_then(Value::as_str).map(PathBuf::from) {
+                    if let Some(raw) = updated.get(&path).and_then(|raw| std::str::from_utf8(raw).ok()) {
+                        for (key, line_key, column_key) in [("offset", "line", "column"), ("end_offset", "end_line", "end_column")] {
+                            let Some(old) = pos.get(key).and_then(Value::as_u64).map(|n| n as usize) else { continue; };
+                            let delta = fixes.iter().filter(|fix| sources[fix.file].path == path && fix.span.end <= old)
+                                .map(|fix| fix.replacement.len() as isize - fix.span.len() as isize).sum();
+                            let Some(offset) = old.checked_add_signed(delta).filter(|offset| raw.is_char_boundary(*offset)) else { continue; };
+                            let Some(before) = raw.get(..offset) else { continue; };
+                            pos.insert(key.into(), json!(offset));
+                            pos.insert(line_key.into(), json!(before.bytes().filter(|b| *b == b'\n').count() + 1));
+                            pos.insert(column_key.into(), json!(before.rsplit('\n').next().unwrap().encode_utf16().count() + 1));
+                        }
+                    }
+                }
+            }
+            for (key, child) in object { if key != "pos" { remap_finding_positions(child, updated, fixes, sources); } }
+        }
+        _ => {}
+    }
+}
 pub fn run(
     project: &Project,
     checks: &[String],
     apply_requested: bool,
     ask: bool,
     existing: &mut Vec<Value>,
+    memory_findings: Vec<Value>,
 ) -> Result<Vec<Value>> {
     let usage = if checks
         .iter()
@@ -1007,6 +1057,7 @@ pub fn run(
         let end=finding["pos"]["end_offset"].as_u64().unwrap_or(start as u64+1) as usize;
         !crate::vet_attributes::ignored(&suppressions,file,Span::new(start,end),"unused")
     });
+    findings.extend(memory_findings);
     let unused = findings
         .iter()
         .map(|finding| {
@@ -1049,6 +1100,7 @@ pub fn run(
             project,
             directory: &scratch.0,
             compiler: std::env::current_exe()?,
+            unverified: Default::default(),
         };
         let cleanups = accepted.clone();
         validator.select(&proposed, &mut accepted)?;
@@ -1068,6 +1120,13 @@ pub fn run(
                 }
             }
             crate::profile::count("vet.manual_findings", manual_findings.len() as u64);
+        }
+        for mut fix in validator.unverified.into_inner() {
+            fix.manual=Some("the correction exceeds the mutability proof budget; compiler validation is incomplete");
+            let mut diagnostic=fix.diagnostic(&project.sources,&mut snapshots,false);
+            diagnostic["code"]=json!("thor/correction-unknown");
+            diagnostic["msgs"][0]=json!(format!("Could not verify the proposed '{}' correction for '{}'.",fix.rule,fix.names));
+            manual_findings.push(diagnostic);
         }
     }
     findings.extend(manual_findings);
@@ -1109,36 +1168,7 @@ pub fn run(
             apply(&accepted, &project.sources)?;
             let updated = revisions(&accepted, &project.sources);
             for finding in &mut findings {
-                let path = Path::new(finding["pos"]["file"].as_str().unwrap());
-                let Some(raw) = updated.get(path) else {
-                    continue;
-                };
-                let raw = std::str::from_utf8(raw).expect("vet edits preserve UTF-8");
-                let fixes = accepted
-                    .iter()
-                    .filter(|fix| project.sources[fix.file].path == path)
-                    .collect::<Vec<_>>();
-                let pos = finding["pos"].as_object_mut().unwrap();
-                for (key, line_key, column_key) in [
-                    ("offset", "line", "column"),
-                    ("end_offset", "end_line", "end_column"),
-                ] {
-                    let old = pos[key].as_u64().unwrap() as usize;
-                    let delta = fixes
-                        .iter()
-                        .filter(|fix| fix.span.end <= old)
-                        .map(|fix| fix.replacement.len() as isize - fix.span.len() as isize)
-                        .sum::<isize>();
-                    let offset = old
-                        .checked_add_signed(delta)
-                        .expect("edits preserve source positions");
-                    let before = &raw[..offset];
-                    let line = before.bytes().filter(|byte| *byte == b'\n').count() + 1;
-                    let column = before.rsplit('\n').next().unwrap().encode_utf16().count() + 1;
-                    pos.insert(key.into(), json!(offset));
-                    pos.insert(line_key.into(), json!(line));
-                    pos.insert(column_key.into(), json!(column));
-                }
+                remap_finding_positions(finding, &updated, &accepted, &project.sources);
             }
             println!("Applied {} corrections.", accepted.len());
             return Ok(findings);

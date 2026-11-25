@@ -81,7 +81,7 @@ never_owned::fn()->string{panic("not called")}
             text=self.program('n:=7;_=bad(n)',prefix+'\nbad::fn(n:int)->int{_='+expr+';return n}\n')
             _,result=self.invoke(text,command='check',flags=['-debug','-json-errors'],fail='Pure code')
             errors=json.loads(result.stderr)['errors'];offset=text.index(expr)
-            self.assertTrue(all(e['pos'] and e['pos']['file'].endswith('/main.thor') for e in errors),errors)
+            self.assertTrue(all(e['pos'] and Path(e['pos']['file']).name=='main.thor' for e in errors),errors)
             self.assertTrue(any(e['pos']['offset']<=offset<e['pos']['end_offset'] for e in errors),errors)
             self.assertTrue(any(e.get('related') for e in errors),errors)
             self.assertNotIn('invalid type',result.stderr)

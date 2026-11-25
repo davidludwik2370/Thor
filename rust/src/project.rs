@@ -28,6 +28,8 @@ pub(crate) use evaluationexec::capture as capture_command;
 pub use evaluationexec::{cancel_active_evaluation, evaluation_cancelled};
 #[path = "nativefacts.rs"]
 mod nativefacts;
+#[path = "lifetimecache.rs"]
+mod lifetimecache;
 #[path = "dependencylookahead.rs"]
 mod dependencylookahead;
 #[path = "discoverywork.rs"]
@@ -74,6 +76,7 @@ pub struct Options {
     pub vet: Option<Vec<String>>,
     pub vet_apply: bool,
     pub vet_ask: bool,
+    pub unverified: crate::unverified::Mode,
 }
 struct LoweringNotes {
     operation: Option<crate::semantics::Ref>,
@@ -235,6 +238,24 @@ fn reference_coordinates(suffix: &str) -> Option<(usize, usize, usize)> {
     (line > 0 && column > 0).then_some((line, column, length))
 }
 
+// Odin prints forward slashes on Windows even when native paths use '\\'.
+// Match known file spellings, rather than rewriting backslashes in user text.
+fn diagnostic_paths(path: &Path, windows: bool) -> impl Iterator<Item = std::borrow::Cow<'_, str>> {
+    let native = path.to_string_lossy();
+    let forward = (windows && native.contains('\\'))
+        .then(|| std::borrow::Cow::Owned(native.replace('\\', "/")));
+    std::iter::once(native).chain(forward)
+}
+
+fn support_file(root: &Path, view: &Path, file: &Path) -> PathBuf {
+    if !view.as_os_str().is_empty() {
+        if let Ok(relative) = file.strip_prefix(view) {
+            return root.join("runtime").join(relative);
+        }
+    }
+    file.to_path_buf()
+}
+
 fn package_files(entry: &Path, skip_support_tests: bool, overlays: &BTreeMap<PathBuf, String>) -> Result<Vec<PathBuf>> {
     if entry.is_file() || overlays.contains_key(entry) {
         return Ok(vec![entry.to_path_buf()]);
@@ -364,16 +385,18 @@ impl Project {
                 .join(".thor-rust-build")
                 .join(&frontend.project_name)
         }))?;
+        let mut memory = crate::memory::Memory::select(
+            &options.command,
+            &options.flags,
+            if options.odin_compatible && options.tracking == "auto" { "off" } else { &options.tracking },
+            options.no_sanitize || options.odin_compatible,
+        )?;
+        memory.bundled_linker_runtime(&options.root, &frontend.odin, &options.flags);
         let mut project = Self {
             publish_layout: None,
             native_override: None,
             collected_diagnostics: None,
-            memory: crate::memory::Memory::select(
-                &options.command,
-                &options.flags,
-                if options.odin_compatible && options.tracking == "auto" { "off" } else { &options.tracking },
-                options.no_sanitize || options.odin_compatible,
-            )?,
+            memory,
             options,
             frontend,
             sources: vec![],
@@ -617,9 +640,18 @@ impl Project {
             crate::caller_metadata::validate(&mut resolver)?;
             self.retain_resolver(resolver);
         }
+        if crate::scoped::present(&self.sources) {
+            let mut resolver=self.resolver();
+            resolver.prepare_contexts();
+            resolver.set_evaluations(self.evaluated.clone());
+            if let Some(plan)=&self.evaluation {crate::specialization::Specializations::apply_bindings(&plan.bindings,&mut resolver);}
+            crate::scoped::validate(&mut resolver)?;
+            self.retain_resolver(resolver);
+        }
         self.schedule_evaluations()?;
         self.check_no_alloc()?;
-        self.backend_runtime = runtimeview::prepare(&self.options.root)?;
+        self.backend_runtime = runtimeview::prepare(&self.options.root,self.options.native_policy_probe
+            &&self.options.flags.iter().any(|flag|flag=="-vet-tabs"))?;
         let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index, &self.resolver_state);
         resolver.set_evaluations(self.evaluated.clone());
         resolver.prepare_contexts();
@@ -639,6 +671,9 @@ impl Project {
             self.options.editor_info,
             self.evaluation.as_ref(),
         );
+        if privileges.validation_exhausted {
+            return Err(Error::new(crate::vet::VALIDATION_BUDGET_EXHAUSTED));
+        }
         crate::caller_metadata::validate_with_permissions(&mut resolver,Some(&privileges))?;
         self.editor_info = privileges.editor_info.clone();
         let purity = if let Some(plan) = &self.evaluation {
@@ -918,7 +953,7 @@ impl Project {
                 continue;
             }
             if path.is_file() || path.is_symlink() {
-                fs::remove_file(path)?;
+                sdkmirror::remove_file_or_link(&path)?;
             }
         }
         if self.file_entry {
@@ -979,19 +1014,23 @@ impl Project {
             if before==self.sources.len() {return result;}
         }
     }
-    fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
+    fn discover_type_facts_from(&mut self, packages: BTreeSet<PathBuf>) -> Result<()> {
+        self.discover_type_facts_selected(packages, true)
+    }
+    fn discover_type_facts_selected(&mut self, mut packages: BTreeSet<PathBuf>, include_general: bool) -> Result<()> {
         let _phase = crate::profile::span("analysis.discover_types");
-        let general = self.options.comptime.aggressive() || self.sources.iter().any(|s| {
+        let general = include_general && (self.options.comptime.aggressive() || self.sources.iter().any(|s| {
             s.nodes.iter().any(|n| {
                 n.immutable
                     || n.data["pure"] == true
                     || matches!(n.kind.as_str(), "Run" | "Interpolation" | "OrPanic")
             }) || s.selections.iter().any(|selection| selection.wildcard)
                 || s.info["ro_parameters"].as_array().is_some_and(|x| !x.is_empty())
+                || s.info["scoped"].as_array().is_some_and(|x| !x.is_empty())
                 || s.info["mut_parameters"]
                     .as_array()
                     .is_some_and(|rows| !rows.is_empty())
-        });
+        }));
         if packages.is_empty() && !general {
             return Ok(());
         }
@@ -1103,8 +1142,10 @@ impl Project {
     pub(crate) fn native_flags(&self) -> Vec<String> {
         let mut result = vec![];
         result.extend(self.memory.extra.iter().cloned());
+        let merged_linker = self.memory.extra.iter().any(|f| f.starts_with("-extra-linker-flags:"));
         for flag in &self.options.flags {
             if !(flag.starts_with("-collection:")
+                || merged_linker && flag.starts_with("-extra-linker-flags:")
                 || matches!(flag.as_str(), "-json-errors" | "-keep-executable")
                 || self.options.command == "strip-semicolon" && flag == "-keep-temp-files")
             {
@@ -1334,16 +1375,20 @@ impl Project {
             if checks.iter().any(|check| check == "unused") {
                 self.discover_vet_type_facts()?;
             }
+            let memory_findings = self.lifetime_findings(&checks)?;
             let mut findings = crate::vet::run(
                 self,
                 &checks,
                 self.options.vet_apply,
                 self.options.vet_ask,
                 &mut errors,
+                memory_findings,
             )?;
             if action == "build" {
                 for finding in &mut findings {
-                    finding["type"] = json!("error");
+                    if !crate::unverified::is_unverified(finding) {
+                        finding["type"] = json!("error");
+                    }
                 }
             }
             // Prefer the source-level vet code when Odin also reports the
@@ -1403,8 +1448,15 @@ impl Project {
         Ok(0)
     }
     pub fn translate(&self, errors: &[Value]) -> Vec<Value> {
+        // Vet diagnostics already use original source coordinates/messages.
+        // Avoid rescanning emitted helpers and rebuilding a resolver for them.
+        if errors.iter().all(|error| error["stage"] == "vet") {
+            crate::profile::count("diagnostics.vet_passthrough", errors.len() as u64);
+            return errors.to_vec();
+        }
         let translated=errors.iter().map(|error|{
             let mut error=error.clone();
+            if error["stage"] == "vet" { return (error, None, None); }
             let mut purity_cause = None;
             let pure_site=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.pure_error_sites.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,site)|*site));
@@ -1477,6 +1529,7 @@ impl Project {
         }).collect();
         let mut translated=crate::diagnosticcleanup::clean(self,translated);
         for error in &mut translated {
+            if error["stage"] == "vet" { continue; }
             if let Some(messages)=error["msgs"].as_array_mut(){crate::parallelcompile::visible_diagnostics(messages);}
             if let Some(messages)=error["msgs"].as_array_mut(){for message in messages {
                 if let Some(text)=message.as_str(){*message=json!(self.hide_generated_names(text));}
@@ -1484,8 +1537,11 @@ impl Project {
         }
         translated
     }
+    pub(crate) fn support_source_path(&self, path: &Path) -> PathBuf {
+        support_file(&self.options.root, &self.backend_runtime, path)
+    }
     fn optional_diagnostic(&self,error:&mut Value) {
-        if error["pos"]["file"].as_str().is_some_and(|file|Path::new(file)==self.options.root.join("runtime/optional/optional.odin")) {
+        if error["pos"]["file"].as_str().is_some_and(|file|self.support_source_path(Path::new(file))==self.options.root.join("runtime/optional/optional.odin")) {
             if let Some((file,offset))=self.instantiation_locations(error).into_iter().find(|(file,_)|!self.sources[*file].path.starts_with(self.options.root.join("runtime"))) {
                 let source=&self.sources[file];
                 let span=source.nodes.iter().filter(|node|node.kind=="OrPanic"&&node.span.start<=offset&&offset<node.span.end)
@@ -1591,30 +1647,31 @@ impl Project {
             .filter(|message| !instantiations_only||message.contains("instantiated as"))
         {
             for (file, source) in self.sources.iter().enumerate() {
-                let path = source.path.to_string_lossy();
-                for (offset, _) in text.match_indices(path.as_ref()) {
-                    let suffix = &text[offset + path.len()..];
-                    let Some((line, column, _)) = reference_coordinates(suffix) else {
-                        continue;
-                    };
-                    let Some(row) = source.raw.split_inclusive('\n').nth(line - 1) else {
-                        continue;
-                    };
-                    let base = source
-                        .raw
-                        .split_inclusive('\n')
-                        .take(line - 1)
-                        .map(str::len)
-                        .sum::<usize>();
-                    let mut units = 0;
-                    for (offset, ch) in row.char_indices() {
-                        if units == column - 1 {
-                            result.push((file, base + offset));
-                            break;
-                        }
-                        units += ch.len_utf16();
-                        if ch == '\n' || units >= column {
-                            break;
+                for path in diagnostic_paths(&source.path, cfg!(windows)) {
+                    for (offset, _) in text.match_indices(path.as_ref()) {
+                        let suffix = &text[offset + path.len()..];
+                        let Some((line, column, _)) = reference_coordinates(suffix) else {
+                            continue;
+                        };
+                        let Some(row) = source.raw.split_inclusive('\n').nth(line - 1) else {
+                            continue;
+                        };
+                        let base = source
+                            .raw
+                            .split_inclusive('\n')
+                            .take(line - 1)
+                            .map(str::len)
+                            .sum::<usize>();
+                        let mut units = 0;
+                        for (offset, ch) in row.char_indices() {
+                            if units == column - 1 {
+                                result.push((file, base + offset));
+                                break;
+                            }
+                            units += ch.len_utf16();
+                            if ch == '\n' || units >= column {
+                                break;
+                            }
                         }
                     }
                 }
@@ -1626,9 +1683,13 @@ impl Project {
         let mut text = self.remap_references(text);
         let mut paths = BTreeMap::new();
         for (path, (file, _)) in &self.outputs {
-            paths.insert(path.to_string_lossy().into_owned(), self.sources[*file].path.to_string_lossy().into_owned());
+            for generated in diagnostic_paths(path, cfg!(windows)) {
+                paths.insert(generated.into_owned(), self.sources[*file].path.to_string_lossy().into_owned());
+            }
             if let (Some(generated), Some(original)) = (path.parent(), self.sources[*file].path.parent()) {
-                paths.insert(generated.to_string_lossy().into_owned(), original.to_string_lossy().into_owned());
+                for generated in diagnostic_paths(generated, cfg!(windows)) {
+                    paths.insert(generated.into_owned(), original.to_string_lossy().into_owned());
+                }
             }
         }
         let mut paths = paths.into_iter().collect::<Vec<_>>();
@@ -1642,63 +1703,75 @@ impl Project {
     fn remap_references(&self, text: &str) -> String {
         let mut text = text.to_string();
         for (path, (file, emitted)) in &self.outputs {
-            let pattern = path.to_string_lossy();
-            let mut cursor = 0;
-            while let Some(found) = text[cursor..].find(pattern.as_ref()) {
-                let start = cursor + found;
-                let coordinates = start + pattern.len();
-                let suffix = &text[coordinates..];
-                let Some((line, column, length)) = reference_coordinates(suffix) else {
-                    cursor = coordinates;
-                    continue;
-                };
-                let end = coordinates + length;
-                // Odin's textual instantiation notes count Unicode scalars;
-                // source-map spans use UTF-8 bytes. Primary JSON positions
-                // already include their byte offset and take another path.
-                let row = emitted
-                    .text
-                    .split_inclusive('\n')
-                    .nth(line.saturating_sub(1));
-                let Some(row) = row else {
-                    cursor = end;
-                    continue;
-                };
-                let offset = emitted
-                    .text
-                    .split_inclusive('\n')
-                    .take(line.saturating_sub(1))
-                    .map(str::len)
-                    .sum::<usize>()
-                    + row
-                        .chars()
-                        .take(column.saturating_sub(1))
-                        .map(char::len_utf8)
-                        .sum::<usize>();
-                if let Some(origin) = emitted.lookup(offset, 1) {
-                    let (line, column) = self.sources[*file].position(origin.span.start);
-                    let replacement = if suffix.starts_with(':') {
-                        let delimiter = if suffix[..length].ends_with(':') { ":" } else { "" };
-                        format!("{}:{line}:{column}{delimiter}", origin.file)
-                    } else {
-                        format!("{}({line}:{column})", origin.file)
+            for pattern in diagnostic_paths(path, cfg!(windows)) {
+                let mut cursor = 0;
+                while let Some(found) = text[cursor..].find(pattern.as_ref()) {
+                    let start = cursor + found;
+                    let coordinates = start + pattern.len();
+                    let suffix = &text[coordinates..];
+                    let Some((line, column, length)) = reference_coordinates(suffix) else {
+                        cursor = coordinates;
+                        continue;
                     };
-                    text.replace_range(start..end, &replacement);
-                    cursor = start + replacement.len();
-                } else {
-                    cursor = end;
+                    let end = coordinates + length;
+                    // Odin's textual instantiation notes count Unicode scalars;
+                    // source-map spans use UTF-8 bytes. Primary JSON positions
+                    // already include their byte offset and take another path.
+                    let row = emitted
+                        .text
+                        .split_inclusive('\n')
+                        .nth(line.saturating_sub(1));
+                    let Some(row) = row else {
+                        cursor = end;
+                        continue;
+                    };
+                    let offset = emitted
+                        .text
+                        .split_inclusive('\n')
+                        .take(line.saturating_sub(1))
+                        .map(str::len)
+                        .sum::<usize>()
+                        + row
+                            .chars()
+                            .take(column.saturating_sub(1))
+                            .map(char::len_utf8)
+                            .sum::<usize>();
+                    if let Some(origin) = emitted.lookup(offset, 1) {
+                        let (line, column) = self.sources[*file].position(origin.span.start);
+                        let replacement = if suffix.starts_with(':') {
+                            let delimiter = if suffix[..length].ends_with(':') { ":" } else { "" };
+                            format!("{}:{line}:{column}{delimiter}", origin.file)
+                        } else {
+                            format!("{}({line}:{column})", origin.file)
+                        };
+                        text.replace_range(start..end, &replacement);
+                        cursor = start + replacement.len();
+                    } else {
+                        cursor = end;
+                    }
                 }
             }
         }
         text
     }
     fn report_details(&self, errors: &[Value], information: &str) -> bool {
-        let mut seen = BTreeSet::new();
+        let _phase = crate::profile::span("diagnostics.report");
+        let mut summary = crate::unverified::Summary::default();
+        let mut seen = HashSet::new();
         let errors = self
             .translate(errors)
             .into_iter()
             .filter_map(|mut error| {
-                if error["type"] == "warning"
+                let unverified = crate::unverified::is_unverified(&error);
+                if unverified {
+                    if self.options.unverified == crate::unverified::Mode::Summary
+                        && !self.options.json && self.collected_diagnostics.is_none() {
+                        // Text summaries need counts, not a fully materialized
+                        // explanation for every hidden notice. JSON retains all.
+                        error["type"] = json!("info");
+                    } else { crate::unverified::prepare(&mut error, self.options.unverified); }
+                }
+                if !unverified && error["type"] == "warning"
                     && self
                         .options
                         .flags
@@ -1717,7 +1790,7 @@ impl Project {
                         }
                     }
                 }
-                if error["type"] == "warning"
+                if !unverified && error["type"] == "warning"
                     && self
                         .options
                         .flags
@@ -1726,14 +1799,14 @@ impl Project {
                 {
                     error["type"] = json!("error");
                 }
-                let key = json!([
-                    error["type"],
-                    error["pos"]["file"],
-                    error["pos"]["offset"],
-                    error["msgs"]
-                ])
-                .to_string();
-                seen.insert(key).then_some(error)
+                let key = (error["type"].as_str().map(str::to_owned),
+                    error["pos"]["file"].as_str().map(str::to_owned),
+                    error["pos"]["offset"].as_u64(),
+                    error["msgs"].as_array().into_iter().flatten()
+                        .filter_map(Value::as_str).map(str::to_owned).collect::<Vec<_>>());
+                if !seen.insert(key) { return None; }
+                summary.add(&error);
+                Some(error)
             })
             .collect::<Vec<_>>();
         let failed = errors.iter().any(|error| error["type"] == "error");
@@ -1745,6 +1818,7 @@ impl Project {
             }
         } else if self.options.json {
             let mut packet = json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors});
+            if summary.count > 0 { packet["unverified"] = summary.json(self.options.unverified); }
             if !information.is_empty() { packet["information"] = json!(information); }
             if self.options.editor_info {
                 packet["slice_access"] = json!(self.editor_info);
@@ -1753,12 +1827,16 @@ impl Project {
         } else {
             if !information.is_empty() { eprint!("{information}"); }
             for error in errors {
+                if self.options.unverified == crate::unverified::Mode::Summary
+                    && crate::unverified::is_unverified(&error) { continue; }
                 // Vet corrections can replace the source before these remaining
                 // warnings are printed. Their positions already follow the edits.
                 let corrected = self.options.command == "vet" && (self.options.vet_apply || self.options.vet_ask);
                 let raw=error["pos"]["file"].as_str().filter(|_|!corrected).and_then(|file|self.sources.iter().find(|source|source.path==Path::new(file))).map(|source|source.raw.as_str());
                 eprintln!("{}",crate::diagnostic::text(&error,raw,self.options.flags.iter().any(|flag|flag=="-terse-errors"),self.options.flags.iter().any(|flag|flag=="-error-pos-style:unix")));
             }
+            let notice = summary.text(self.options.unverified, &self.options.command);
+            if !notice.is_empty() { eprintln!("{notice}"); }
         }
         failed
     }
@@ -1771,6 +1849,35 @@ pub fn print_diagnostic(error: &Value) {
 mod incremental_index_tests {
     use super::*;
     use crate::{ast::NodeId, semantics::Ref};
+
+    #[test]
+    fn diagnostic_path_spellings_handle_windows_without_rewriting_posix_literals() {
+        let path=Path::new(r"C:\project folder\é\main.odin");
+        let native=diagnostic_paths(path,false).map(|p|p.into_owned()).collect::<Vec<_>>();
+        let windows=diagnostic_paths(path,true).map(|p|p.into_owned()).collect::<Vec<_>>();
+        let forward=diagnostic_paths(Path::new("C:/project/main.odin"),true).count();
+        if native!=vec![r"C:\project folder\é\main.odin".to_string()]
+            || windows!=vec![r"C:\project folder\é\main.odin".to_string(),"C:/project folder/é/main.odin".into()]
+            || forward!=1 {panic!("diagnostic path spellings changed their source or duplicated matches");}
+        for suffix in ["(3:4)","(3, 4)",":3:4:"] {
+            let coordinates=reference_coordinates(suffix);
+            if coordinates!=Some((3,4,suffix.len())) {panic!("native coordinates were lost: {suffix}");}
+        }
+    }
+
+    #[test]
+    fn support_view_identity_is_bounded_by_its_recorded_root() {
+        let root=std::env::temp_dir().join("thor-install");
+        let view=root.join("lib/runtime-view");
+        let file=view.join("format/render.odin");
+        let original=support_file(&root,&view,&file);
+        let unrelated=root.join("lib/other/render.odin");
+        let retained=support_file(&root,&view,&unrelated);
+        let empty=support_file(&root,Path::new(""),&file);
+        if original!=root.join("runtime/format/render.odin")||retained!=unrelated||empty!=file {
+            panic!("diagnostic support-view identity escaped its recorded root");
+        }
+    }
 
     #[test]
     fn output_flags_preserve_source_facts_and_semantic_flags_invalidate_them() {

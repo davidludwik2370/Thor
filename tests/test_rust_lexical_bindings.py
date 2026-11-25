@@ -9,6 +9,7 @@ from thorlang.driver import Project,frontend_binary
 from thorlang.evaluation import Evaluator
 from thorlang.semantics import Type
 from thorlang.specialization import Binding,Unresolved,type_code
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -21,7 +22,7 @@ class RustLexicalBindingTests(unittest.TestCase):
                               '--example','lexical_protocol'],capture_output=True,text=True,timeout=600)
         if build.returncode:
             raise RuntimeError(build.stdout+build.stderr)
-        cls.binary=native.ROOT/'rust/target/release/examples/lexical_protocol'
+        cls.binary=rust_binary('lexical_protocol', example=True)
         cls.frontend=frontend_binary('odin')[0]
 
     def compare(self,body,*,annotation='int',constant=None,prefix=''):

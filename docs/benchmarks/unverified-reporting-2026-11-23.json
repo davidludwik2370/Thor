@@ -1,0 +1,4071 @@
+{
+  "date": "2026-11-23",
+  "platform": "macOS ARM64",
+  "method": "Sequential paired warm samples with identical input sources and flags. Memory checks only, required-only compile-time evaluation; ordinary transpile also checked.",
+  "source_sha256": {
+    "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor": "5160a370b6609f4b29730dbe898406820f363ca958562eba78fdd88d6db3f32d",
+    "/Users/davidludwik/Code/Thor/ascending_primes/ascending_primes.thor": "c3c7826d274bcd4a7832aa2536d26ce11bf3ad81ff78a8bbf7a3f35b4eb5c197",
+    "/Users/davidludwik/Code/Thor/big_num_demo/big_num_demo.thor": "fdb2e326b7340f2bd25a8e56efe2acda014de3466d546cf79ac7a5a6802647a1",
+    "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor": "008ce4503c61f35437d327a94bcbdb57f5d49a2ac5fea909b5440e93e609bdb9",
+    "/Users/davidludwik/Code/Thor/circles_on_dots/cricles_on_dots.thor": "e08f96ca0ce6800c36bad60e685bb359cfe995ec9fd81562fec2af072f370928",
+    "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor": "0bb9a403fdacb02d8957f11356a09eaf403b57868e8ff9dca57d34d61a5590e5",
+    "/Users/davidludwik/Code/Thor/double_bet/double_bet.thor": "34a3fbcc53eec6723da8a2d226937a4d71ba7455d6685efc40f748210b291c1c",
+    "/Users/davidludwik/Code/Thor/hilo/hilo.thor": "8d2a5a23dd1dabf5cc08f16c9bc87682c20f7c78b3bfdf8e24cb6d2f417e1ee8",
+    "/Users/davidludwik/Code/Thor/hilo_test/hilo_test.thor": "61022ce43bce328aeb4d68af057c213affbdac9b331d8ec98034a5ffad6312b7",
+    "/Users/davidludwik/Code/Thor/life/life.thor": "bece4f141d7562f19a1697c05595fe44b78797c43bd9d9100c95369e63b8890a",
+    "/Users/davidludwik/Code/Thor/md5/md5.thor": "8f4820817681974348c8f2661ec11d81b6aedfce923f5336249947ac5e0833e6",
+    "/Users/davidludwik/Code/Thor/othello/othello.thor": "2416cc9087d822db5328e17a66b34ada7a39c01a9231ac22835a274d386f3449",
+    "/Users/davidludwik/Code/Thor/poker/poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+    "/Users/davidludwik/Code/Thor/poker/judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+    "/Users/davidludwik/Code/Thor/poker/simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+    "/Users/davidludwik/Code/Thor/poker/poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269",
+    "/Users/davidludwik/Code/Thor/poker_pmap/poker_test.thor": "5e3c6a5772c54595ff167c53ecd68ef0e609c4d08e23daec8d2b906a55342dfb",
+    "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor": "abb5fd369f414bb1546f38d2b77f7ea50e15e58b139050942c5ea5893f01225d",
+    "/Users/davidludwik/Code/Thor/poker_pmap/simulation_test.thor": "f17ad177deb55907f77bc1c0a2ebbb12f6130c22755cd4d44890dc64d15ad5c5",
+    "/Users/davidludwik/Code/Thor/poker_pmap/poker.thor": "9caa48af2f47aac48b1ac96d576b86247d1e2f9f58e60322fe46b4f23302f1a8",
+    "/Users/davidludwik/Code/Thor/pythagorean_tripples/pythagorean_tripples.thor": "2f303cd15cec29660362c2926fc3b14e7ea213b122b73f025d655895a6523b18",
+    "/Users/davidludwik/Code/Thor/react_time/react_time.thor": "ecc9ce08829a1d5d850684ff3bd251a7db2ea72551be70ff228ce9f9ec40ea1f",
+    "/Users/davidludwik/Code/Thor/sandbox/sandbox.thor": "83982291fcc1f6a3b1dc696078a385c29dd36abe0f93daee82a01ac1202ccdfb",
+    "/Users/davidludwik/Code/Thor/sketch/sketch.thor": "44222823369d8e3539c78b3cf69ed559bd601c8faf40755fceb2df3070fd5e36",
+    "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor": "3a9e636449dd50dd9629e73473bfa8b72b1d3c22f656348828a2a25e42471dd6",
+    "/Users/davidludwik/Code/Thor/tetris/tetris.thor": "004c40f457b3901266ff83e3c3d91aa0c8d5a6fcff19ee1d2f0e8731e02703b7",
+    "/Users/davidludwik/Code/Thor/triangle_solver/triangle_solver.thor": "88c4a290cbaf05fd40ed5f09a38b1a284d5a140c1f9cc250578b8ce9847c779f"
+  },
+  "compiler_sha256": {
+    "before": "352f08420304954e5ac823117ebbf6fd4d7e1fd5c29b5fc754652fcc2d0c2b0e",
+    "after": "b33deb1a48f732f6d53cc8539e5bf1e6ab1623a2e3e9ee669c706a8d6d088c0f"
+  },
+  "findings": [
+    {
+      "project": "15_puzzle",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 6,
+          "lifetime": 17
+        },
+        "count": 23,
+        "definite_memory_issues": 0,
+        "locations": 17,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          1639,
+          1640,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          1639,
+          1640,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          2074,
+          2081,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          2074,
+          2081,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          2484,
+          2504,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          2484,
+          2504,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          3434,
+          3442,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          3434,
+          3442,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          3983,
+          3997,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          4581,
+          4591,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          4581,
+          4591,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          4646,
+          4668,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          4646,
+          4668,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          4700,
+          4732,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          9647,
+          9675,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          9704,
+          9719,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          10120,
+          10143,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          10293,
+          10312,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          11297,
+          11322,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          12317,
+          12330,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          13026,
+          13044,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          13166,
+          13187,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/15_puzzle/15_puzzle.thor",
+          13414,
+          13435,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "ascending_primes",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "lifetime": 2
+        },
+        "count": 2,
+        "definite_memory_issues": 0,
+        "locations": 2,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/ascending_primes/ascending_primes.thor",
+          420,
+          603,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/ascending_primes/ascending_primes.thor",
+          634,
+          685,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "big_num_demo",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "bin_tree",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 2,
+          "lifetime": 27
+        },
+        "count": 29,
+        "definite_memory_issues": 0,
+        "locations": 28,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          363,
+          371,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          414,
+          422,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          491,
+          499,
+          "Unverified lifetime: storage may have been released; selected reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          525,
+          533,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          567,
+          575,
+          "Unverified lifetime: storage may have been released; selected reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          601,
+          609,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          786,
+          795,
+          "Unverified leak: allocation may escape on some paths; cleanup or ownership transfer is not verified on every path."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          926,
+          932,
+          "Unverified lifetime: reference may reach released storage; lifetime cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          1048,
+          1075,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          1085,
+          1112,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          1833,
+          1858,
+          "Unverified leak: allocation may escape on some paths; cleanup or ownership transfer is not verified on every path."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          1867,
+          1911,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          1920,
+          1964,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          2568,
+          2703,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          2997,
+          3044,
+          "Unverified lifetime: indexed storage is beyond the tracked reference provenance."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3183,
+          4314,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3217,
+          3377,
+          "Unverified lifetime: reference may reach released storage; lifetime cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3306,
+          3312,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3342,
+          3348,
+          "Unverified lifetime: storage may have been released on another path; this access cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3464,
+          3484,
+          "Unverified lifetime: storage may have been released; selected reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3488,
+          3508,
+          "Unverified lifetime: storage may have been released; selected reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3629,
+          3788,
+          "Unverified lifetime: reference may reach released storage; lifetime cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3801,
+          3826,
+          "Unverified lifetime: cleanup target has unknown provenance; validity and ownership cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          3801,
+          3826,
+          "Unverified lifetime: cleanup may release storage more than once."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          4012,
+          4059,
+          "Unverified lifetime: indexed storage is beyond the tracked reference provenance."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          4190,
+          4298,
+          "Unverified lifetime: reference may reach released storage; lifetime cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          4821,
+          4921,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          5024,
+          5038,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/bin_tree/bin_tree.thor",
+          5043,
+          5057,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "circles_on_dots",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 1,
+          "lifetime": 1
+        },
+        "count": 2,
+        "definite_memory_issues": 0,
+        "locations": 1,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/circles_on_dots/cricles_on_dots.thor",
+          1902,
+          1914,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/circles_on_dots/cricles_on_dots.thor",
+          1902,
+          1914,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "Dijkstra",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 3,
+          "lifetime": 6
+        },
+        "count": 9,
+        "definite_memory_issues": 0,
+        "locations": 6,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          2766,
+          2775,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          2766,
+          2775,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          3575,
+          3584,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          3575,
+          3584,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          4686,
+          4760,
+          "Unverified lifetime: loop reference graph did not converge within the analysis budget; retention, release, and lifetime of this reference cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          5735,
+          5742,
+          "Unverified lifetime: reference expression exceeds the analysis depth budget."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          5743,
+          5744,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          5743,
+          5744,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/Dijkstra/Dijkstra.thor",
+          6271,
+          6297,
+          "Unverified lifetime: recursive call requires a lifetime summary that did not converge; retention, release, and lifetime of this reference cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "double_bet",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "hilo",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "hilo_test",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "life",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "md5",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 1
+        },
+        "count": 1,
+        "definite_memory_issues": 0,
+        "locations": 1,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/md5/md5.thor",
+          1429,
+          1456,
+          "Unverified leak: allocation has no visible cleanup or ownership transfer; allocator lifetime is unknown (it may be arena-managed)."
+        ]
+      ]
+    },
+    {
+      "project": "othello",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 1,
+          "lifetime": 1
+        },
+        "count": 2,
+        "definite_memory_issues": 0,
+        "locations": 1,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/othello/othello.thor",
+          2396,
+          2402,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/othello/othello.thor",
+          2396,
+          2402,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "poker",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 5,
+          "lifetime": 5
+        },
+        "count": 10,
+        "definite_memory_issues": 0,
+        "locations": 5,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          18052,
+          18068,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          18052,
+          18068,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          18111,
+          18116,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          18111,
+          18116,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          36472,
+          36550,
+          "Unverified leak: project analysis budget reached; remaining procedure bodies require manual review."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/judge_test.thor",
+          36472,
+          36550,
+          "Unverified lifetime: project analysis budget reached; remaining procedure bodies require manual review."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/poker.thor",
+          5967,
+          5968,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/poker.thor",
+          5967,
+          5968,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/poker_test.thor",
+          19363,
+          19416,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker/poker_test.thor",
+          19363,
+          19416,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "poker_pmap",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 5,
+          "lifetime": 5
+        },
+        "count": 10,
+        "definite_memory_issues": 0,
+        "locations": 5,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          18972,
+          18988,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          18972,
+          18988,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          19031,
+          19036,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          19031,
+          19036,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          37578,
+          37656,
+          "Unverified leak: project analysis budget reached; remaining procedure bodies require manual review."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor",
+          37578,
+          37656,
+          "Unverified lifetime: project analysis budget reached; remaining procedure bodies require manual review."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/poker.thor",
+          6020,
+          6021,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/poker.thor",
+          6020,
+          6021,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/poker_test.thor",
+          19357,
+          19410,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/poker_pmap/poker_test.thor",
+          19357,
+          19410,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "pythagorean_tripples",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "react_time",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "sketch",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 1,
+          "lifetime": 5
+        },
+        "count": 6,
+        "definite_memory_issues": 0,
+        "locations": 5,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          1340,
+          1356,
+          "Unverified lifetime: indexed storage is beyond the tracked reference provenance."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          1456,
+          1472,
+          "Unverified lifetime: indexed storage is beyond the tracked reference provenance."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          2431,
+          2436,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          2431,
+          2436,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          2458,
+          2477,
+          "Unverified lifetime: indexed storage is beyond the tracked reference provenance."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sketch/sketch.thor",
+          3846,
+          3874,
+          "Unverified lifetime: cleanup may release storage more than once."
+        ]
+      ]
+    },
+    {
+      "project": "sudoku",
+      "findings_equal": true,
+      "summary": {
+        "categories": {
+          "leak": 2,
+          "lifetime": 3
+        },
+        "count": 5,
+        "definite_memory_issues": 0,
+        "locations": 3,
+        "mode": "summary"
+      },
+      "finding_evidence": [
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor",
+          3391,
+          3397,
+          "Unverified lifetime: reference expression exceeds the analysis depth budget."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor",
+          3398,
+          3399,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor",
+          3398,
+          3399,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ],
+        [
+          "thor/leak-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor",
+          11678,
+          11701,
+          "Unverified leak: analysis budget reached; remaining cleanup obligations cannot be verified."
+        ],
+        [
+          "thor/lifetime-unknown",
+          "unverified",
+          "/Users/davidludwik/Code/Thor/sudoku/sudoku.thor",
+          11678,
+          11701,
+          "Unverified lifetime: analysis budget reached; remaining reference effects cannot be verified."
+        ]
+      ]
+    },
+    {
+      "project": "tetris",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    },
+    {
+      "project": "triangle_solver",
+      "findings_equal": true,
+      "summary": null,
+      "finding_evidence": []
+    }
+  ],
+  "samples": [
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.23960441700182855,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.093061708,
+          "self_seconds": 0.07617758300000001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.234749167,
+          "self_seconds": 1.5084999999998017e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.082171708,
+          "self_seconds": 0.001361582
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.014179833,
+          "self_seconds": 0.007568206000000001
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.002704292,
+          "self_seconds": 0.0016390450000000002
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24723879099474289,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.094416625,
+          "self_seconds": 0.077456458
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.241937417,
+          "self_seconds": 2.0458000000000975e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 2.125e-06,
+          "self_seconds": 2.125e-06
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085423167,
+          "self_seconds": 0.0015230420000000022
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.014222334,
+          "self_seconds": 0.007600788
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.002735708,
+          "self_seconds": 0.0016755849999999998
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 0,
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24266562500270084,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.092799459,
+          "self_seconds": 0.075858459
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.237146542,
+          "self_seconds": 1.966700000000099e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.084969834,
+          "self_seconds": 0.0015520419999999757
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.014155042,
+          "self_seconds": 0.007602879
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.002785958,
+          "self_seconds": 0.0017389579999999996
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.2413906670117285,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.092156542,
+          "self_seconds": 0.075369709
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.236473583,
+          "self_seconds": 1.1165999999979137e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 2.042e-06,
+          "self_seconds": 2.042e-06
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.081939375,
+          "self_seconds": 0.0013415000000000094
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.014134833,
+          "self_seconds": 0.007594991000000002
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.002649958,
+          "self_seconds": 0.001603541
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 0,
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24340383301023394,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.09375725,
+          "self_seconds": 0.077205667
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.238342125,
+          "self_seconds": 1.566599999996976e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.082525458,
+          "self_seconds": 0.001333080999999986
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.013919083,
+          "self_seconds": 0.007467535000000002
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.0026325,
+          "self_seconds": 0.001599874
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.2502142500015907,
+      "stderr_bytes": 0,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.097556208,
+          "self_seconds": 0.080449833
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.245104166,
+          "self_seconds": 1.879200000001746e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 2e-06,
+          "self_seconds": 2e-06
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.088085542,
+          "self_seconds": 0.0018552110000000094
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.014384208,
+          "self_seconds": 0.007715541000000002
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.002720167,
+          "self_seconds": 0.001657834
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 0,
+        "lifetime.inline_promotions": 22,
+        "lifetime.loop_expired_slots": 4,
+        "lifetime.result_fact_calls": 26,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 25,
+        "lifetime.summary_library_contracts": 4,
+        "lifetime.summary_nodes": 159,
+        "lifetime.summary_proofs": 7,
+        "lifetime.summary_verified": 3,
+        "lifetime.writer_summary_applied": 12,
+        "vet.lifetime_objects": 176,
+        "vet.lifetime_steps": 2145
+      }
+    },
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.14952612499473616,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.144889125,
+          "self_seconds": 3.245900000001245e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.083945916,
+          "self_seconds": 0.0013672909999999927
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.15118800001800992,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.146342,
+          "self_seconds": 2.1625000000025096e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.0838645,
+          "self_seconds": 0.0012965429999999972
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.15125633298885077,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.146466833,
+          "self_seconds": 2.5914999999987476e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.084176583,
+          "self_seconds": 0.0013510860000000013
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.15489825000986457,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.150033667,
+          "self_seconds": 2.7666000000009516e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.087242667,
+          "self_seconds": 0.001601249000000013
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1497682920016814,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.144879041,
+          "self_seconds": 2.59979999999993e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.083709167,
+          "self_seconds": 0.0013049589999999944
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "hilo_test",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.14810987500823103,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.143351666,
+          "self_seconds": 2.8040999999978666e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085526292,
+          "self_seconds": 0.0015287089999999892
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9827365829842165,
+      "stderr_bytes": 5814,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.576571792,
+          "self_seconds": 0.083196834
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.976567917,
+          "self_seconds": 1.7542000000037028e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.327159792,
+          "self_seconds": 0.0037604580000000776
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.46589025,
+          "self_seconds": 0.455976385
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.027480083,
+          "self_seconds": 0.008264290999999938
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9867989580088761,
+      "stderr_bytes": 187,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.58153225,
+          "self_seconds": 0.07423008399999997
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.980025416,
+          "self_seconds": 1.1957999999978597e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 5.9e-05,
+          "self_seconds": 5.9e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.323931416,
+          "self_seconds": 0.0039035829999999883
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.479486375,
+          "self_seconds": 0.469490148
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.027756791,
+          "self_seconds": 0.008429623999999993
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 10,
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9990986249758862,
+      "stderr_bytes": 5814,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.579352708,
+          "self_seconds": 0.08181195699999999
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.993088292,
+          "self_seconds": 1.6041999999938383e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.329521292,
+          "self_seconds": 0.0037812090000000076
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.469372292,
+          "self_seconds": 0.459236655
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.028163959,
+          "self_seconds": 0.008323143999999984
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9726011250168085,
+      "stderr_bytes": 187,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.566344042,
+          "self_seconds": 0.07342099999999996
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.966707875,
+          "self_seconds": 2.5458000000089243e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 5.9542e-05,
+          "self_seconds": 5.9542e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.327678458,
+          "self_seconds": 0.004042832999999968
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.465423417,
+          "self_seconds": 0.4557413
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.027440083,
+          "self_seconds": 0.008088738999999973
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 10,
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9814144579868298,
+      "stderr_bytes": 5814,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.579481083,
+          "self_seconds": 0.084806457
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.975501875,
+          "self_seconds": 1.541799999982274e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.324206459,
+          "self_seconds": 0.0037565400000000304
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.467109959,
+          "self_seconds": 0.457282672
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.027559625,
+          "self_seconds": 0.008184094000000013
+        }
+      },
+      "counters": {
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.9925948750169482,
+      "stderr_bytes": 187,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.564673292,
+          "self_seconds": 0.07335887600000002
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.986149958,
+          "self_seconds": 1.1539000000060362e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 6.2041e-05,
+          "self_seconds": 6.2041e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.349988334,
+          "self_seconds": 0.0042183330000000185
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.46412925,
+          "self_seconds": 0.45421645
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.027123125,
+          "self_seconds": 0.00794536299999998
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 10,
+        "lifetime.inline_promotions": 28,
+        "lifetime.loop_expired_slots": 206,
+        "lifetime.result_fact_calls": 845,
+        "lifetime.summary_applied": 28,
+        "lifetime.summary_hits": 167,
+        "lifetime.summary_nodes": 539,
+        "lifetime.summary_proofs": 100,
+        "lifetime.summary_verified": 3,
+        "vet.lifetime_objects": 40740,
+        "vet.lifetime_steps": 65547
+      }
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.40597141699981876,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.398483875,
+          "self_seconds": 5.4124999999960455e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.325000875,
+          "self_seconds": 0.0037946659999999466
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.4230098339903634,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.41611475,
+          "self_seconds": 3.3791000000005234e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.329518208,
+          "self_seconds": 0.0039237919999999815
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.40217924999888055,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.396726292,
+          "self_seconds": 2.7416999999974045e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.325549334,
+          "self_seconds": 0.003784125000000027
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.4009521669941023,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.395141625,
+          "self_seconds": 3.179300000000218e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.327412416,
+          "self_seconds": 0.003823538999999987
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.4079874169838149,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.401774583,
+          "self_seconds": 4.2457999999967466e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.333383792,
+          "self_seconds": 0.003885958999999939
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "poker_pmap",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.41411541699199006,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.408065792,
+          "self_seconds": 2.678999999999876e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.335798667,
+          "self_seconds": 0.003970373999999888
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5275050839991309,
+      "stderr_bytes": 2442,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.403639666,
+          "self_seconds": 0.07014029
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.521631958,
+          "self_seconds": 1.8666999999972234e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.063417584,
+          "self_seconds": 0.0010344160000000102
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.318672917,
+          "self_seconds": 0.317314246
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.013838542,
+          "self_seconds": 0.0031031310000000055
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5495322079805192,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.42741575,
+          "self_seconds": 0.07121795799999997
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.543202042,
+          "self_seconds": 1.262499999998834e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 4.625e-05,
+          "self_seconds": 4.625e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.0629485,
+          "self_seconds": 0.0009755430000000023
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.342417875,
+          "self_seconds": 0.341062425
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.013733667,
+          "self_seconds": 0.002949251
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 5,
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5494880419864785,
+      "stderr_bytes": 2442,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.432389875,
+          "self_seconds": 0.07432504199999995
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.542996666,
+          "self_seconds": 1.612499999992245e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.06563325,
+          "self_seconds": 0.000998418000000001
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.342998791,
+          "self_seconds": 0.341635252
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.013979834,
+          "self_seconds": 0.0031142570000000022
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5541252919938415,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.436277916,
+          "self_seconds": 0.07231791500000001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.547503417,
+          "self_seconds": 1.3792000000067972e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 4.1042e-05,
+          "self_seconds": 4.1042e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.06643475,
+          "self_seconds": 0.0010547929999999983
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.349715417,
+          "self_seconds": 0.34829558099999997
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014203542,
+          "self_seconds": 0.0030529899999999967
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 5,
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5368623330141418,
+      "stderr_bytes": 2442,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.423690917,
+          "self_seconds": 0.072936377
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.530642,
+          "self_seconds": 1.9414999999911586e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.064730167,
+          "self_seconds": 0.0010774179999999967
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.334961666,
+          "self_seconds": 0.333599993
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014573541,
+          "self_seconds": 0.003390833000000008
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5221947920217644,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.406604292,
+          "self_seconds": 0.07101512599999998
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.516007375,
+          "self_seconds": 1.2249000000075227e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 4.175e-05,
+          "self_seconds": 4.175e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.064902375,
+          "self_seconds": 0.0009845009999999987
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.3211695,
+          "self_seconds": 0.319770627
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014377916,
+          "self_seconds": 0.0033634119999999927
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 5,
+        "lifetime.loop_expired_slots": 3,
+        "lifetime.result_fact_calls": 73,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_hits": 38,
+        "lifetime.summary_nodes": 29,
+        "lifetime.summary_proofs": 9,
+        "vet.lifetime_objects": 587,
+        "vet.lifetime_steps": 10158
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.11689600002137013,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.111660375,
+          "self_seconds": 2.845900000000845e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.066908333,
+          "self_seconds": 0.0010324149999999949
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.11420779200852849,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.10903525,
+          "self_seconds": 5.204099999998879e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.0643995,
+          "self_seconds": 0.0010207519999999998
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.11498466701596044,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.10964325,
+          "self_seconds": 2.1791999999992706e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.065328667,
+          "self_seconds": 0.001032002000000004
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.12989545898744836,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.124158083,
+          "self_seconds": 2.8708000000002287e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.068246708,
+          "self_seconds": 0.0011409970000000186
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.11627087500528432,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.110877917,
+          "self_seconds": 2.8290999999999733e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.065251459,
+          "self_seconds": 0.0009490429999999966
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sudoku",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.12197262499830686,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.1160485,
+          "self_seconds": 2.7124000000003368e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.071894542,
+          "self_seconds": 0.001126793000000001
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5749106659786776,
+      "stderr_bytes": 26312,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.225013875,
+          "self_seconds": 0.094515125
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.568065166,
+          "self_seconds": 2.3582000000077485e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.272754917,
+          "self_seconds": 0.0022854569999999907
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.114977667,
+          "self_seconds": 0.109498439
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014816167,
+          "self_seconds": 0.005333496
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5549892089911737,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.204729375,
+          "self_seconds": 0.074860375
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.547743,
+          "self_seconds": 1.716699999998461e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.000223125,
+          "self_seconds": 0.000223125
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.2735365,
+          "self_seconds": 0.0019647930000000202
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.11571175,
+          "self_seconds": 0.11036537800000001
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.013934125,
+          "self_seconds": 0.0045560909999999965
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 28,
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5694592500221916,
+      "stderr_bytes": 26312,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.223716709,
+          "self_seconds": 0.09359187500000002
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.561978417,
+          "self_seconds": 1.7916000000006704e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.270003583,
+          "self_seconds": 0.0020025840000000295
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.115161333,
+          "self_seconds": 0.10977712199999999
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014245084,
+          "self_seconds": 0.004867419000000003
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.556853082991438,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.208635541,
+          "self_seconds": 0.075725874
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.55014725,
+          "self_seconds": 1.2083999999967787e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.000246292,
+          "self_seconds": 0.000246292
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.270787958,
+          "self_seconds": 0.0019162899999999872
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.118389125,
+          "self_seconds": 0.112979609
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.01427425,
+          "self_seconds": 0.0047162079999999995
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 28,
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5731112910143565,
+      "stderr_bytes": 26312,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.224682625,
+          "self_seconds": 0.09635154199999998
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.566490125,
+          "self_seconds": 1.7416999999908533e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.271878834,
+          "self_seconds": 0.0018890840000000408
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.113602875,
+          "self_seconds": 0.10821037899999998
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.014017708,
+          "self_seconds": 0.004773503000000005
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.5517872500058729,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.20090275,
+          "self_seconds": 0.07381179199999999
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.545330125,
+          "self_seconds": 2.1792000000075973e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.000237958,
+          "self_seconds": 0.000237958
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.274103375,
+          "self_seconds": 0.0021422080000000343
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.113651375,
+          "self_seconds": 0.10829741199999998
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.013201625,
+          "self_seconds": 0.004364714999999998
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 28,
+        "lifetime.loop_expired_slots": 101,
+        "lifetime.result_fact_calls": 214,
+        "lifetime.summary_applied": 53,
+        "lifetime.summary_hits": 247,
+        "lifetime.summary_library_contracts": 11,
+        "lifetime.summary_nodes": 289,
+        "lifetime.summary_proofs": 20,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 1842,
+        "vet.lifetime_steps": 29344
+      }
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.34821358299814165,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.341885417,
+          "self_seconds": 2.5749999999991058e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.271022584,
+          "self_seconds": 0.001901335000000004
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.34729233299731277,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.340591916,
+          "self_seconds": 4.028999999999838e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.272164375,
+          "self_seconds": 0.0024988360000000043
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.36161041699233465,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.355335125,
+          "self_seconds": 2.5749999999991058e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.2734395,
+          "self_seconds": 0.00201621099999999
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.35017745799268596,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.343523833,
+          "self_seconds": 3.76250000000411e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.271467417,
+          "self_seconds": 0.0019315839999999862
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.34789054200518876,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.341511584,
+          "self_seconds": 4.312600000000444e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.270277542,
+          "self_seconds": 0.001954041999999989
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "15_puzzle",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.3477442920266185,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.341579333,
+          "self_seconds": 3.512399999994198e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.269950334,
+          "self_seconds": 0.002058040999999955
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.336474666983122,
+      "stderr_bytes": 15645,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.1689865,
+          "self_seconds": 0.11449054100000002
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.330783416,
+          "self_seconds": 1.5748999999953828e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.094042208,
+          "self_seconds": 0.001390373999999972
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.033536125,
+          "self_seconds": 0.027769463000000005
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.020957125,
+          "self_seconds": 0.003342081000000007
+        }
+      },
+      "counters": {
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.3052922080096323,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.139677667,
+          "self_seconds": 0.08111670900000001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.299475875,
+          "self_seconds": 3.69179999999969e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.000302792,
+          "self_seconds": 0.000302792
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.093430041,
+          "self_seconds": 0.0014747500000000108
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.037137416,
+          "self_seconds": 0.030607441999999995
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.02112075,
+          "self_seconds": 0.003594831999999999
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 81,
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.3332734160067048,
+      "stderr_bytes": 15645,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.167595792,
+          "self_seconds": 0.111197334
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.327647833,
+          "self_seconds": 1.6415000000047364e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.093816084,
+          "self_seconds": 0.0014414600000000055
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.034830375,
+          "self_seconds": 0.028796425999999996
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.021565,
+          "self_seconds": 0.003353957000000001
+        }
+      },
+      "counters": {
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.3034308750065975,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.1367755,
+          "self_seconds": 0.080264001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.297698958,
+          "self_seconds": 1.9665000000002042e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.000388541,
+          "self_seconds": 0.000388541
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.094213167,
+          "self_seconds": 0.0013948770000000027
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.034802583,
+          "self_seconds": 0.028827575999999997
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.021320375,
+          "self_seconds": 0.003335992999999999
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 81,
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.335028625006089,
+      "stderr_bytes": 15645,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.168496666,
+          "self_seconds": 0.11311008299999999
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.329173625,
+          "self_seconds": 1.9791000000046743e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.094932792,
+          "self_seconds": 0.001439459000000004
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.034192167,
+          "self_seconds": 0.028257925000000003
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.021191625,
+          "self_seconds": 0.0033996680000000223
+        }
+      },
+      "counters": {
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.304158417013241,
+      "stderr_bytes": 188,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.136126792,
+          "self_seconds": 0.079681792
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.298051917,
+          "self_seconds": 2.062600000002357e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 0.00033725,
+          "self_seconds": 0.00033725
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.093633,
+          "self_seconds": 0.0013432119999999825
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.034440958,
+          "self_seconds": 0.02862758
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.021666792,
+          "self_seconds": 0.0037117059999999848
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 81,
+        "lifetime.graph_programs": 1,
+        "lifetime.graph_summary_applied": 2,
+        "lifetime.graph_summary_reads": 30,
+        "lifetime.loop_expired_slots": 12,
+        "lifetime.result_fact_calls": 50,
+        "lifetime.result_fact_packages": 1,
+        "lifetime.summary_applied": 6,
+        "lifetime.summary_hits": 33,
+        "lifetime.summary_nodes": 71,
+        "lifetime.summary_proofs": 8,
+        "lifetime.summary_verified": 2,
+        "vet.lifetime_objects": 434,
+        "vet.lifetime_steps": 5155
+      }
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.16489220800576732,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.159756875,
+          "self_seconds": 3.470799999999441e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.095492625,
+          "self_seconds": 0.001313748999999989
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.16578050001407973,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.160414833,
+          "self_seconds": 3.5500000000021625e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.096142792,
+          "self_seconds": 0.0014775850000000035
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1632712089922279,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.15796475,
+          "self_seconds": 3.104199999998114e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.0956895,
+          "self_seconds": 0.0014653309999999864
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1642133750137873,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.158714959,
+          "self_seconds": 2.6416999999973045e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.096048167,
+          "self_seconds": 0.0015168319999999957
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.16666379201342352,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.160994667,
+          "self_seconds": 4.229100000002761e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.09576,
+          "self_seconds": 0.0014448330000000065
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "bin_tree",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.16153166702133603,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.156214458,
+          "self_seconds": 2.2917999999982896e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.095446125,
+          "self_seconds": 0.0013923330000000234
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.2506392909854185,
+      "stderr_bytes": 4260,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.109745375,
+          "self_seconds": 0.07259679200000001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.244546375,
+          "self_seconds": 2.220899999999526e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085691791,
+          "self_seconds": 0.001221708000000002
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.028596667,
+          "self_seconds": 0.026501690000000015
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007994625,
+          "self_seconds": 0.0031527029999999998
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.2398388749861624,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.101191125,
+          "self_seconds": 0.066452666
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.233901625,
+          "self_seconds": 1.4124000000004244e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 4.6292e-05,
+          "self_seconds": 4.6292e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.084681709,
+          "self_seconds": 0.0012259999999999632
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.027411125,
+          "self_seconds": 0.02542108300000001
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007281042,
+          "self_seconds": 0.002825785999999996
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 6,
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24570787500124425,
+      "stderr_bytes": 4260,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.10928525,
+          "self_seconds": 0.073713792
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.239775666,
+          "self_seconds": 1.904099999999742e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085091666,
+          "self_seconds": 0.001219708
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.027658958,
+          "self_seconds": 0.02566250000000001
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007341458,
+          "self_seconds": 0.0028520789999999987
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24101041600806639,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.103221917,
+          "self_seconds": 0.068098459
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.235276334,
+          "self_seconds": 1.191600000002846e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 5.175e-05,
+          "self_seconds": 5.175e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.084448542,
+          "self_seconds": 0.0012340430000000041
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.027622,
+          "self_seconds": 0.025679637000000005
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007449708,
+          "self_seconds": 0.0029216659999999972
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 6,
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.24914404097944498,
+      "stderr_bytes": 4260,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.108680041,
+          "self_seconds": 0.072460791
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.243326916,
+          "self_seconds": 1.5457999999995975e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.0851915,
+          "self_seconds": 0.0012445020000000223
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.028561125,
+          "self_seconds": 0.026514609000000012
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007086125,
+          "self_seconds": 0.002791295999999995
+        }
+      },
+      "counters": {
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "vet",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.2416674999985844,
+      "stderr_bytes": 186,
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.104502042,
+          "self_seconds": 0.06951362600000001
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.236016416,
+          "self_seconds": 1.2208000000013541e-05
+        },
+        "diagnostics.report": {
+          "calls": 1,
+          "inclusive_seconds": 5.1167e-05,
+          "self_seconds": 5.1167e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.083741209,
+          "self_seconds": 0.0011720010000000197
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.027548541,
+          "self_seconds": 0.02559702500000001
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.007388708,
+          "self_seconds": 0.0029312449999999964
+        }
+      },
+      "counters": {
+        "diagnostics.vet_passthrough": 6,
+        "lifetime.loop_expired_slots": 10,
+        "lifetime.result_fact_calls": 145,
+        "lifetime.summary_applied": 13,
+        "lifetime.summary_hits": 61,
+        "lifetime.summary_nodes": 97,
+        "lifetime.summary_proofs": 11,
+        "lifetime.summary_verified": 1,
+        "vet.lifetime_objects": 326,
+        "vet.lifetime_steps": 5307
+      }
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1523765409947373,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.146726208,
+          "self_seconds": 3.150099999998934e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.08669425,
+          "self_seconds": 0.001321125999999992
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1397690000012517,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.134198834,
+          "self_seconds": 2.4832999999974126e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085467709,
+          "self_seconds": 0.0012594990000000111
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.1380169579933863,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.132455375,
+          "self_seconds": 3.57499999999733e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085584875,
+          "self_seconds": 0.0012579549999999912
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.14358654199168086,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.134928709,
+          "self_seconds": 2.2501000000008098e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085329208,
+          "self_seconds": 0.0012519990000000036
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "before",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.13970620799227618,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.133946417,
+          "self_seconds": 4.912700000000991e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.086097625,
+          "self_seconds": 0.0011713319999999972
+        }
+      },
+      "counters": {}
+    },
+    {
+      "engine": "after",
+      "project": "sketch",
+      "command": "transpile",
+      "json": false,
+      "mode": "default",
+      "seconds": 0.13854258399805985,
+      "stderr_bytes": 0,
+      "stages": {
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.1328615,
+          "self_seconds": 2.520899999999826e-05
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.085011708,
+          "self_seconds": 0.0011883329999999998
+        }
+      },
+      "counters": {}
+    }
+  ],
+  "codegen": [
+    {
+      "project": "15_puzzle",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "ascending_primes",
+      "identical": true,
+      "files": 13
+    },
+    {
+      "project": "big_num_demo",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "bin_tree",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "circles_on_dots",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "Dijkstra",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "double_bet",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "hilo",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "hilo_test",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "life",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "md5",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "othello",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "poker",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "poker_pmap",
+      "identical": true,
+      "files": 4
+    },
+    {
+      "project": "pythagorean_tripples",
+      "identical": true,
+      "files": 13
+    },
+    {
+      "project": "react_time",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "sketch",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "sudoku",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "tetris",
+      "identical": true,
+      "files": 1
+    },
+    {
+      "project": "triangle_solver",
+      "identical": true,
+      "files": 1
+    }
+  ],
+  "sdk": {
+    "method": "Four sequential runs in before/after/after/before order, two per compiler. Native test build without executing the binary. Same pinned Odin SDK, source and flags. No --apply.",
+    "samples": [
+      {
+        "engine": "before",
+        "command": [
+          "/tmp/thor-unverified-2026-11-23/thor-before",
+          "vet",
+          "/Users/davidludwik/Thor/integration-projects/vetted/odin-lang__Odin/tests/core/normal.thor",
+          "-file",
+          "-all-packages",
+          "-build-mode:test",
+          "--odin-compatible",
+          "--odin",
+          "/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin",
+          "--vet=lifetime,leak",
+          "--comptime=required",
+          "-thread-count:1",
+          "--output-dir",
+          "/tmp/thor-unverified-2026-11-23/sdk-bench/before/generated"
+        ],
+        "seconds": 37.10842004098231,
+        "stderr_bytes": 283517,
+        "stages": {
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 16.80460025,
+            "self_seconds": 14.073558374
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 37.091312792,
+            "self_seconds": 2.8041999996730738e-05
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 19.4351275,
+            "self_seconds": 0.04793600300000023
+          },
+          "vet.lifetime": {
+            "calls": 1,
+            "inclusive_seconds": 0.442382375,
+            "self_seconds": 0.4056460169999999
+          },
+          "vet.lifetime_result_facts": {
+            "calls": 1,
+            "inclusive_seconds": 2.281201792,
+            "self_seconds": 0.23503200999999896
+          }
+        },
+        "counters": {
+          "lifetime.loop_expired_slots": 525,
+          "lifetime.result_fact_calls": 28096,
+          "lifetime.summary_applied": 25,
+          "lifetime.summary_hits": 566,
+          "lifetime.summary_nodes": 363,
+          "lifetime.summary_proofs": 83,
+          "lifetime.summary_verified": 5,
+          "lifetime.writer_summary_applied": 7,
+          "vet.lifetime_objects": 3718,
+          "vet.lifetime_steps": 67054
+        },
+        "stderr_lines": 2935,
+        "unverified_count": 469
+      },
+      {
+        "engine": "after",
+        "command": [
+          "/tmp/thor-unverified-2026-11-23/thor-release2",
+          "vet",
+          "/Users/davidludwik/Thor/integration-projects/vetted/odin-lang__Odin/tests/core/normal.thor",
+          "-file",
+          "-all-packages",
+          "-build-mode:test",
+          "--odin-compatible",
+          "--odin",
+          "/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin",
+          "--vet=lifetime,leak",
+          "--comptime=required",
+          "-thread-count:1",
+          "--output-dir",
+          "/tmp/thor-unverified-2026-11-23/sdk-bench/after/generated"
+        ],
+        "seconds": 33.66297004101216,
+        "stderr_bytes": 190,
+        "stages": {
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 12.544665167,
+            "self_seconds": 9.750517082
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 33.635595166,
+            "self_seconds": 0.0007609979999969596
+          },
+          "diagnostics.report": {
+            "calls": 1,
+            "inclusive_seconds": 0.004579459,
+            "self_seconds": 0.004579459
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 20.171023667,
+            "self_seconds": 0.05348837900001158
+          },
+          "vet.lifetime": {
+            "calls": 1,
+            "inclusive_seconds": 0.454492334,
+            "self_seconds": 0.41651901500000016
+          },
+          "vet.lifetime_result_facts": {
+            "calls": 1,
+            "inclusive_seconds": 2.331678584,
+            "self_seconds": 0.25123652399999585
+          }
+        },
+        "counters": {
+          "diagnostics.vet_passthrough": 931,
+          "lifetime.loop_expired_slots": 525,
+          "lifetime.result_fact_calls": 28096,
+          "lifetime.summary_applied": 25,
+          "lifetime.summary_hits": 566,
+          "lifetime.summary_nodes": 363,
+          "lifetime.summary_proofs": 83,
+          "lifetime.summary_verified": 5,
+          "lifetime.writer_summary_applied": 7,
+          "vet.lifetime_objects": 3718,
+          "vet.lifetime_steps": 67054
+        },
+        "stderr_lines": 2,
+        "unverified_count": 469,
+        "unverified_locations": 364
+      },
+      {
+        "engine": "after",
+        "command": [
+          "/tmp/thor-unverified-2026-11-23/thor-release2",
+          "vet",
+          "/Users/davidludwik/Thor/integration-projects/vetted/odin-lang__Odin/tests/core/normal.thor",
+          "-file",
+          "-all-packages",
+          "-build-mode:test",
+          "--odin-compatible",
+          "--odin",
+          "/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin",
+          "--vet=lifetime,leak",
+          "--comptime=required",
+          "-thread-count:1",
+          "--output-dir",
+          "/tmp/thor-unverified-2026-11-23/sdk-bench/after/generated"
+        ],
+        "seconds": 32.4522867090127,
+        "stderr_bytes": 190,
+        "stages": {
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 11.97395175,
+            "self_seconds": 9.194104625
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 32.429252625,
+            "self_seconds": 3.758399999753692e-05
+          },
+          "diagnostics.report": {
+            "calls": 1,
+            "inclusive_seconds": 0.004404291,
+            "self_seconds": 0.004404291
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 19.670552083,
+            "self_seconds": 0.048831703999976384
+          },
+          "vet.lifetime": {
+            "calls": 1,
+            "inclusive_seconds": 0.4536205,
+            "self_seconds": 0.41497581100000014
+          },
+          "vet.lifetime_result_facts": {
+            "calls": 1,
+            "inclusive_seconds": 2.317329167,
+            "self_seconds": 0.2426030420000056
+          }
+        },
+        "counters": {
+          "diagnostics.vet_passthrough": 931,
+          "lifetime.loop_expired_slots": 525,
+          "lifetime.result_fact_calls": 28096,
+          "lifetime.summary_applied": 25,
+          "lifetime.summary_hits": 566,
+          "lifetime.summary_nodes": 363,
+          "lifetime.summary_proofs": 83,
+          "lifetime.summary_verified": 5,
+          "lifetime.writer_summary_applied": 7,
+          "vet.lifetime_objects": 3718,
+          "vet.lifetime_steps": 67054
+        },
+        "stderr_lines": 2,
+        "unverified_count": 469,
+        "unverified_locations": 364
+      },
+      {
+        "engine": "before",
+        "command": [
+          "/tmp/thor-unverified-2026-11-23/thor-before",
+          "vet",
+          "/Users/davidludwik/Thor/integration-projects/vetted/odin-lang__Odin/tests/core/normal.thor",
+          "-file",
+          "-all-packages",
+          "-build-mode:test",
+          "--odin-compatible",
+          "--odin",
+          "/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin",
+          "--vet=lifetime,leak",
+          "--comptime=required",
+          "-thread-count:1",
+          "--output-dir",
+          "/tmp/thor-unverified-2026-11-23/sdk-bench/before/generated"
+        ],
+        "seconds": 37.097176958981436,
+        "stderr_bytes": 283517,
+        "stages": {
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 16.720286083,
+            "self_seconds": 13.953371083
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 37.061408708,
+            "self_seconds": 0.0014143750000030764
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 19.5443505,
+            "self_seconds": 0.04992579900000038
+          },
+          "vet.lifetime": {
+            "calls": 1,
+            "inclusive_seconds": 0.448344292,
+            "self_seconds": 0.41080577100000004
+          },
+          "vet.lifetime_result_facts": {
+            "calls": 1,
+            "inclusive_seconds": 2.310479125,
+            "self_seconds": 0.24130674900000937
+          }
+        },
+        "counters": {
+          "lifetime.loop_expired_slots": 525,
+          "lifetime.result_fact_calls": 28096,
+          "lifetime.summary_applied": 25,
+          "lifetime.summary_hits": 566,
+          "lifetime.summary_nodes": 363,
+          "lifetime.summary_proofs": 83,
+          "lifetime.summary_verified": 5,
+          "lifetime.writer_summary_applied": 7,
+          "vet.lifetime_objects": 3718,
+          "vet.lifetime_steps": 67054
+        },
+        "stderr_lines": 2935,
+        "unverified_count": 469
+      }
+    ]
+  }
+}

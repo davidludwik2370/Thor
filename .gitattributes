@@ -1,0 +1,9 @@
+/thor text eol=lf
+/thor-rust text eol=lf
+/thor-python text eol=lf
+/thor-install text eol=lf
+/llvm-symbolizer-thor text eol=lf
+/mkthor text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.ps1 text eol=lf

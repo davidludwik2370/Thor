@@ -1,5 +1,6 @@
 """Purity imposed by fn callers: valid local mutation and contextual errors."""
 import json
+from pathlib import Path
 import unittest
 
 from tests import test_thor as base
@@ -125,7 +126,7 @@ work::fn(n:int)->int{local:=n;library.reset(&local);return local}
         self.assertEqual(len(errors),1,errors)
         error=errors[0]
         self.assertEqual(error['pos']['offset'],text.index('library.reset(&local)'))
-        self.assertTrue(any(note['pos']['file'].endswith('/library/main.odin')
+        self.assertTrue(any(Path(note['pos']['file']).parts[-2:]==('library','main.odin')
                             and note['pos']['offset']==library.index('state}') for note in error['related']),error)
         self.assertTrue(any("fn 'work' requires" in note['message'] for note in error['related']))
 

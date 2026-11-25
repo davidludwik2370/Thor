@@ -515,8 +515,11 @@ impl Lower<'_, '_> {
                     return Ok(Some(true));
                 }
             } else {
-                let value = self.big_constant_value(*value, Some(kind), seen)?;
-                if Self::constant_compare(&selected, &value, "==")? {
+                let (operand, op) = if n.kind == "CaseComparison" {
+                    (self.constant_child(*value, "expr")?, n.op.as_str())
+                } else {(*value, "==")};
+                let value = self.big_constant_value(operand, Some(kind), seen)?;
+                if Self::constant_compare(&selected, &value, op)? {
                     return Ok(Some(true));
                 }
             }
@@ -531,7 +534,7 @@ impl Lower<'_, '_> {
         let source = &self.resolver.sources[r.file];
         let node = source.node(r.node);
         let Some(selector) = source
-            .role(r.node, "selector")
+            .role(r.node, "selector").or_else(|| (node.kind == "Switch").then(|| source.role(r.node, "expr")).flatten())
             .map(|node| Ref { file: r.file, node })
         else {
             return Ok(None);
@@ -540,62 +543,67 @@ impl Lower<'_, '_> {
             return Ok(None);
         };
         let mut intervals: Vec<(Value, Value, bool)> = vec![];
-        for case in node.data["cases"].as_array().ok_or(Failure::Unknown)? {
-            for span in case["matches"].as_array().into_iter().flatten() {
-                let value = self.constant_at(r, span)?;
-                let n = source.node(value.node);
-                let bounds: std::result::Result<(Value, Value, bool), Failure> = (|| {
-                    if n.kind == "Binary" && matches!(n.op.as_str(), ".." | "..<" | "..=") {
-                        let low = self.big_constant_value(
-                            self.constant_child(value, "left")?,
-                            Some(kind),
-                            seen,
-                        )?;
-                        let high = self.big_constant_value(
-                            self.constant_child(value, "right")?,
-                            Some(kind),
-                            seen,
-                        )?;
-                        Ok((low, high, n.op == "..="))
-                    } else {
-                        let low = self.big_constant_value(value, Some(kind), seen)?;
-                        Ok((low.clone(), low, true))
-                    }
-                })(
-                );
-                let Ok((low, high, closed)) = bounds else {
-                    continue;
+        let operands = if node.kind == "Switch" {
+            source.role(r.node, "body").into_iter().flat_map(|body| source.node(body).children.iter())
+                .flat_map(|case| source.group(*case, "types")).map(|node| Ref {node:*node, ..r}).collect::<Vec<_>>()
+        } else {
+            node.data["cases"].as_array().ok_or(Failure::Unknown)?.iter()
+                .flat_map(|case| case["matches"].as_array().into_iter().flatten())
+                .map(|span| self.constant_at(r, span)).collect::<std::result::Result<Vec<_>, _>>()?
+        };
+        for value in operands {
+            let n = source.node(value.node);
+            let bounds: std::result::Result<(Value, Value, bool), Failure> = (|| {
+                if n.kind == "Binary" && matches!(n.op.as_str(), ".." | "..<" | "..=") {
+                    let low = self.big_constant_value(
+                        self.constant_child(value, "left")?,
+                        Some(kind),
+                        seen,
+                    )?;
+                    let high = self.big_constant_value(
+                        self.constant_child(value, "right")?,
+                        Some(kind),
+                        seen,
+                    )?;
+                    Ok((low, high, n.op == "..="))
+                } else {
+                    let low = self.big_constant_value(value, Some(kind), seen)?;
+                    Ok((low.clone(), low, true))
+                }
+            })(
+            );
+            let Ok((low, high, closed)) = bounds else {
+                continue;
+            };
+            if Self::constant_compare(&low, &high, ">")?
+                || Self::constant_compare(&low, &high, "==")? && !closed
+            {
+                return Ok(Some(
+                    "A switch case range must not be empty or reversed.".into(),
+                ));
+            }
+            for (a, b, inclusive) in &intervals {
+                let lower = if Self::constant_compare(&low, a, ">")? {
+                    &low
+                } else {
+                    a
                 };
-                if Self::constant_compare(&low, &high, ">")?
-                    || Self::constant_compare(&low, &high, "==")? && !closed
+                let upper = if Self::constant_compare(&high, b, "<")? {
+                    &high
+                } else {
+                    b
+                };
+                if Self::constant_compare(lower, upper, "<")?
+                    || Self::constant_compare(lower, upper, "==")?
+                        && (Self::constant_compare(lower, &high, "<")? || closed)
+                        && (Self::constant_compare(lower, b, "<")? || *inclusive)
                 {
                     return Ok(Some(
-                        "A switch case range must not be empty or reversed.".into(),
+                        "Duplicate or overlapping constant switch cases.".into(),
                     ));
                 }
-                for (a, b, inclusive) in &intervals {
-                    let lower = if Self::constant_compare(&low, a, ">")? {
-                        &low
-                    } else {
-                        a
-                    };
-                    let upper = if Self::constant_compare(&high, b, "<")? {
-                        &high
-                    } else {
-                        b
-                    };
-                    if Self::constant_compare(lower, upper, "<")?
-                        || Self::constant_compare(lower, upper, "==")?
-                            && (Self::constant_compare(lower, &high, "<")? || closed)
-                            && (Self::constant_compare(lower, b, "<")? || *inclusive)
-                    {
-                        return Ok(Some(
-                            "Duplicate or overlapping constant switch cases.".into(),
-                        ));
-                    }
-                }
-                intervals.push((low, high, closed));
             }
+            intervals.push((low, high, closed));
         }
         Ok(None)
     }

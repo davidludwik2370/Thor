@@ -21,6 +21,7 @@ python3 tools/build_tls.py
 python3 tools/build_tls.py check
 python3 tools/build_tls.py test
 python3 -m unittest discover -s tests -p test_tls.py -v
+python3 -m unittest tests.test_generic_constant_hover_tls -v
 ```
 
 The executable is `tls/bin/tls` (`tls.exe` on Windows). `THOR_ODIN` or `--odin`
@@ -35,6 +36,13 @@ tests. `tests/test_tls.py` also launches the real executable and checks stdio LS
 messages, file discovery, semantic token ranges, unsaved changes, and diagnostics.
 
 ## Current support
+
+- Infer nested uses of the same generic procedure, including calls through
+  forward/backward constants and callable aliases. The inference recursion guard
+  tracks the procedure together with its call site: `square(FIRST)` and
+  `FIRST :: square(3)` are distinct instantiations. Actual cyclic initializers and
+  excessive inference depth remain bounded. This is editor type inference; TLS
+  does not execute the procedure to populate hover values.
 
 - Complete supported file-vet policies after `#+vet`, spaces, and commas.
   Suggestions include `no_alloc` and all native file policy names (including

@@ -42,7 +42,7 @@ async function run() {
         assert.equal(document.isDirty,false,'Run must save the edited source');
         assert.equal(fs.readFileSync(path.join(root,'normal-run.txt'),'utf8'),'ok','Run must build the whole package without -debug');
         assert.equal(vscode.debug.activeDebugSession,undefined);
-        assert.equal(fs.existsSync(path.join(root,'.vscode/bin/debug')),false);
+        assert.equal(fs.existsSync(path.join(root,'.vscode/bin',process.platform==='win32'?'debug.exe':'debug')),false);
         await new Promise(resolve=>setTimeout(resolve,100)); // Let the first program return to the shell prompt.
         fs.unlinkSync(path.join(root,'normal-run.txt'));
         const warmStart=Date.now();
@@ -59,8 +59,11 @@ async function run() {
         subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('thor-lldb',{
             createDebugAdapterTracker() { return {onWillReceiveMessage(message) {
                 if (['initialize','launch','restart','disconnect'].includes(message.command)) result.protocol.push(message.command);
+                if (['next','stepIn','stepOut','continue'].includes(message.command)) (result.steps ||= []).push(message.command);
             },onDidSendMessage(message) {
                 if (message.type==='event' && message.event==='stopped') stops.push(message.body);
+                if(message.type==='event' && ['terminated','exited'].includes(message.event)) (result.exits ||= []).push(message);
+                if(message.type==='response' && message.command==='stackTrace') (result.frames ||= []).push(message.body?.stackFrames?.[0]);
                 if (message.type==='event' && message.event==='output' && message.body.category==='stderr') {
                     (result.errors ||= []).push(message.body.output);
                 }
@@ -102,6 +105,16 @@ async function run() {
             current=await frame();
         }
         assert.equal(current.frame.line,bodyLine);
+        // Inspect the completed assignment too: some native Windows PDBs point
+        // the entry line before the parameter's prologue spill. The dedicated
+        // DAP regressions retain that first-statement failure separately.
+        if(process.platform==='win32') {
+            const entry=await session.customRequest('evaluate',{frameId:current.frame.id,expression:'value',context:'watch'});
+            result.entryArgument=entry.result;
+            await session.customRequest('next',{threadId:current.thread});
+            current=await frame();
+            assert.equal(current.frame.line,bodyLine+1);
+        }
         const value = await session.customRequest('evaluate',{frameId:current.frame.id,expression:'value',context:'watch'});
         assert.equal(value.result,'9');
         const scopes = (await session.customRequest('scopes',{frameId:current.frame.id})).scopes;

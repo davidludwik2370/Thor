@@ -267,6 +267,10 @@ impl<'a> Inputs<'a> {
         for (token, site) in std::mem::take(&mut lower.expression_error_sites) {
             related.insert(token, LoweringNotes {operation: Some(site), related: vec![]});
         }
+        for (token,seed) in std::mem::take(&mut lower.immutable_error_sites){
+            related.entry(token).or_insert(LoweringNotes{operation:None,related:vec![]}).related.push(
+                crate::purediagnostics::note(self.sources,seed,"Immutable storage declared here."));
+        }
         let output = Output {
             emitted,
             errors,

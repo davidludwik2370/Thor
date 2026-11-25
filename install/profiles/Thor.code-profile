@@ -1,0 +1,4 @@
+{
+  "name": "Thor",
+  "settings": "{\n  \"workbench.colorTheme\": \"Dark Modern\",\n  \"thor.colors.recommended\": true\n}\n"
+}

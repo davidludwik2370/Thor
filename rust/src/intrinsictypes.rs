@@ -84,6 +84,7 @@ const ATOMIC: &[&str] = &[
     "atomic_compare_exchange_weak_explicit",
 ];
 const QUERIES: &[&str] = &["has_target_feature", "is_package_imported"];
+pub(crate) fn atomic_intrinsic(name:&str)->bool{ATOMIC.contains(&name)}
 const MATRIX: &[&str] = &[
     "transpose",
     "outer_product",

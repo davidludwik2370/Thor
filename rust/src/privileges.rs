@@ -111,6 +111,7 @@ pub struct Issue {
 }
 #[derive(Clone, Default)]
 pub struct Facts {
+    pub validation_exhausted: bool,
     pub issues: HashMap<Ref, Vec<Issue>>,
     pub mutating: BTreeSet<Ref>,
     pub verified_parameters: BTreeSet<Ref>,
@@ -231,6 +232,9 @@ pub struct Privileges<'a, 'r> {
     // Only the opt-in vet pass supplies prospective immutable declarations.
     vet_seeds: Option<HashSet<Ref>>,
     vet_stable_conditions: HashMap<Ref, bool>,
+    validation_budget: Option<usize>,
+    vet_steps: usize,
+    vet_exhausted: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -275,6 +279,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             work: HashMap::new(), work_weight: 0,
             vet_seeds: None,
             vet_stable_conditions: HashMap::new(),
+            validation_budget: std::env::var("THOR_VET_VALIDATION_BUDGET").ok().and_then(|s|s.parse().ok()),
+            vet_steps: 0,
+            vet_exhausted: false,
         }
     }
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
@@ -342,6 +349,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             })
             .collect::<Vec<_>>();
         for proc in procedures {
+            if this.vet_budget_exceeded(){break;}
             if discovering && this.r.has_demanded_packages() {
                 crate::profile::count("permissions.dependency_retries", 1);
                 if let Some(cache) = cache.as_deref_mut() { this.harvest(cache); }
@@ -363,10 +371,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if this.s(proc).shared_native {
                 continue;
             }
-            let toolkit = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .join("runtime");
+            let toolkit = this.r.runtime_root();
             if this.s(proc).path.starts_with(&toolkit) && !this.reader_targets.contains(&proc)
                 && !this
                     .s(proc)
@@ -403,7 +408,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }
-        this.settle_recursive();
+        if !this.vet_exhausted {this.settle_recursive();}
+        this.facts.validation_exhausted=this.vet_exhausted&&this.validation_budget.is_some();
         for c in 0..this.contexts.len() {
             let Some(proc) = this.contexts[c].proc else {
                 continue;
@@ -468,6 +474,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         // repeatedly walking every unrelated SDK body.
         let mut visits = HashMap::<C, usize>::new();
         while let Some(c) = self.recursive_pending.pop_first() {
+            if self.vet_budget_exceeded(){break;}
             let count = visits.entry(c).or_default();
             if *count >= 24 {
                 continue;
@@ -483,6 +490,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.pure_depth = usize::from(self.contexts[c].checked);
             self.body_pass(body, c, true);
             self.pure_depth = 0;
+            if self.vet_budget_exceeded(){break;}
             if !self.state_matches(c, &before) {
                 self.contexts[c].revision += 1;
                 if visits[&c] == 24 {
@@ -511,36 +519,59 @@ impl<'a, 'r> Privileges<'a, 'r> {
         this.vet_seeds = Some(seeds);
         this.annotations();
         this.opaque_readonly = true;
-        let contexts = roots.iter().map(|root|
-            this.summary(*root, Substitutions::new(), None, false)).collect::<Vec<_>>();
-        this.settle_recursive();
+        let mut contexts=Vec::new();
+        for root in roots {
+            contexts.push(this.summary(*root,Substitutions::new(),None,false));
+            if this.vet_budget_exceeded(){break;}
+        }
+        if !this.vet_exhausted {this.settle_recursive();}
+        let blocked=this.vet_safety_findings(&contexts);
+        crate::profile::count("vet.safety_contexts", this.contexts.len() as u64);
+        crate::profile::count("vet.safety_values", this.values.len() as u64);
+        this.r.end_symbol_queries(previous);
+        blocked
+    }
+    fn vet_budget_exceeded(&mut self)->bool {
+        if self.vet_seeds.is_none()&&self.validation_budget.is_none(){return false;}
+        self.vet_steps+=1;
+        self.vet_exhausted|=self.values.len()>100_000||self.contexts.len()>4096
+            ||self.vet_steps>self.validation_budget.unwrap_or(200_000);
+        self.vet_exhausted
+    }
+    fn vet_safety_findings(&mut self,contexts:&[C])->BTreeMap<Ref,&'static str>{
+        if self.vet_exhausted {
+            crate::profile::count("vet.safety_budget_fallback",1);
+            // Prospective qualification must never become an automatic edit
+            // merely because a proof was cut short. Ordinary compilation and
+            // the authoritative current-build validation are unchanged.
+            return self.vet_seeds.iter().flatten().map(|seed|(*seed,
+                "configuration and escaping-reference safety exceeds the prospective mutability proof budget; review manually")).collect();
+        }
         let mut blocked = BTreeMap::new();
-        for issues in this.facts.issues.values() {
+        for issues in self.facts.issues.values() {
             for issue in issues {
                 blocked.insert(issue.seed,
                     "this storage reaches a write or unverified reference operation in a compile-time alternative");
             }
         }
-        for context in contexts {
-            for value in this.contexts[context].results.clone() {
-                let typ = this.values[value].typ.owned();
-                if !this.type_property(&typ, queries::Property::Slice) { continue; }
-                for origin in this.refs(value) {
+        for &context in contexts {
+            for value in self.contexts[context].results.clone() {
+                let typ = self.values[value].typ.owned();
+                if !self.type_property(&typ, queries::Property::Slice) { continue; }
+                for origin in self.refs(value) {
                     if let Some(seed) = origin.seed.filter(|_| origin.aspect != Aspect::Inline) { blocked.insert(seed,
                         "read-only storage escapes through a result and changes its callers' contract"); }
                 }
             }
-            for value in this.contexts[context].stores.values().copied().collect::<Vec<_>>() {
-                let typ = this.values[value].typ.owned();
-                if !this.type_property(&typ, queries::Property::Slice) { continue; }
-                for origin in this.refs(value) {
+            for value in self.contexts[context].stores.values().copied().collect::<Vec<_>>() {
+                let typ = self.values[value].typ.owned();
+                if !self.type_property(&typ, queries::Property::Slice) { continue; }
+                for origin in self.refs(value) {
                     if let Some(seed) = origin.seed.filter(|_| origin.aspect != Aspect::Inline) { blocked.insert(seed,
                         "read-only storage escapes through an output parameter"); }
                 }
             }
         }
-        crate::profile::count("vet.safety_contexts", this.contexts.len() as u64);
-        this.r.end_symbol_queries(previous);
         blocked
     }
     fn editor_info(&mut self) -> Vec<serde_json::Value> {
@@ -1760,9 +1791,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if self.depth < 40 {
             if let Some(body) = self.role(proc, "body") {
                 for pass in 0..24 {
+                    if self.vet_budget_exceeded(){self.contexts[c].cacheable=false;break;}
                     crate::profile::count("permissions.body_passes", 1);
                     let before = self.state(c);
                     self.body_pass(body, c, pass >= 2);
+                    if self.vet_budget_exceeded(){self.contexts[c].cacheable=false;break;}
                     if self.state_matches(c, &before) {
                         break;
                     }
@@ -1975,6 +2008,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn eval(&mut self, r: Ref, c: C) -> V {
+        if self.vet_exhausted {return self.value(Type::Unknown);}
         if self.reuse.is_some() { self.observe_cache_input(r, c); }
         let typ = self.typ(r, c);
         let kind = self.kind(r).to_string();
@@ -2357,6 +2391,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn statement(&mut self, r: Ref, c: C) {
+        if self.vet_budget_exceeded(){return;}
         if self.discovering && self.r.has_demanded_packages() {
             return;
         }
@@ -2378,6 +2413,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 } else {
                     rhs.iter().map(|v| self.eval(*v, c)).collect()
                 };
+                if self.vet_budget_exceeded(){return;}
                 for (index, name) in names.into_iter().enumerate() {
                     let v = values
                         .get(index)
@@ -2435,6 +2471,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 } else {
                     rhs.iter().map(|v| self.eval(*v, c)).collect()
                 };
+                if self.vet_budget_exceeded(){return;}
                 for (index, (site, target)) in lhs.into_iter().zip(targets).enumerate() {
                     if self.text(site) == "_" {
                         continue;
@@ -2528,6 +2565,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 };
                 // Preserve storage shared with output parameters. Independent
                 // return facts still detach from transient local rebindings.
+                if self.vet_budget_exceeded(){return;}
                 let mut snapshots = HashMap::new();
                 let mut pending = self.contexts[c].stores.values().copied().collect::<Vec<_>>();
                 while let Some(value) = pending.pop() {
@@ -3405,6 +3443,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let summary = self.summary(candidate, substitutions, Some(c), contract);
             self.note_callee(summary);
             self.pure_depth = old_depth;
+            if self.vet_budget_exceeded(){return self.value(Type::Unknown);}
             let effects = self.contexts[summary].effects.clone();
             for (origin, effect) in effects {
                 let mut origins = self.resolve(&origin, &bound);
@@ -3932,12 +3971,11 @@ pub(crate) fn reviewed_library_contract(
     reviewed && verified_library(resolver, callee, path)
 }
 
-fn verified_library(resolver: &Resolver<'_>, reference: Ref, path: &str) -> bool {
+pub(crate) fn verified_library(resolver: &Resolver<'_>, reference: Ref, path: &str) -> bool {
     let _phase = crate::profile::span("permissions.library_verification");
     let Some((collection, suffix)) = path.split_once(':') else { return false; };
     if collection == "thor" {
-        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent().unwrap().join("runtime").join(suffix);
+        let expected = resolver.runtime_root().join(suffix);
         return resolver.sources[reference.file].collection_roots.get(collection)
             .map(|root| root.join(suffix))
             .is_some_and(|actual| match (
@@ -3963,6 +4001,9 @@ const FMT_READERS: &[&str] = &[
     "aprintln",
     "aprintf",
     "aprintfln",
+    "caprint",
+    "caprintf",
+    "caprintfln",
     "tprint",
     "tprintln",
     "tprintf",
@@ -3973,6 +4014,54 @@ const FMT_READERS: &[&str] = &[
 mod graph_tests {
     use crate::ast::Source;
     use super::*;
+
+    #[test]
+    fn prospective_budget_preserves_manual_protection_and_isolates_normal_analysis() {
+        let mut resolver=Resolver::new(&[]);
+        let mut analysis=Privileges::new(&mut resolver,&[],false);
+        analysis.vet_steps=200_000;
+        let normal=analysis.vet_budget_exceeded();
+        if normal||analysis.vet_exhausted{panic!("prospective budget affected ordinary analysis");}
+        let seeds=HashSet::from([Ref{file:0,node:NodeId(1)},Ref{file:0,node:NodeId(2)}]);
+        analysis.vet_seeds=Some(seeds.clone());
+        let stopped=analysis.vet_budget_exceeded();
+        let manual=analysis.vet_safety_findings(&[]);
+        if !stopped||manual.len()!=seeds.len()||seeds.iter().any(|seed|!manual.contains_key(seed)){
+            panic!("exhausted prospective proof published automatic edits");
+        }
+    }
+
+    #[test]
+    fn completed_view_queries_cache_with_pending_imports_but_discovery_does_not() {
+        // Keep the imported package outside the indexed source package; do not
+        // rely on Unix /tmp aliases to make two spellings appear distinct.
+        let directory=std::env::temp_dir();
+        let mut source=Source::from_frontend(directory.join("unindexed/view-cache.thor"),"body".into(),serde_json::json!({
+            "nodes":[{"kind":"File","start":0,"end":4,"parent":-1},
+                {"kind":"Procedure","start":0,"end":4,"parent":0},
+                {"kind":"Ident","start":0,"end":4,"parent":1}],
+            "features":[],"edits":[],"selections":[]}),true).unwrap();
+        source.collection_roots.insert("pending".into(),directory);
+        let sources=[source];
+        let mut resolver=Resolver::new(&sources);
+        let procedure=Ref{file:0,node:NodeId(1)};
+        let missing=resolver.package_symbol(procedure,"pending:","MISSING");
+        if missing.is_some()||!resolver.has_demanded_packages(){panic!("fixture needs a pending import");}
+        {
+            let mut analysis=Privileges::new(&mut resolver,&[],false);
+            let result=analysis.can_introduce_view(procedure);
+            if result||analysis.view_sources.get(&procedure)!=Some(&false)||!analysis.view_bodies.contains_key(&procedure){
+                panic!("complete fixed-input query was not cached");
+            }
+            let again=analysis.can_introduce_view(procedure);
+            if again {panic!("cached negative changed its result");}
+        }
+        let mut discovery=Privileges::new(&mut resolver,&[],true);
+        let partial=discovery.can_introduce_view(procedure);
+        if partial||!discovery.view_sources.is_empty()||!discovery.view_bodies.is_empty(){
+            panic!("incomplete discovery published a negative proof");
+        }
+    }
 
     #[test]
     fn writable_parameters_keep_output_locations_without_borrowed_origins() {

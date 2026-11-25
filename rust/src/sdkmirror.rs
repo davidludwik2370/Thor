@@ -213,13 +213,26 @@ impl SdkMirror {
     }
 }
 
+/// Remove an owned file or link without following it. Windows directory links
+/// require RemoveDirectory, even when their target no longer exists.
+pub(super) fn remove_file_or_link(path: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::FileTypeExt;
+        if fs::symlink_metadata(path)?.file_type().is_symlink_dir() {
+            return fs::remove_dir(path);
+        }
+    }
+    fs::remove_file(path)
+}
+
 pub(super) fn write_link(path: &Path, target: &Path) -> Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| Error::new("SDK link has no parent"))?;
     fs::create_dir_all(parent)?;
     if path.is_symlink() || path.is_file() {
-        fs::remove_file(path)?;
+        remove_file_or_link(path)?;
     }
     #[cfg(unix)]
     std::os::unix::fs::symlink(target, path)?;
@@ -234,4 +247,39 @@ pub(super) fn write_link(path: &Path, target: &Path) -> Result<()> {
         "native SDK overlays require filesystem symbolic links",
     ));
     Ok(())
+}
+
+#[cfg(all(test, any(unix, windows)))]
+mod link_tests {
+    use super::*;
+
+    #[test]
+    fn replacing_owned_links_preserves_targets_and_handles_dangling_directories() {
+        let root = std::env::temp_dir().join(format!("thor-sdk-link-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let first = root.join("first");
+        let second = root.join("second");
+        let link = root.join("generated/link");
+        fs::create_dir_all(&first).unwrap();
+        fs::create_dir_all(&second).unwrap();
+        fs::write(first.join("asset"), "original").unwrap();
+        write_link(&link, &first).unwrap();
+        write_link(&link, &first).unwrap();
+        write_link(&link, &second).unwrap();
+        let retargeted = fs::read_link(&link).unwrap() == second;
+        fs::remove_dir(&second).unwrap();
+        write_link(&link, &first).unwrap();
+        let restored = fs::read_to_string(link.join("asset")).unwrap() == "original";
+        remove_file_or_link(&link).unwrap();
+        write_link(&link, &first.join("asset")).unwrap();
+        write_link(&link, &first.join("asset")).unwrap();
+        let file_link = fs::read_to_string(&link).unwrap() == "original";
+        remove_file_or_link(&link).unwrap();
+        let refused_directory = remove_file_or_link(&first).is_err();
+        let original = fs::read_to_string(first.join("asset")).unwrap();
+        fs::remove_dir_all(root).unwrap();
+        if !retargeted || !restored || !file_link || !refused_directory || original != "original" {
+            panic!("owned-link replacement changed target files or followed a directory");
+        }
+    }
 }

@@ -13,13 +13,14 @@ import time
 import unittest
 from unittest.mock import patch
 
+from tests.native_paths import file_uri_key, normalize_lsp_uris, thor_launcher, native_test_compiler, process_running
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
-THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
+THOR = Path(os.environ.get('THOR_TEST_COMPILER', thor_launcher()))
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False, checker_args="", collections=None):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False, checker_args="", collections=None, initialization_options=None):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -48,7 +49,7 @@ class Client:
                 'enable_unused_imports_reporting': unused_imports,
                 'enable_unused_imports_on_change': unused_imports, 'enable_auto_import': False,
                 'enable_checker_workspace_diagnostics': False, 'thread_count': 1,
-                'checker_args': ('--vet ' if vet else '')+checker_args}
+                'checker_args': ('--vet ' if vet else '')+checker_args, **(initialization_options or {})}
         })['capabilities']
         self.send('initialized', {})
 
@@ -72,7 +73,7 @@ class Client:
                     if not part:
                         raise EOFError('incomplete LSP response')
                     payload.extend(part)
-                self.messages.put(json.loads(payload))
+                self.messages.put(normalize_lsp_uris(json.loads(payload)))
         except Exception as error:
             self.messages.put({'reader_error': str(error)})
 
@@ -114,7 +115,7 @@ class Client:
     def diagnostic(self, uri, *, empty=False, code=None, contains=None, snapshot=None, timeout=45):
         def matching(value):
             return (value.get('method') == 'textDocument/publishDiagnostics'
-                    and value['params'].get('uri') == uri
+                    and file_uri_key(value['params'].get('uri','')) == file_uri_key(uri)
                     and (not empty or not value['params']['diagnostics'])
                     and (code is None or any(d.get('code') == code for d in value['params']['diagnostics']))
                     and (snapshot is None or any((d.get('data') or {}).get('snapshot') == snapshot
@@ -133,7 +134,7 @@ class Client:
             except queue.Empty:
                 reports = [value['params']['diagnostics'] for value in self.notifications
                            if value.get('method') == 'textDocument/publishDiagnostics'
-                           and value['params'].get('uri') == uri]
+                           and file_uri_key(value['params'].get('uri','')) == file_uri_key(uri)]
                 raise AssertionError('Timed out waiting for matching diagnostics. '
                                      'Recent reports '+json.dumps(reports[-3:])[:4000]) from None
 
@@ -142,11 +143,14 @@ class Client:
             try:
                 self.request('shutdown', None)
                 self.send('exit', None)
+                # Finish the protocol with EOF as well as the exit notification.
+                self.process.stdin.close()
                 self.process.wait(timeout=5)
             except Exception:
                 self.process.kill()
                 self.process.wait(timeout=5)
-        self.process.stdin.close()
+        if not self.process.stdin.closed:
+            self.process.stdin.close()
         self.process.stdout.close()
         self.reader.join(timeout=1)
         self.log.close()
@@ -1414,6 +1418,10 @@ main::proc(){
 
     @classmethod
     def setUpClass(cls):
+        if os.environ.get('THOR_TEST_TLS_PREBUILT') == '1':
+            if not BINARY.is_file():
+                raise RuntimeError(f'Prebuilt TLS executable is missing: {BINARY}')
+            return
         if not shutil.which(os.environ.get('THOR_ODIN', 'odin')):
             raise unittest.SkipTest('Odin is required for TLS tests')
         subprocess.run(['python3', str(ROOT / 'tools' / 'build_tls.py')], check=True,
@@ -1971,7 +1979,6 @@ main::proc(){
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 
-    @unittest.skipIf(os.name=='nt','Uses an executable Python test compiler')
     def test_superseded_silent_check_is_cancelled_before_latest_snapshot(self):
         temporary=tempfile.TemporaryDirectory(prefix='tls-slow-check-');self.addCleanup(temporary.cleanup)
         root=Path(temporary.name).resolve();main=root/'main.thor';compiler=root/'compiler.py'
@@ -1991,6 +1998,7 @@ if 'SLOW' in text:
 (root/'completed').write_text(text)
 print(json.dumps({'error_count':0,'errors':[]}),file=sys.stderr)
 ''');compiler.chmod(0o755)
+        if os.name=='nt':compiler=native_test_compiler(root,'superseded' if 'SLOW' in text else 'shutdown')
         client=Client(root,compiler_command=compiler);self.addCleanup(client.close)
         client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
         deadline=time.monotonic()+5
@@ -2004,11 +2012,11 @@ print(json.dumps({'error_count':0,'errors':[]}),file=sys.stderr)
         while time.monotonic()<deadline:
             if (root/'completed').exists() and (root/'completed').read_text()==changed:break
             time.sleep(.02)
-        self.assertTrue((root/'cancelled').exists(),'Superseded check was not terminated')
+        if os.name=='nt':self.assertFalse(process_running(int((root/'started').read_text())),'Superseded check was not terminated')
+        else:self.assertTrue((root/'cancelled').exists(),'Superseded check was not terminated')
         self.assertEqual((root/'completed').read_text(),changed)
         self.assertLess(time.monotonic()-start,5)
 
-    @unittest.skipIf(os.name=='nt','Uses an executable Python test compiler')
     def test_shutdown_cancels_inflight_compiler_check(self):
         temporary=tempfile.TemporaryDirectory(prefix='tls-close-check-');self.addCleanup(temporary.cleanup)
         root=Path(temporary.name).resolve();main=root/'main.thor';compiler=root/'compiler.py'
@@ -2023,13 +2031,15 @@ signal.signal(signal.SIGTERM,cancel)
 (root/'started').write_text('yes')
 time.sleep(10)
 ''');compiler.chmod(0o755)
+        if os.name=='nt':compiler=native_test_compiler(root,'superseded' if 'SLOW' in text else 'shutdown')
         client=Client(root,compiler_command=compiler);self.addCleanup(client.close)
         client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
         deadline=time.monotonic()+5
         while not (root/'started').exists() and time.monotonic()<deadline:time.sleep(.02)
         self.assertTrue((root/'started').exists())
         client.close()
-        self.assertTrue((root/'cancelled').exists(),'Closing TLS left its compiler check running')
+        if os.name=='nt':self.assertFalse(process_running(int((root/'started').read_text())),'Closing TLS left its compiler check running')
+        else:self.assertTrue((root/'cancelled').exists(),'Closing TLS left its compiler check running')
 
     def test_capabilities_and_demo_have_no_parser_errors(self):
         text = (ROOT / 'demo' / 'main.thor').read_text()
@@ -2557,19 +2567,22 @@ main::proc(){_=Record{};_=LIMIT;_=counter;_=identity;_=overloaded;_=écho}
             self.assertIn('set[string]',json.dumps(hover))
         client.diagnostic(main.as_uri(),empty=True)
 
-    @unittest.skipIf(os.name=='nt','POSIX test launcher; Windows validation is separate')
     def test_runtime_discovery_respects_explicit_collections_and_bounds_failed_queries(self):
         with tempfile.TemporaryDirectory(prefix='tls root query ') as directory:
             root=Path(directory).resolve()
             compiler=root/'compiler';marker=root/'called'
             compiler.write_text('#!/bin/sh\ntouch "'+str(marker)+'"\nexit 1\n')
             compiler.chmod(0o755)
+            if os.name=='nt':compiler=native_test_compiler(root,'query')
             client=Client(root,compiler_command=compiler)
             client.close()
             self.assertFalse(marker.exists(),'Explicit collections must avoid a root query')
             for body in ['exit 1','printf "relative/path"','exec sleep 5']:
                 with self.subTest(body=body):
-                    compiler.write_text('#!/bin/sh\n'+body+'\n')
+                    if os.name=='nt':
+                        config={'root_output':'relative/path'} if 'printf' in body else {'query_sleep':True} if 'sleep' in body else {}
+                        compiler=native_test_compiler(root,'query',**config)
+                    else:compiler.write_text('#!/bin/sh\n'+body+'\n')
                     started=time.monotonic()
                     client=Client(root,compiler_command=compiler,collections=[])
                     client.close()
@@ -2778,7 +2791,6 @@ main::proc(){local:=proc(a,b:int)->bool{return a<b};_=local;_=local(1,2)}
                 position = self.position(text, fragment, offset)
                 self.assertEqual(tokens.get((position['line'], position['character'])), kind)
 
-    @unittest.skipIf(os.name == 'nt', 'Uses an executable Python test compiler')
     def test_locationless_compiler_error_stays_with_its_package_and_clears(self):
         temporary = tempfile.TemporaryDirectory(prefix='tls-locationless-')
         self.addCleanup(temporary.cleanup)
@@ -2800,6 +2812,7 @@ print(json.dumps({'error_count':len(errors),'errors':errors}),file=sys.stderr)
 raise SystemExit(bool(errors))
 ''')
         compiler.chmod(0o755)
+        if os.name=='nt':compiler=native_test_compiler(root,'locationless')
         client = Client(root, compiler_command=compiler)
         self.addCleanup(client.close)
         for file, text in [(main, clean), (bad, broken)]:

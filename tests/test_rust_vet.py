@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import unittest
+from unittest.mock import patch
 from tests import test_vet as reference
 from tests import test_rust_compiler as native
 
@@ -40,6 +41,53 @@ blocked::proc(x:int)->int{return cycle_a(x)}
         counters = json.loads(profile.read_text())['counters']
         self.assertLessEqual(counters.get('vet.portability_body_scans', 0), 52, counters)
         self.assertGreater(counters.get('vet.portability_body_scans', 0), 48, counters)
+
+    def test_imported_test_packages_participate_in_correction_validation(self):
+        self.write('package root\n@(require) import "cases"\n')
+        cases=self.app/'cases';cases.mkdir()
+        suite=cases/'suite_test.thor'
+        suite.write_text('package cases\nimport "core:testing"\n@(test) check_value::proc(t:^testing.T){value:=7;testing.expect_value(t,value,7)}\n')
+        def invoke(command,*flags):
+            result=subprocess.run([str(native.RUST),command,str(self.source),'-file','-all-packages',
+                '--output-dir',str(self.output),*flags],cwd=self.root,capture_output=True,text=True,timeout=90)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        profile=self.root/'required-import-profile.json'
+        with patch.dict(os.environ,{'THOR_PROFILE':str(profile)}):
+            invoke('vet','--vet=immutable,unused','-build-mode:test','--apply')
+        self.assertEqual(json.loads(profile.read_text())['counters'].get('vet.validation_checks'),1)
+        self.assertIn('value:>7',suite.read_text())
+        self.assertIn('@(require) import "cases"',self.source.read_text())
+        invoke('test')
+
+    def test_enum_constant_arguments_do_not_poison_unrelated_pure_edits(self):
+        self.write('package main\nE::enum{a=5,b=9}\n'
+            'identity::proc(c:byte)->bool{return c==0}\n'
+            'main::proc(){check::proc($e:E){when e==.a{if int(e)!=5{panic("enum")}}};check(.a);check(.b)}\n')
+        profile=self.root/'enum-profile.json'
+        with patch.dict(os.environ,{'THOR_PROFILE':str(profile)}):
+            self.invoke('--vet=pure','--apply','--comptime=required')
+        self.assertIn('identity::fn',self.source.read_text())
+        self.assertEqual(json.loads(profile.read_text())['counters'].get('vet.validation_checks'),1)
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
+
+    def test_imported_test_pointer_exposure_is_not_auto_frozen(self):
+        self.write('package root\n@(require) import "cases"\n')
+        cases=self.app/'cases';cases.mkdir()
+        suite=cases/'suite_test.thor'
+        suite.write_text('package cases\nimport "core:testing"\nread::proc(b:[]u8)->u8{return ((^u8)(raw_data(b)))^}\n@(test) check_value::proc(t:^testing.T){values:=[]u8{7};testing.expect_value(t,read(values),7)}\n')
+        result=subprocess.run([str(native.RUST),'vet',str(self.source),'-file','-all-packages',
+            '-build-mode:test','--vet=immutable','--apply','--output-dir',str(self.output)],
+            cwd=self.root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('values:=',suite.read_text())
+        self.invoke('-all-packages',command='test')
+
+    def test_matrix_element_addresses_and_writes_prevent_immutable_edits(self):
+        self.write('package main\nread::proc(p:^f32)->f32{return p^}\nmain::proc(){transform:=(matrix[2,2]f32){};transform[0,0]=7;if read(&transform[0,0])!=7{panic("matrix")}}\n')
+        result=self.invoke('--vet=immutable','--apply')
+        self.assertNotIn("Declare 'transform' immutable",result.stdout+result.stderr)
+        self.assertIn('transform:=',self.source.read_text())
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
 
     def test_options_before_source_and_large_batches(self):
         body='\n'.join(f'value_{index}:={index};if value_{index}!={index}{{panic("result")}}' for index in range(80))

@@ -81,6 +81,37 @@ class ImmutableOracleTests(unittest.TestCase):
     invoke=fixtures.RustVetTests.invoke
     findings=fixtures.RustVetTests.findings
 
+    def test_generic_shared_when_writes_do_not_probe_loop_induction_variables(self):
+        self.write('''package main
+work::proc(tag:$T){
+ when T==int{
+  total:=0
+  for index:=0;index<4;index+=1{total+=index}
+  if total!=6{panic("loop result")}
+  read_only:=7
+  if read_only!=7{panic("reader")}
+ }else{
+  count:=0
+  for index:=0;index<3;index+=1{count+=index}
+  if count!=3{panic("other branch")}
+ }
+}
+main::proc(){work(1);work(f64(2))}
+''')
+        profile=self.root/'shared-when-profile.json'
+        result=subprocess.run([str(native.RUST),'vet',str(self.app),'--apply','--vet=immutable','--comptime=required',
+            '--output-dir',str(self.output)],capture_output=True,text=True,cwd=self.root,
+            env={**os.environ,'THOR_PROFILE':str(profile)},timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(json.loads(profile.read_text())['counters'].get('vet.validation_checks'),1)
+        text=self.source.read_text()
+        self.assertIn('read_only:>7',text)
+        for name in ['total','count','index']:
+            self.assertNotIn(name+':>',text)
+        for flags in ([],native.UNCHECKED):
+            built=self.invoke(*flags,command='run')
+            self.assertEqual(built.returncode,0,built.stdout+built.stderr)
+
     def test_testing_parameter_and_sdk_conditions_do_not_block_readonly_locals(self):
         self.write('''package main
 import "core:testing"
@@ -184,6 +215,35 @@ main::proc(){
         self.assertEqual(counters.get('vet.safety_roots'),1,counters)
         self.assertEqual(counters.get('vet.safety_seeds'),80,counters)
         self.invoke('--vet=immutable','--apply')
+        self.assertEqual(self.source.read_text(),text)
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
+
+    def test_generic_when_scalar_writes_reject_the_entire_batch_once(self):
+        count=24
+        body='\n'.join(f'counter_{i}:=uint(0);when T==f32{{counter_{i}+=1}};total+=counter_{i}' for i in range(count))
+        text='package main\ncompute::proc($T:typeid)->uint{total:=uint(0);\n'+body+'\nreturn total}\nmain::proc(){if compute(f32)!=24{panic("sum")}}\n'
+        findings,counters=self.profiled(text)
+        self.assertEqual(findings,[])
+        self.assertEqual(counters.get('vet.validation_checks'),1,counters)
+        self.assertEqual(counters.get('vet.readonly_corrections_rejected'),count,counters)
+        self.invoke('--vet=immutable','--apply')
+        self.assertEqual(self.source.read_text(),text)
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
+
+    def test_inconclusive_validation_never_publishes_or_applies_a_correction(self):
+        text='package main\nmain::proc(){value:=7;if value!=7{panic("value")}}\n'
+        self.write(text)
+        result=subprocess.run([str(native.RUST),'vet',str(self.app),'--vet=immutable',
+            '--apply','-json-errors'],env={**os.environ,'THOR_VET_VALIDATION_BUDGET':'0'},
+            capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stderr)
+        findings=json.loads(result.stderr)['errors']
+        unknown=[item for item in findings if item.get('code')=='thor/correction-unknown']
+        self.assertEqual(len(unknown),1,findings)
+        self.assertIn("'value'",unknown[0]['msgs'][0])
+        self.assertIn('Could not verify',unknown[0]['msgs'][0])
+        self.assertTrue(unknown[0].get('manual_review'))
+        self.assertNotIn('fix',unknown[0])
         self.assertEqual(self.source.read_text(),text)
         for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
 

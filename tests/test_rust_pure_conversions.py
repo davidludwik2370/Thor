@@ -27,7 +27,7 @@ outer::proc($T:typeid,n:int)->int{
         self.assertEqual(len(errors),1,errors)
         line=next(i for i,line in enumerate(code.splitlines(),1) if 'T(uintptr(value))' in line)
         self.assertEqual(errors[0]['pos']['line'],line,errors)
-        self.assertTrue(errors[0]['pos']['file'].endswith('/input/main.thor'),errors)
+        self.assertTrue(errors[0]['pos']['file'].replace('\\','/').endswith('/input/main.thor'),errors)
         for hidden in ('conversion_type','pure_type_site','Thor expression'):
             self.assertNotIn(hidden,result.stderr)
 

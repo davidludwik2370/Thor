@@ -6,7 +6,6 @@ import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import "core:unicode/utf8"
-import "core:bufio"
 import "core:os"
 import "core:io"
 import "base:runtime"
@@ -156,8 +155,6 @@ input :: proc(message := "", allocator := context.allocator) -> (res: string, er
 
     // A local reader must not read ahead and discard the next input line.
     buffer: [1]byte
-    r: bufio.Reader
-    bufio.reader_init_with_buf(&r, os.to_stream(os.stdin), buffer[:])
     // Keep capacity until the temporary buffer is freed. Odin's read_string
     // returns a slice of a dynamic buffer without retaining its allocation
     // size; trimming that string further also loses the newline's byte count.
@@ -166,16 +163,28 @@ input :: proc(message := "", allocator := context.allocator) -> (res: string, er
     line.allocator = allocator
     defer delete(line)
     for {
-        c, read_err := bufio.reader_read_byte(&r)
-        if read_err != nil { err = read_err; break }
+        count, read_err := os.read(os.stdin, buffer[:])
+        if count == 0 {
+            err = read_err.(io.Error) or_else .Unknown
+            if read_err == nil { err = .EOF }
+            when ODIN_OS == .Windows {
+                // ReadFile reports a closed stdin pipe as ERROR_BROKEN_PIPE.
+                // os.to_stream erases that distinction into io.Error.Unknown.
+                if code, ok := read_err.(os.General_Error); ok && code == .Broken_Pipe {
+                    err = .EOF
+                }
+            }
+            break
+        }
+        c := buffer[0]
         if c == '\n' {
             if len(line) > 0 && line[len(line)-1] == '\r' {
                 resize(&line, len(line)-1)
             }
             break
         }
-        count, allocation_err := append(&line, c)
-        if allocation_err != nil || count != 1 { return "", .Unknown }
+        appended, allocation_err := append(&line, c)
+        if allocation_err != nil || appended != 1 { return "", .Unknown }
     }
     allocation_err: runtime.Allocator_Error
     res, allocation_err = strings.clone(string(line[:]), allocator)

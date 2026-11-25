@@ -90,10 +90,23 @@ and the Rust frontend’s independent parsing work (the frontend caps at 32).
 
 Thor’s `--vet` and native `-vet-*` policies are distinct:
 
-- `--vet[=immutable,pure,unused,semicolon]` checks original Thor conventions.
-  Findings are errors for `thor build --vet`, including with `-ignore-warnings`.
-  Other commands, including TLS `check` and standalone `vet`, report warnings;
-  `-warnings-as-errors` can make those strict too.
+- `--vet[=immutable,pure,unused,semicolon,lifetime,leak]` checks original Thor conventions, reference lifetimes and cleanup obligations.
+  Lifetime/leak findings explicitly separate definite issues from unverified
+  boundaries; see [Lifetime vet](lifetime-vet.md). Ownership has no automatic fix.
+  Ordinary findings and definite memory issues are errors for `thor build --vet`,
+  including with `-ignore-warnings`. Other commands report those as warnings;
+  `-warnings-as-errors` can escalate them. Incomplete analysis is summarized as
+  nonfatal information by default. `--unverified` (or `--unverified=show`) shows
+  individual notices; `--unverified=error` shows them as errors and fails the
+  command. `--unverified=summary` explicitly selects the default. The options
+  also cover unfinished convention-correction validation. JSON retains full
+  details and a top-level count in every mode. They apply to `vet` and to
+  `check/build/run/test/publish` with `--vet`; native `-vet` alone does not enable
+  Thor analysis. See [reporting incomplete analyses](lifetime-vet.md#reporting-incomplete-analyses)
+  for strict exit behavior, warning-flag interaction and TLS settings.
+  Completed memory checks can be reused for unchanged inputs; dependency content
+  and resource checks guard reuse. `--no-cache` bypasses it and `--clear-cache`
+  clears it. See [memory-check reuse](lifetime-vet.md#reusing-unchanged-checks).
 - All native `-vet*` flags and `#+vet` file tags accept Odin-compatible source
   in `.thor` files. Policies that depend on source structure use a separate,
   source-preserving native check before ordinary Thor lowering. Native severities,

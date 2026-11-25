@@ -100,6 +100,10 @@ translated commands or copying the project. `--command` accepts POSIX-style
 literal argument quoting. Shell expansion, pipelines, redirection, and compound
 scripts receive a conversion error. Single-quoted strings may contain literal
 shell punctuation.
+Absolute Windows drive paths retain their backslashes, including inside flags
+such as `-out:C:\build\game.exe`; native Windows commands also accept UNC paths.
+Quote paths containing spaces. Printed commands continue to use literal
+argument quoting and do not execute a shell.
 
 ### Native policy compatibility
 

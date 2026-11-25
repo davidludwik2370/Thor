@@ -1,0 +1,83 @@
+#!/bin/sh
+# Native bootstrap only. End-user installation needs neither Python nor Cargo.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+version=$(cat "$root/release/version")
+bundle=
+checksum=
+base=${THOR_RELEASE_BASE:-}
+forward=$(mktemp -d "${TMPDIR:-/tmp}/thor-bootstrap.XXXXXXXX")
+trap 'rm -rf "$forward"' EXIT HUP INT TERM
+# Keep original arguments in "$@"; acquisition options are consumed below using
+# a second pass before invoking the native installer.
+for arg do
+    case "$arg" in --help|-h)
+        cat <<'HELP'
+Thor installer (macOS/Linux)
+Usage: ./thor-install [--vscode [--profile NAME]] [options]
+  --bundle FILE          Use a local release bundle and FILE.sha256
+  --sha256 HEX           Supply the expected SHA-256 explicitly
+  --release-base URL     Download release artifacts from this directory
+  --version VERSION      Select a release (default: release/version)
+  --prefix DIR           Choose a per-user installation directory
+  --vscode               Install Thor, standard Odin/OLS and CodeLLDB
+  --profile NAME         Create/use a named VS Code profile
+  --colors / --no-colors  Enable/disable Thor colors for a NEW profile
+  --code PATH            Select the VS Code CLI
+  --code-user-data DIR   Use separate editor user data
+  --extensions-dir DIR   Use separate extension storage
+  --path                 Add a managed user PATH entry
+  --dry-run              Verify the distribution without installing
+  --help                 Show this overview
+Existing editor settings, profiles and project configurations are preserved.
+ARM64 Linux --vscode builds native OLS and adds its managed server setting.
+Without a published GitHub release, use --bundle or --release-base.
+HELP
+        exit 0;; esac
+done
+# A newline-delimited argument file is safe here because all installer argument
+# values reject newline/control characters. Rebuild positional args without eval.
+: > "$forward/args"
+while [ "$#" -gt 0 ]; do
+    arg=$1; shift
+    case "$arg" in
+        --release-base|--version|--bundle|--sha256)
+            [ "$#" -gt 0 ] || { echo "thor-install: $arg requires a value" >&2; exit 1; }
+            case "$arg" in --release-base) base=$1;; --version) version=$1;; --bundle) bundle=$1;; --sha256) checksum=$1;; esac
+            shift;;
+        *) case "$arg" in *'
+'*) echo 'thor-install: newline in argument' >&2; exit 1;; esac
+           printf '%s\n' "$arg" >> "$forward/args";;
+    esac
+done
+case "$version" in ''|*[!a-zA-Z0-9._-]*) echo 'thor-install: invalid version' >&2; exit 1;; esac
+case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; *) echo 'thor-install: use thor-install.cmd on Windows' >&2; exit 1;; esac
+case "$(uname -m)" in arm64|aarch64) arch=aarch64;; x86_64|amd64) arch=x86_64;; *) echo 'thor-install: unsupported architecture' >&2; exit 1;; esac
+if [ -z "$bundle" ]; then
+    if [ -z "$base" ]; then
+        origin=$(git -C "$root" remote get-url origin 2>/dev/null || :)
+        case "$origin" in https://github.com/*) slug=${origin#https://github.com/};; git@github.com:*) slug=${origin#git@github.com:};; *) slug=;; esac
+        slug=${slug%.git}
+        case "$slug" in */*) base="https://github.com/$slug/releases/download/v$version";; *) echo 'thor-install: no release location is configured. Use --bundle FILE or --release-base URL until GitHub releases are published.' >&2; exit 1;; esac
+    fi
+    case "$base" in https://*) ;; http://localhost:*|http://127.0.0.1:*|http://\[::1\]:*) ;; *) echo 'thor-install: release URLs must use HTTPS (localhost HTTP is supported for testing)' >&2; exit 1;; esac
+    command -v curl >/dev/null 2>&1 || { echo 'thor-install: install curl and CA certificates first' >&2; exit 1; }
+    bundle="$forward/thor-$version-$os-$arch.tar.gz"
+    curl --fail --location --proto '=https,http' --proto-redir '=https' "$base/$(basename "$bundle")" -o "$bundle"
+    if [ -z "$checksum" ]; then
+        curl --fail --location --proto '=https,http' --proto-redir '=https' "$base/$(basename "$bundle").sha256" -o "$bundle.sha256"
+    fi
+fi
+if [ -z "$checksum" ]; then checksum=$(awk 'NR == 1 {print $1}' "$bundle.sha256"); fi
+case "$checksum" in ''|*[!a-fA-F0-9]*) echo 'thor-install: invalid SHA-256' >&2; exit 1;; esac
+[ "${#checksum}" -eq 64 ] || { echo 'thor-install: invalid SHA-256 length' >&2; exit 1; }
+if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$bundle" | awk '{print $1}'); else actual=$(shasum -a 256 "$bundle" | awk '{print $1}'); fi
+expected=$(printf '%s' "$checksum" | tr 'A-F' 'a-f')
+[ "$actual" = "$expected" ] || { echo 'thor-install: bundle SHA-256 mismatch; nothing installed' >&2; exit 1; }
+# Stream only the named executable into a private temporary file. Do not extract
+# arbitrary archive paths before the native installer validates the inventory.
+tar -xOzf "$bundle" thor-install > "$forward/thor-install"
+chmod 700 "$forward/thor-install"
+set --
+while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+"$forward/thor-install" --bundle "$bundle" --sha256 "$expected" "$@"

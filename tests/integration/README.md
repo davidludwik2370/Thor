@@ -43,6 +43,12 @@ require identical stdout. Explicitly marked native test failures are compared
 case by case, retaining their original failure verdicts. Crashes and unavailable
 baseline configurations remain recorded as unavailable.
 
+Use `--test-report text` if an SDK's optional JSON reporter is unavailable.
+The runner enables Odin's normal test-state log and requires a final state for
+every finished case before comparing package names, test names and verdicts.
+Incomplete/crashed reports remain incomplete. Changing report formats rebuilds
+the recorded test baselines; it never reuses an incompatible old report.
+
 The large Odin repository and examples matrix use one initial command to
 validate the copied project, followed by individually translated commands for
 the full matrix. This preserves per-command failure evidence.
@@ -144,3 +150,32 @@ The shared RTTI consumers can also be checked against a second native SDK.
 THOR_TEST_SECOND_ODIN=/path/to/other/odin \
   python3 -m unittest tests.test_runtime_sdk_compatibility
 ```
+
+To audit every already migrated, vet-applied build/test configuration without
+editing its sources, use the same manifest and native baseline gates:
+
+```sh
+python3 tests/integration/vet_memory_projects.py \
+  --results integration-projects/memory-vet-results --resume
+```
+
+This runs all Thor vet checks by default (`--checks=lifetime,leak` selects only
+ownership checks). It preserves each recipe's target, defines, collections,
+test build mode and SDK, uses required-only compile-time evaluation, and reuses
+the main runner's process-tree memory limits with one command at a time.
+Baseline-unavailable configurations remain recorded skips. Reports retain full
+diagnostics and profiles. A successful command can still contain warnings;
+unverified ownership findings require review and are never automatically ignored.
+
+After fixing a finding, rerun only the affected native-baseline comparisons:
+
+```sh
+python3 tests/integration/run_odin_projects.py --stage verify \
+  --projects '^odin-lang/Odin$' --commands 'core-normal|core-speed'
+```
+
+`--commands` is restricted to verification. Other recorded command results and
+their artifact indices are retained, so a targeted retry does not erase earlier
+suite coverage. The default serial runner unwinds an active command on Ctrl+C.
+Explicit `@(require)` imports must survive convention fixes, including root
+files that import test packages only for their registered tests.

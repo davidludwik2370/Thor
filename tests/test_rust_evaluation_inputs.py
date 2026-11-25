@@ -1,12 +1,15 @@
 """Dependency snapshots, resources and invalidation against the Python model."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from thorlang.compiler import Source
 from thorlang.dependencies import Inputs, file_digest, signature
 from thorlang.driver import frontend_binary
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -17,7 +20,7 @@ class RustEvaluationInputTests(unittest.TestCase):
         result=subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',
             str(native.ROOT/'rust/Cargo.toml'),'--example','inputs_protocol'],capture_output=True,text=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
-        cls.binary=native.ROOT/'rust/target/release/examples/inputs_protocol'
+        cls.binary=rust_binary('inputs_protocol', example=True)
         cls.frontend=frontend_binary('odin')[0]
 
     def setUp(self):
@@ -33,6 +36,19 @@ class RustEvaluationInputTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def run_reference(self,operations,data=None,collections=None):
+        # Windows uses a versioned native file-ID signature, deliberately unlike
+        # the archived Unix stat tuple. Borrow only that platform representation
+        # while retaining independent reference dependency/invalidation logic.
+        if os.name=='nt':
+            with patch('thorlang.dependencies.signature',side_effect=self.snapshot_signature):
+                return self.reference_operations(operations,data,collections)
+        return self.reference_operations(operations,data,collections)
+
+    def snapshot_signature(self,path):
+        if os.name=='nt':return self.run_native([{'op':'signature','path':str(path)}])['answers'][0]
+        return signature(path)
+
+    def reference_operations(self,operations,data=None,collections=None):
         inputs=Inputs(json.loads(json.dumps(data)) if data is not None else None)
         answers=[]
         for operation in operations:
@@ -41,13 +57,13 @@ class RustEvaluationInputTests(unittest.TestCase):
             elif op=='binding':inputs.binding(path)
             elif op=='tree':inputs.tree(path)
             elif op=='package':inputs.package(path,[Path(name) for name in operation['paths']],tuple(operation.get('suffixes',['.odin','.thor'])))
-            elif op=='directory':inputs.data['directories'][str(path)]=signature(path)
+            elif op=='directory':inputs.data['directories'][str(path)]=self.snapshot_signature(path)
             elif op=='source':
                 raw=operation.get('raw')
                 source=Source(path,self.frontend,raw=raw.encode() if raw is not None else None,cache=False)
                 source.collections={name:Path(path) for name,path in (collections or {}).items()}
                 inputs.source(source,source_file=operation.get('source_file',True))
-            elif op=='signature':answer=signature(path)
+            elif op=='signature':answer=self.snapshot_signature(path)
             elif op=='resolve':answer=str(path.resolve())
             elif op=='digest':answer=file_digest(path)
             elif op=='valid':answer=inputs.valid()
@@ -158,13 +174,13 @@ class RustEvaluationInputTests(unittest.TestCase):
         path=self.root/'module.odin';path.write_text('before')
         packet=self.compare([{'op':'tree','path':str(self.root)}])
         path.write_text('change')
-        packet['data']['files'][str(path)]['stat']=signature(path)
+        packet['data']['files'][str(path)]['stat']=self.snapshot_signature(path)
         self.assertFalse(self.run_native([],packet['data'])['valid'])
         self.assertFalse(self.run_reference([],packet['data'])['valid'])
         packet=self.compare([{'op':'tree','path':str(self.root)}])
         child=self.root/'new_package';child.mkdir()
         (child/'new.odin').write_text('package example')
-        packet['data']['directories'][str(self.root)]['stat']=signature(self.root)
+        packet['data']['directories'][str(self.root)]['stat']=self.snapshot_signature(self.root)
         self.assertFalse(self.run_native([],packet['data'])['valid'])
         self.assertFalse(self.run_reference([],packet['data'])['valid'])
 

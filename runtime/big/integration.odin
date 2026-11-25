@@ -22,6 +22,10 @@ compiler_switch_case :: proc(value,match:$T)->bool where T==Integer || T==Ration
     defer compiler_destroy_value(match)
     return compare(value,match,"==")
 }
+compiler_switch_compare :: proc(value, match: $T, $op: string) -> bool where T == Integer || T == Rational {
+    defer compiler_destroy_value(match)
+    return compare(value, match, op)
+}
 compiler_switch_range :: proc(value,low,high:$T,$inclusive:bool)->bool where T==Integer || T==Rational {
     defer compiler_destroy_value(low)
     defer compiler_destroy_value(high)

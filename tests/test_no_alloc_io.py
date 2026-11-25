@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+import shutil
 import unittest
 from tests import test_rust_compiler as base
 
@@ -24,6 +25,77 @@ class NoAllocIOTests(unittest.TestCase):
                     self.assertIn(fail,result.stderr)
                 else:self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         return result
+
+    def test_reviewed_sdk_crlf_checkout_preserves_effects_but_other_edits_fail(self):
+        sdk=__import__('pathlib').Path(subprocess.check_output([os.environ.get('THOR_ODIN','odin'),'root'],text=True).strip())
+        original=sdk/'core/fmt/fmt.odin'
+        replacement=self.root/'format-crlf.odin'
+        raw=original.read_bytes().replace(b'\r\n',b'\n')
+        replacement.write_bytes(raw.replace(b'\n',b'\r\n'))
+        overlay=self.root/'format-overlay.json'
+        overlay.write_text(json.dumps({'Replace':{str(original):str(replacement)}}))
+        self.check('fmt.println(7)','import "core:fmt"',flags=['--overlay',str(overlay)])
+        replacement.write_bytes(raw+b'\n// unreviewed change\n')
+        self.check('fmt.println(7)','import "core:fmt"',flags=['--overlay',str(overlay)],fail='effect profile does not match')
+
+    def test_relocated_runtime_collection_uses_actual_reviewed_sources(self):
+        copied=self.root/'moved installation'
+        for name in ['runtime','frontend']:
+            shutil.copytree(base.ROOT/name,copied/name)
+        imports='import basic "thor:basic"\nimport "core:fmt"'
+        from unittest.mock import patch
+        with patch.dict(os.environ,{'THOR_ROOT':str(copied)}):
+            self.check('fmt.println(7);basic.print(8)',imports)
+            source=copied/'runtime/basic/basic.thor'
+            source.write_bytes(source.read_bytes()+b'\n// changed source snapshot\n')
+            self.check('basic.print(8)',imports,fail='effect profile does not match')
+
+    def test_user_thor_collection_does_not_replace_compiler_io_proofs(self):
+        custom=self.root/'custom';(custom/'basic').mkdir(parents=True)
+        source=custom/'basic/basic.odin'
+        source.write_text('package custom_basic\nprint::proc(value:int){_=value}\n')
+        flags=['-collection:thor='+str(custom)]
+        imports='import custom "thor:basic"\nimport "core:fmt"'
+        self.check('custom.print(1);fmt.println(7)',imports,flags=flags)
+        source.write_text('package custom_basic\nprint::proc(value:int){_=make([]int,value)}\n')
+        self.check('custom.print(1);fmt.println(7)',imports,flags=flags,fail="builtin 'make'")
+
+    def test_test_only_effects_do_not_invalidate_an_ordinary_build(self):
+        # Odin accepts ordinary sources named *_test; only registered test
+        # procedures are inactive in a normal build, not their whole file.
+        self.source.write_text('''package main
+import "core:fmt"
+import "core:os"
+import "core:testing"
+@(test) changes_stream::proc(t:^testing.T){ptr:=&os.stdout;_=ptr;_=t}
+@(no_alloc) checked::proc(){fmt.println(7)}
+main::proc(){checked()}
+''')
+        for engine in self.engines:
+            good=self.invoke(engine,'check')
+            self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+            bad=self.invoke(engine,'build',flags=['-build-mode:test'])
+            self.assertNotEqual(bad.returncode,0,bad.stderr)
+            self.assertIn('native file metadata escapes',bad.stderr)
+        self.source.write_text(self.source.read_text().replace('main::proc(){checked()}',
+            'main::proc(){changes_stream(nil);checked()}'))
+        bad=self.invoke('rust','check')
+        self.assertNotEqual(bad.returncode,0,bad.stderr)
+        self.assertIn('native file metadata escapes',bad.stderr)
+
+    def test_native_test_runner_terminal_queries_preserve_no_alloc_printing(self):
+        self.source.write_text('''package main
+import "core:fmt"
+import "core:testing"
+@(no_alloc) show::proc(){fmt.println(7)}
+@(test) verify::proc(t:^testing.T){show();_=t}
+main::proc(){show()}
+''')
+        for engine in self.engines:
+            for flags in [[],base.UNCHECKED]:
+                result=self.invoke(engine,'test',flags=flags)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertIn('Finished 1 test',result.stdout+result.stderr)
 
     def test_print_families_aliases_and_named_arguments(self):
         for body in ['fmt.print(7);fmt.println(8,sep=",",flush=false)',
@@ -222,7 +294,7 @@ main::proc(){
         self.source.write_text(code)
         for engine in self.engines:
             for flags in [[],base.UNCHECKED,['-debug']]:
-                output=self.root/(engine+'-io-program')
+                output=self.root/(engine+'-io-program'+('.exe' if os.name=='nt' else ''))
                 result=self.invoke(engine,'build',flags=['-thread-count:1',f'-out:{output}',*flags])
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                 for data in [b'hello',b'',b'\xc3\xa9abc',b'\xffabc',b'x'*32,b'y'*33]:

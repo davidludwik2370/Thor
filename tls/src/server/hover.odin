@@ -21,6 +21,7 @@ write_hover_content :: proc(
         cat=append_first_line_comment(cat,"pure function",allocator)
     }
 	if .Immutable in symbol.flags { cat = append_first_line_comment(cat, "immutable storage", allocator) }
+	if .Scoped in symbol.flags {cat=append_first_line_comment(cat,"scoped owner; shallow cleanup at scope exit",allocator)}
 	doc := construct_symbol_docs(symbol, allocator)
 	if thor_type_display_enabled(ast_context) && .Variable in symbol.flags && thor_big_kind(symbol)!="" &&
 	   strings.contains(doc,"These fields are compiler/runtime implementation details") {
@@ -40,7 +41,9 @@ write_hover_content :: proc(
 		}
 	}
 
-	return build_markup_content(cat, doc, allocator, language="thor" if thor_type_display_enabled(ast_context) else "odin")
+	size_info := ""
+	if ast_context.show_hover_size {size_info = construct_hover_size(ast_context, symbol, allocator)}
+	return build_markup_content(cat, doc, allocator, language="thor" if thor_type_display_enabled(ast_context) else "odin", size_info=size_info)
 }
 
 write_field_hover_content :: proc(
@@ -87,6 +90,12 @@ get_hover_information :: proc(
 
 	ast_context.position_hint = position_context.hint
 	ast_context.show_layout = config.enable_hover_layout
+	ast_context.show_hover_size = config.enable_hover_size
+	if config.enable_hover_size || config.enable_hover_layout {
+		ast_context.layout_active=true
+		ast_context.layout_cache = make(map[Layout_Cache_Key]Layout_Cache_Result, ast_context.allocator)
+		ast_context.layout_budget = HOVER_LAYOUT_BUDGET
+	}
 
 	get_globals(document.ast, &ast_context)
 	get_locals(&ast_context, &position_context)
@@ -176,7 +185,12 @@ get_hover_information :: proc(
             }
 			if str, ok := keywords_docs[ident.name]; ok {
 				hover.contents.kind = "markdown"
-				hover.contents.value = str
+                size_info := ""
+                if ast_context.show_hover_size {
+                    basic := Symbol{type=.Type,value=SymbolBasicValue{ident=ident}}
+                    size_info = construct_hover_size(&ast_context,basic)
+                }
+                hover.contents.value = hover_size_in_builtin_docs(str,size_info)
 				hover.range = common.get_token_range(position_context.identifier^, ast_context.file.src)
 				return hover, true, true
 			}

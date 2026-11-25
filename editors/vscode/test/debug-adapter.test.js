@@ -7,6 +7,17 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const {Framing,DebugMaps,ThorDebugAdapter} = require('../debug-adapter');
 
+test('PDB disassembly labels use their own frame without losing source references',()=>{
+    const adapter=Object.create(ThorDebugAdapter.prototype);
+    adapter.frames=new Map();adapter.sourceAliases=new Map();
+    adapter.maps={debugRoots:[],location:()=>undefined};
+    const frames=adapter.mapFrames([{id:1,name:'invoke_main',line:166,
+        source:{name:'@main::__thor_abcd_pure_validate',origin:'disassembly',sourceReference:1000}}]);
+    assert.equal(frames[0].name,'invoke_main');
+    assert.equal(frames[0].source.name,'@invoke_main');
+    assert.equal(frames[0].source.sourceReference,1000);
+});
+
 test('parallel-map frames hide compiler input mode without hiding user parameter names',()=>{
     const adapter=Object.create(ThorDebugAdapter.prototype);
     adapter.frames=new Map();adapter.sourceAliases=new Map();
@@ -81,6 +92,14 @@ test('debug maps require a matching debug build and reject stale original text',
         fs.writeFileSync(manifest,JSON.stringify(data));
         const maps=new DebugMaps(manifest);
         assert.equal(maps.originals.size,1);
+        if(process.platform==='win32') {
+            const lower=original.replace(/^[A-Z]:/,drive=>drive.toLowerCase());
+            const upper=original.replace(/^[a-z]:/,drive=>drive.toUpperCase());
+            assert.ok(maps.candidates(lower,2).length);
+            assert.deepEqual(maps.candidates(lower,2),maps.candidates(upper,2));
+            assert.deepEqual(maps.location(generated.replace(/^[a-z]:/i,drive=>drive.toLowerCase()),2),
+                maps.location(generated.replace(/^[a-z]:/i,drive=>drive.toUpperCase()),2));
+        }
         maps.verifyExecutable(executable);
         fs.writeFileSync(executable,'another build');
         assert.throws(()=>maps.verifyExecutable(executable),/does not match/);
@@ -178,4 +197,71 @@ test('disconnect during native startup succeeds and settles initialize', {timeou
     const response=messages.find(message=>message.type==='response'&&message.request_seq===1);
     assert.equal(response?.success,false,messages);
     assert.match(response.message,/Thor debug session closed/);
+});
+
+test('explicit library stops keep step-over and step-in within their runtime root',async()=>{
+    const root=path.join(os.tmpdir(),'thor debugger runtime');
+    const basic=path.join(root,'basic/basic.thor'),format=path.join(root,'format/format.odin');
+    for(const command of ['next','stepIn','stepOut']) {
+        for(const start of [basic,path.join(os.tmpdir(),'app/main.thor')]) {
+            const adapter=Object.create(ThorDebugAdapter.prototype);
+            adapter.step={command,args:{},count:0,start:{source:{path:start},name:'basic::print',line:50}};
+            adapter.maps={debugRoots:[process.platform==='win32'?root.replace(/^[A-Z]:/,drive=>drive.toLowerCase()):root]};adapter.references=new Map();adapter.frames=new Map();
+            adapter.mapFrames=frames=>{
+                adapter.frames.set(1,{point:{internal:false},generated:false});return frames;
+            };
+            const calls=[],events=[];
+            adapter.request=async request=>{
+                calls.push(request);
+                return {stackFrames:[{id:1,name:command==='stepIn'?'format::write_value':'basic::print',
+                    source:{path:command==='stepIn'?format:basic},line:51}]};
+            };
+            adapter.emit=message=>events.push(message);
+            await adapter.stopped({body:{reason:'step',threadId:7}});
+            const skips=command==='stepOut'||start!==basic;
+            assert.deepEqual(calls,skips?['stackTrace','stepOut']:['stackTrace']);
+            assert.equal(events.length,skips?0:1);
+        }
+    }
+});
+
+test('unavailable pure-body arguments use the actual owner only after native argument checks',async()=>{
+    for(const scenario of ['argument','local','non-scalar','owner-local','error','ordinary','other-helper','available','optimized','expression']) {
+        const adapter=Object.create(ThorDebugAdapter.prototype);
+        const frame={generated:scenario!=='ordinary',raw:{name:scenario==='other-helper'?'main::__thor_123abc_format_4_9':'main::render.__thor_f9c59e190ad0_pure_23_body-726-4c79e6557e8888ac'},base:{id:2}};
+        const args={frameId:1,expression:scenario==='expression'?'side_effect()':'n',context:'watch'};
+        const original={result:scenario==='available'?'0':scenario==='optimized'?'<optimized out>':'<variable not available>'};
+        const calls=[];
+        adapter.request=async(command,request)=>{
+            calls.push(request);
+            if(scenario==='error')throw new Error('metadata unavailable');
+            if(request.expression.startsWith('/py '))return {result:scenario==='local'||scenario==='non-scalar'||scenario==='owner-local'&&request.frameId===2?'false':'true'};
+            return {result:'7'};
+        };
+        const value=await adapter.owningArgument(frame,args,original);
+        assert.equal(value.result,scenario==='argument'?'7':original.result,scenario);
+        if(scenario==='argument') {
+            assert.equal(calls.length,3);
+            assert.deepEqual(calls.at(-1),{...args,frameId:2});
+        } else if(['ordinary','other-helper','available','optimized','expression'].includes(scenario))assert.equal(calls.length,0,scenario);
+        else assert.ok(calls.every(call=>call.expression.startsWith('/py ')),scenario);
+    }
+});
+
+test('the merged variables pane applies the same checked scalar-argument projection',async()=>{
+    const adapter=Object.create(ThorDebugAdapter.prototype);
+    adapter.references=new Map([[70,[10,20]]]);adapter.referenceFrames=new Map([[70,1]]);
+    adapter.frames=new Map([[1,{generated:true,raw:{name:'main::__thor_123abc_pure_23_body'},base:{id:2}}]]);
+    const calls=[];
+    adapter.request=async(command,args)=>{
+        calls.push({command,args});
+        if(command==='variables')return {variables:[{name:'n',value:args.variablesReference===10?'<variable not available>':'7',type:'long long',variablesReference:0}]};
+        if(args.expression.startsWith('/py '))return {result:'true'};
+        return {result:'7',type:'long long',variablesReference:0};
+    };
+    const body=await adapter.variables({variablesReference:70});
+    assert.equal(body.variables.length,1);
+    assert.equal(body.variables[0].value,'7');
+    const projections=calls.filter(call=>call.command==='evaluate'&&!call.args.expression.startsWith('/py '));
+    assert.equal(projections.length,1);
 });

@@ -23,6 +23,7 @@ Json_Error :: struct {
 	type: string,
 	stage: string,
 	code: string,
+	certainty: string,
 	fix: Json_Vet_Fix,
 	pos:  Json_Type_Error,
 	msgs: []string,
@@ -54,11 +55,13 @@ Json_Errors :: struct {
 	errors:      []Json_Error,
 	check_paths: []string, // Local provenance, supplied after reading the compiler's JSON.
 	slice_access: []Thor_Slice_Info,
+	unverified: struct {mode:string, count, locations:int},
 }
 
 Check_Mode :: enum {
 	Saved,
 	Workspace,
+	Combined,
 }
 
 Check_Request :: struct {
@@ -72,6 +75,7 @@ Check_Request :: struct {
 
 Check_Buffer :: struct {
 	path: string,
+	fullpath: string,
 	canonical: string,
 	text: []u8,
 	pending_vet_lines: [dynamic]int,
@@ -116,7 +120,8 @@ queue_check_request :: proc(mode: Check_Mode, path: string, config: ^common.Conf
 		append(
 			&buffers,
 			Check_Buffer {
-				path = strings.clone(document.fullpath, checker.allocator),
+				path = strings.clone(document.uri.path, checker.allocator),
+				fullpath = strings.clone(document.fullpath, checker.allocator),
 				canonical = os.get_absolute_path(document.fullpath, checker.allocator) or_else strings.clone(document.fullpath, checker.allocator),
 				text = slice.clone(document.text[:document.used_text], checker.allocator),
 				pending_vet_lines = thor_pending_vet_lines(&document,checker.allocator),
@@ -147,6 +152,7 @@ is_thor_check :: proc(p: string, buffers: []Check_Buffer = nil) -> bool {
 delete_check_buffers :: proc(buffers: []Check_Buffer) {
 	for b in buffers {
 		delete(b.path, checker.allocator)
+		delete(b.fullpath, checker.allocator)
 		delete(b.canonical, checker.allocator)
 		delete(b.text, checker.allocator)
 		delete(b.pending_vet_lines)
@@ -196,9 +202,11 @@ run_check_consumer :: proc(c: Consumer) {
 		append(&paths, request.path)
 
 		buffers := request.buffers
+		mode := request.check_mode
 		generation := request.generation
 		slice_revision := request.slice_revision
 		for later in chan.try_recv(c.ch) {
+			if mode!=later.check_mode {mode=.Combined}
 			append(&paths, later.path)
 			delete_check_buffers(buffers)
 			buffers = later.buffers
@@ -207,7 +215,7 @@ run_check_consumer :: proc(c: Consumer) {
 		}
 
 		if generation == intrinsics.atomic_load(&checker.generation) {
-			check(request.check_mode, paths[:], buffers, request.config, generation, slice_revision)
+			check(mode, paths[:], buffers, request.config, generation, slice_revision)
 		}
 
 		if generation == intrinsics.atomic_load(&checker.generation) {
@@ -290,20 +298,38 @@ check_unused_imports :: proc(document: ^Document, config: ^common.Config) {
 	}
 }
 
-resolve_check_paths :: proc(mode: Check_Mode, paths: []string, config: ^common.Config) -> []string {
+resolve_check_paths :: proc(mode: Check_Mode, paths: []string, config: ^common.Config, buffers:[]Check_Buffer=nil) -> []string {
 	if len(config.profile.checker_path) > 0 {
 		return config.profile.checker_path[:]
 	}
 
-	if mode == .Saved || config.enable_checker_only_saved {
+	open_documents := mode!=.Saved && (config.enable_checker_only_saved || !config.enable_checker_workspace_diagnostics)
+	if mode == .Saved || mode == .Combined || config.enable_checker_only_saved || open_documents {
 		results := make([dynamic]string, context.temp_allocator)
-		for p in paths {
+		requested:=make([dynamic]string,len(paths),len(paths)+len(buffers),context.temp_allocator)
+		copy(requested[:],paths)
+		if open_documents {
+			// Watcher events can supersede an in-flight document check. Check
+			// the current open packages rather than discarding its result and
+			// then doing nothing when workspace diagnostics are disabled.
+			for buffer in buffers {append(&requested,buffer.fullpath if buffer.fullpath!="" else buffer.canonical)}
+		}
+		for p in requested {
 			if p == "" {
 				continue
 			}
-			dir := path.dir(p, context.temp_allocator)
+			forward,_:=filepath.replace_separators(p,'/',context.temp_allocator)
+			dir := path.dir(forward, context.temp_allocator)
 			if dir not_in config.checker_skip_packages && !slice.contains(results[:], dir) {
 				append(&results, dir)
+			}
+		}
+		// A watcher request must not erase a queued document check, including
+		// files outside the workspace. Keep optional workspace-wide checking
+		// when it was requested alongside those document changes.
+		if mode==.Combined && !config.enable_checker_only_saved && config.enable_checker_workspace_diagnostics {
+			for dir in fallback_find_odin_directories(config) {
+				if !slice.contains(results[:],dir) {append(&results,dir)}
 			}
 		}
 		return results[:]
@@ -326,6 +352,56 @@ CheckProcess :: struct {
 
 // A native diagnostic can lack a filename entirely. Keep that error with the
 // job that produced it, rather than choosing an arbitrary open editor buffer.
+compiler_diagnostic_path :: proc(file:string,buffers:[]Check_Buffer)->string {
+	// Canonical paths select snapshots; publication keeps the editor's spelling,
+	// including Windows directory links and files not saved to disk yet.
+	for buffer in buffers {
+		if compiler_path_equal(file,buffer.path) || compiler_path_equal(file,buffer.canonical) {return buffer.path}
+	}
+	when ODIN_OS==.Windows {
+		file:=common.get_case_sensitive_path(file,context.temp_allocator)
+		forward,_:=filepath.replace_separators(file,'/',context.temp_allocator)
+		return forward
+	} else {return file}
+}
+
+// VS Code lowercases Windows drive letters in URIs. Native compiler metadata
+// may retain the uppercase drive and use backslashes. Do not fold component
+// case: Windows can also host explicitly case-sensitive project directories.
+compiler_path_equal :: proc(a,b:string)->bool {
+	if a==b {return true}
+	when ODIN_OS!=.Windows {return false}
+	if len(a)!=len(b) {return false}
+	for i in 0..<len(a) {
+		byte:=a[i]
+		other:=b[i]
+		if byte==other {continue}
+		if (byte=='/'||byte=='\\') && (other=='/'||other=='\\') {continue}
+		if i==0 && len(a)>1 && a[1]==':' && b[1]==':' {
+			if (byte|32)==(other|32) && (byte|32)>='a' && (byte|32)<='z' {continue}
+		}
+		return false
+	}
+	return true
+}
+
+compiler_update_slice_info :: proc(infos:[]Thor_Slice_Info,buffers:[]Check_Buffer,revision:int) {
+	thor_update_slice_info(infos,revision)
+	for info in infos {for buffer in buffers {
+		if !compiler_path_equal(buffer.canonical,info.file) {continue}
+		ensure_diagnostic_path(.Check,common.create_uri(buffer.path,context.temp_allocator).uri)
+		// Documents use case-corrected forward-slash paths on Windows, while
+		// diagnostics use the client's URI spelling and the compiler uses native
+		// absolute paths. Cache the exact document key as well as the URI key.
+		for file in ([]string{buffer.path,buffer.fullpath}) {
+			if file!="" && file!=info.file {
+				alias:=info;alias.file=file
+				thor_update_slice_info([]Thor_Slice_Info{alias},revision)
+			}
+		}
+	}}
+}
+
 compiler_error_fallback_path :: proc(check_paths: []string, buffers: []Check_Buffer) -> string {
 	for requested in check_paths {
 		checked := os.get_absolute_path(requested, context.temp_allocator) or_else requested
@@ -419,7 +495,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 		return path
 	}
 
-	paths := resolve_check_paths(mode, check_paths, config)
+	paths := resolve_check_paths(mode, check_paths, config, buffers)
 
 	if len(paths) == 0 {
 		return
@@ -589,17 +665,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	if generation != intrinsics.atomic_load(&checker.generation) { return }
 	clear_diagnostics(.Check)
 	for result in errors {
-		thor_update_slice_info(result.slice_access, slice_revision)
-		for info in result.slice_access {
-			for buffer in buffers {
-				if buffer.canonical != info.file { continue }
-				ensure_diagnostic_path(.Check, common.create_uri(buffer.path, context.temp_allocator).uri)
-				if buffer.path != info.file {
-					alias := info; alias.file = buffer.path
-					thor_update_slice_info([]Thor_Slice_Info{alias}, slice_revision)
-				}
-			}
-		}
+		compiler_update_slice_info(result.slice_access,buffers,slice_revision)
 	}
 
 	DiagnosticKey :: struct {
@@ -610,6 +676,10 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	}
 
 	diagnostics := make(map[DiagnosticKey]struct{}, context.temp_allocator)
+	Unverified_File :: struct {count, locations:int, pos:Json_Type_Error}
+	Unverified_Location :: struct {path:string, line,column:int}
+	unverified_files := make(map[string]Unverified_File, context.temp_allocator)
+	unverified_locations := make(map[Unverified_Location]struct{}, context.temp_allocator)
 	for e in errors {
 		for error in e.errors {
 			if len(error.msgs) == 0 {
@@ -642,18 +712,13 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			}
 
 			path := error.pos.file
-			// Keep the URI the editor opened, including symlinked workspaces.
-			for b in buffers { if b.canonical == path { path = b.path; break } }
 			if path == "" {
 				path = compiler_error_fallback_path(e.check_paths, buffers)
 				if path == "" { log.errorf("Compiler: %s", message); continue }
 				message = fmt.tprintf("%s\nThe compiler did not provide a source location; this diagnostic is attached to a file in the package being checked.", message)
 			}
 
-			when ODIN_OS == .Windows {
-				path = common.get_case_sensitive_path(path, context.temp_allocator)
-				path, _ = filepath.replace_separators(path, '/', context.temp_allocator)
-			}
+			path=compiler_diagnostic_path(path,buffers)
 
 			key := DiagnosticKey {
 				path    = path,
@@ -670,22 +735,33 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			if is_ols_builtin_file(path) {
 				continue
 			}
+			if e.unverified.mode == "summary" && error.stage == "vet" &&
+			   (error.certainty == "unverified" || error.code == "thor/correction-unknown") {
+				stats, present := unverified_files[path]
+				if !present { stats.pos = error.pos }
+				stats.count += 1
+				location := Unverified_Location{path,error.pos.line,error.pos.column}
+				if location not_in unverified_locations {
+					unverified_locations[location] = {}
+					stats.locations += 1
+				}
+				unverified_files[path] = stats
+				continue
+			}
 
 			uri := common.create_uri(path, context.temp_allocator)
 
 			diagnostic_severity := DiagnosticSeverity.Error
 			if strings.equal_fold(error.type, "warning") {
 				diagnostic_severity = .Warning
+			} else if strings.equal_fold(error.type,"info") || strings.equal_fold(error.type,"note") {
+				diagnostic_severity = .Information
 			}
 			related := make([dynamic]Diagnostic_Related_Information, context.temp_allocator)
 			for note in error.related {
 				note_path := note.pos.file
 				if note_path == "" { continue }
-				for b in buffers { if b.canonical == note_path { note_path = b.path; break } }
-				when ODIN_OS == .Windows {
-					note_path = common.get_case_sensitive_path(note_path, context.temp_allocator)
-					note_path, _ = filepath.replace_separators(note_path, '/', context.temp_allocator)
-				}
+				note_path=compiler_diagnostic_path(note_path,buffers)
 				note_uri := common.create_uri(note_path, context.temp_allocator)
 				append(&related, Diagnostic_Related_Information{
 					location = {uri = note_uri.uri, range = compiler_error_range(note.pos)},
@@ -712,6 +788,14 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			)
 		}
 
+	}
+	for path, summary in unverified_files {
+		uri := common.create_uri(path,context.temp_allocator)
+		finding := summary.count == 1 ? "finding" : "findings"
+		location := summary.locations == 1 ? "location" : "locations"
+		message := fmt.tprintf("Unverified analysis: %d %s at %d source %s. These are incomplete checks, not confirmed bugs. Set tls.unverified to show (or pass --unverified in checker_args) to see details.",summary.count,finding,summary.locations,location)
+		add_diagnostics(.Check,uri.uri,Diagnostic{code="thor/unverified-summary",severity=.Information,
+			range=compiler_error_range(summary.pos),message=message})
 	}
 
 }

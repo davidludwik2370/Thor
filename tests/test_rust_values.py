@@ -2,8 +2,9 @@
 import json,random,shutil,subprocess,tempfile,unittest
 from thorlang import values
 from pathlib import Path
+from tests.native_paths import rust_binary
 ROOT=Path(__file__).resolve().parents[1]
-BINARY=ROOT/'rust/target/release/examples/value_protocol'
+BINARY=rust_binary('value_protocol', example=True)
 
 def integer(n):return dict(kind='integer',value=str(n))
 def sequence(items,storage='array',nil=False,**kwargs):return dict(kind='sequence',values=items,storage=storage,nil=nil,**kwargs)

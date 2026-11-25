@@ -465,7 +465,7 @@ impl Lower<'_, '_> {
             return false;
         }
         match n.kind.as_str() {
-            "Paren" | "Unary" => s
+            "Paren" | "Unary" | "CaseComparison" => s
                 .role(id, "expr")
                 .is_some_and(|child| self.switch_constant(child, seen)),
             "Binary" => ["left", "right"].iter().all(|role| {
@@ -511,7 +511,8 @@ impl Lower<'_, '_> {
         let mut operands = vec![];
         for case in self.cases(id)? {
             for operand in case.matches {
-                if self.switch_constant(operand, &mut HashSet::new()) {
+                if self.source.node(operand).kind != "CaseComparison"
+                    && self.switch_constant(operand, &mut HashSet::new()) {
                     operands.push(operand);
                 }
             }
@@ -532,13 +533,16 @@ impl Lower<'_, '_> {
             while let Type::Nominal(_, inner) = base { base = inner; }
             matches!(base, Type::Enum(_))
         });
-        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: ${}Selector) -> bool {{\n{}switch {selector} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},self.prefix,if partial {"#partial "} else {""}),id)];
+        let type_selector = self.source.role(id, "selector")
+            .is_some_and(|selector| self.resolver.denotes_type(self.reference(selector)));
+        let typeid_of = if type_selector {self.native("typeid_of")} else {String::new()};
+        let parameter_type = if type_selector {"typeid".to_owned()} else {format!("${}Selector", self.prefix)};
+        let selected = if type_selector {format!("{typeid_of}({selector})")} else {selector.clone()};
+        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: {parameter_type}) -> bool {{\n{}switch {selected} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},if partial {"#partial "} else {""}),id)];
         for operand in operands {
-            declaration.extend([
-                self.g("case ", operand),
-                self.render(operand, None, true)?,
-                self.g(":\n", operand),
-            ]);
+            declaration.push(self.g(if type_selector {format!("case {typeid_of}(")} else {"case ".into()}, operand));
+            declaration.push(self.render(operand, None, true)?);
+            declaration.push(self.g(if type_selector {"):\n"} else {":\n"}, operand));
         }
         declaration.push(self.g("case:\n}\nreturn true\n}\n", id));
         self.helpers.insert(
@@ -621,32 +625,8 @@ impl Lower<'_, '_> {
         let mut values = vec![];
         for operand in &case.matches {
             let value = if let Some(selector) = selector {
-                let node = self.source.node(*operand);
                 let selector_code = self.render(selector, None, true)?;
-                if node.kind == "Binary" && matches!(node.op.as_str(), ".." | "..<" | "..=") {
-                    let low = self.render(self.role(*operand, "left")?, None, true)?;
-                    let high = self.render(self.role(*operand, "right")?, None, true)?;
-                    Code::concat([
-                        self.g("((", *operand),
-                        selector_code.clone(),
-                        self.g(") >= (", *operand),
-                        low,
-                        self.g(") && (", *operand),
-                        selector_code,
-                        self.g(if node.op == "..=" { ") <= (" } else { ") < (" }, *operand),
-                        high,
-                        self.g("))", *operand),
-                    ])
-                } else {
-                    let value = self.render(*operand, None, true)?;
-                    Code::concat([
-                        self.g("((", *operand),
-                        selector_code,
-                        self.g(") == (", *operand),
-                        value,
-                        self.g("))", *operand),
-                    ])
-                }
+                self.switch_match_condition(*operand, selector_code, true)?
             } else {
                 self.render(*operand, None, true)?
             };
@@ -1130,6 +1110,7 @@ impl Lower<'_, '_> {
         let logical_selector = selector
             .map(|node| self.typ(node))
             .filter(|typ| typ.big_name().is_some());
+        let comparisons = cases.iter().any(|case| self.comparison_cases(&case.matches));
         let selector_code = if let (Some(selector), Some(_)) = (selector, logical_selector.as_ref())
         {
             if let Some(problem) = self.big_compile_case_problem(id) {
@@ -1151,10 +1132,19 @@ impl Lower<'_, '_> {
             ]);
             self.g(name, selector)
         } else if let Some(selector) = selector {
-            self.render(selector, None, false)?
+            if comparisons {
+                let name = self.temporary_name("switch_selector");
+                code.extend([self.g(format!("{name} := "), selector),
+                    self.render(selector, None, false)?, self.g("\n", selector)]);
+                self.g(name, selector)
+            } else { self.render(selector, None, false)? }
         } else {
             self.g("", id)
         };
+        if comparisons && logical_selector.is_none() {
+            code.push(self.comparison_validation(id, selector_code.clone(),
+                &cases.iter().map(|case| case.matches.clone()).collect::<Vec<_>>(), missing)?);
+        }
         if missing {
             self.meta = true;
             let type_of = self.native("type_of");
@@ -1163,7 +1153,7 @@ impl Lower<'_, '_> {
                     format!("when {}meta.type_is_enum({type_of}(", self.prefix),
                     id,
                 ),
-                selector_code.clone(),
+                if comparisons { self.render(selector.ok_or_else(|| Error::new("missing switch selector"))?, None, true)? } else { selector_code.clone() },
                 self.g(")) {\n", id),
             ]);
             if targets.is_some() {
@@ -1171,7 +1161,7 @@ impl Lower<'_, '_> {
             }
         }
         code.push(self.g(
-            if self.source.node(id).data["partial"] == true {
+            if !comparisons && self.source.node(id).data["partial"] == true {
                 "#partial switch "
             } else {
                 "switch "
@@ -1179,7 +1169,7 @@ impl Lower<'_, '_> {
             id,
         ));
         code.extend([
-            if logical_selector.is_some() {
+            if logical_selector.is_some() || comparisons {
                 self.g("", id)
             } else {
                 selector_code.clone()
@@ -1192,49 +1182,15 @@ impl Lower<'_, '_> {
                 if i > 0 {
                     code.push(self.g(", ", *operand));
                 }
-                if let Some(typ) = logical_selector.as_ref() {
-                    let module = self.module("big");
-                    let hint = Hint {
-                        constant_literal: false,
-                        code: self.g(format!("{module}.{}", typ.big_name().unwrap()), *operand),
-                        semantic: Some(typ.clone()),
-                        element_only: false,
-                        plain_array: false,
-                    };
-                    let node = self.source.node(*operand);
-                    let value = if node.kind == "Binary"
-                        && matches!(node.op.as_str(), ".." | "..<" | "..=")
-                    {
-                        let low = self.role(*operand, "left")?;
-                        let high = self.role(*operand, "right")?;
-                        Code::concat([
-                            self.g(format!("{module}.compiler_switch_range("), *operand),
-                            selector_code.clone(),
-                            self.g(",", *operand),
-                            self.big_owned(low, Some(hint.clone()), false)?,
-                            self.g(",", *operand),
-                            self.big_owned(high, Some(hint), false)?,
-                            self.g(format!(",{})", node.op == "..="), *operand),
-                        ])
-                    } else {
-                        Code::concat([
-                            self.g(format!("{module}.compiler_switch_case("), *operand),
-                            selector_code.clone(),
-                            self.g(",", *operand),
-                            self.big_owned(*operand, Some(hint), false)?,
-                            self.g(")", *operand),
-                        ])
-                    };
-                    code.push(value.region(
-                        &self.source.path,
-                        node.span,
-                        "debug-capture",
-                    ));
-                } else {
+                if comparisons && logical_selector.is_none() {
+                    code.push(self.switch_match_condition(*operand, selector_code.clone(), false)?);
+                } else if let Some(typ) = logical_selector.as_ref() {
+                    code.push(self.big_switch_match(*operand, selector_code.clone(), typ)?.region(
+                        &self.source.path, self.source.node(*operand).span, "debug-capture"));                } else {
                     code.push(self.render(*operand, None, false)?);
                 }
             }
-            code.push(self.g(if logical_selector.is_some() { ":\n" } else { ": " }, case.result));
+            code.push(self.g(if logical_selector.is_some() || comparisons { ":\n" } else { ": " }, case.result));
             if missing && targets.is_some() {
                 code.push(self.g(format!("{}matched=true; ", self.prefix), case.result));
             }
@@ -1859,5 +1815,207 @@ impl Lower<'_, '_> {
         } else {
             call
         }))
+    }
+}
+
+impl Lower<'_, '_> {
+    fn big_switch_match(&mut self, operand: NodeId, selector: Code, typ: &Type) -> Result<Code> {
+        let module = self.module("big");
+        let hint = Hint {
+            constant_literal: false,
+            code: self.g(format!("{module}.{}", typ.big_name().unwrap()), operand),
+            semantic: Some(typ.clone()),
+            element_only: false,
+            plain_array: false,
+        };
+        let node = self.source.node(operand);
+        if node.kind == "Binary" && matches!(node.op.as_str(), ".." | "..<" | "..=") {
+            return Ok(Code::concat([
+                self.g(format!("{module}.compiler_switch_range("), operand),
+                selector,
+                self.g(",", operand),
+                self.big_owned(self.role(operand, "left")?, Some(hint.clone()), false)?,
+                self.g(",", operand),
+                self.big_owned(self.role(operand, "right")?, Some(hint), false)?,
+                self.g(format!(",{})", node.op == "..="), operand),
+            ]));
+        }
+        if node.kind == "CaseComparison" {
+            return Ok(Code::concat([
+                self.g(format!("{module}.compiler_switch_compare("), operand),
+                selector,
+                self.g(",", operand),
+                self.big_owned(self.role(operand, "expr")?, Some(hint), false)?,
+                self.g(format!(",{})", json!(node.op)), operand),
+            ]));
+        }
+        Ok(Code::concat([
+            self.g(format!("{module}.compiler_switch_case("), operand),
+            selector,
+            self.g(",", operand),
+            self.big_owned(operand, Some(hint), false)?,
+            self.g(")", operand),
+        ]))
+    }
+    fn comparison_cases(&self, operands: &[NodeId]) -> bool {
+        operands
+            .iter()
+            .any(|id| self.source.node(*id).kind == "CaseComparison")
+    }
+    /// A captured selector and native comparisons retain short circuiting and
+    /// contextual enum operands without manufacturing numeric bounds.
+    fn switch_match_condition(
+        &mut self,
+        operand: NodeId,
+        selector: Code,
+        constant: bool,
+    ) -> Result<Code> {
+        let node = self.source.node(operand);
+        if node.kind == "Binary" && matches!(node.op.as_str(), ".." | "..<" | "..=") {
+            let low = self.render(self.role(operand, "left")?, None, constant)?;
+            let high = self.render(self.role(operand, "right")?, None, constant)?;
+            return Ok(Code::concat([
+                self.g("((", operand),
+                selector.clone(),
+                self.g(") >= (", operand),
+                low,
+                self.g(") && (", operand),
+                selector,
+                self.g(if node.op == "..=" { ") <= (" } else { ") < (" }, operand),
+                high,
+                self.g("))", operand),
+            ]));
+        }
+        let (value, op) = if node.kind == "CaseComparison" {
+            (self.role(operand, "expr")?, node.op.clone())
+        } else {
+            (operand, "==".into())
+        };
+        let value = self.render(value, None, constant)?;
+        Ok(Code::concat([
+            self.g("((", operand),
+            selector,
+            self.g(format!(") {op} ("), operand),
+            value,
+            self.g("))", operand),
+        ]))
+    }
+    /// Keep Odin's duplicate, range, #partial and enum coverage checks for the
+    /// ordinary alternatives. This branch is never executed, even unoptimized.
+    /// Predicate overlaps are intentional and use source-order first matching.
+    pub(super) fn comparison_validation(
+        &mut self,
+        id: NodeId,
+        selector: Code,
+        cases: &[Vec<NodeId>],
+        missing: bool,
+    ) -> Result<Code> {
+        let partial = self.source.node(id).data["partial"] == true
+            || self.source.text(id).trim_start().starts_with("#partial");
+        let mut code = vec![
+            self.g(
+                if partial {
+                    "if false {#partial switch "
+                } else {
+                    "if false {switch "
+                },
+                id,
+            ),
+            selector,
+            self.g(" {\n", id),
+        ];
+        for operands in cases {
+            for operand in operands {
+                if self.source.node(*operand).kind == "CaseComparison" {
+                    continue;
+                }
+                code.extend([
+                    self.g("case ", *operand),
+                    self.render(*operand, None, false)?,
+                    self.g(":\n", *operand),
+                ]);
+            }
+        }
+        if !missing {
+            code.push(self.g("case:\n", id));
+        }
+        code.push(self.g("}}\n", id));
+        Ok(Code::concat(code))
+    }
+    pub(super) fn comparison_switch_statement(&mut self, id: NodeId) -> Result<Option<Code>> {
+        let Some(body) = self.source.role(id, "body") else {
+            return Ok(None);
+        };
+        if !self.source.node(body).children.iter().any(|case| {
+            self.source.group(*case, "types").iter().any(|value| self.source.node(*value).kind == "CaseComparison")
+        }) {return Ok(None);}
+        let cases = self.source.node(body).children.to_vec();
+        let operands = cases
+            .iter()
+            .map(|case| self.source.group(*case, "types").to_vec())
+            .collect::<Vec<_>>();
+        let selector = self.role(id, "expr")?;
+        let name = self.temporary_name("switch_selector");
+        let mut code = vec![self.g("{\n", id)];
+        if let Some(init) = self.source.role(id, "init") {
+            code.extend([self.render(init, None, false)?, self.g("\n", init)]);
+        }
+        let logical = self.typ(selector);
+        let big = logical.big_name().is_some();
+        let value = if big {
+            self.big_owned(selector, None, false)?
+        } else {
+            self.render(selector, None, false)?
+        };
+        code.extend([
+            self.g(format!("{name} := "), selector),
+            value,
+            self.g("\n", selector),
+        ]);
+        if big {
+            if let Some(problem) = self.big_compile_case_problem(id) {
+                return Ok(Some(self.error_token(id, &problem)));
+            }
+            let module = self.module("big");
+            code.push(self.g(
+                format!("defer {module}.compiler_destroy(&{name})\n"),
+                selector,
+            ));
+        } else {
+            code.push(self.comparison_validation(
+                id,
+                self.g(&name, selector),
+                &operands,
+                !operands.iter().any(Vec::is_empty),
+            )?);
+        }
+        if let Some(label) = self.source.role(id, "label") {
+            code.extend([self.render(label, None, false)?, self.g(": ", label)]);
+        }
+        code.push(self.g("switch {\n", id));
+        for (case, operands) in cases.into_iter().zip(&operands) {
+            code.push(self.g("case ", case));
+            for (index, operand) in operands.iter().enumerate() {
+                if index > 0 {
+                    code.push(self.g(",", *operand));
+                }
+                let value = if big {
+                    self.big_switch_match(*operand, self.g(&name, selector), &logical)?
+                } else {
+                    self.switch_match_condition(*operand, self.g(&name, selector), false)?
+                };
+                code.push(value);
+            }
+            code.push(self.g(":\n", case));
+            for statement in self.source.group(case, "body").to_vec() {
+                code.extend([
+                    self.render(statement, None, false)?,
+                    self.g("\n", statement),
+                ]);
+            }
+            code.extend(self.helper_declarations(case));
+        }
+        code.push(self.g("}\n}", id));
+        Ok(Some(Code::concat(code)))
     }
 }

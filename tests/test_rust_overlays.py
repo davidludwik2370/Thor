@@ -18,7 +18,7 @@ class RustOverlayTests(unittest.TestCase):
         replacements = {}
         for index, (original, text) in enumerate(values.items()):
             snapshot = self.root / f'snapshot-{index}.txt'
-            snapshot.write_text(text)
+            snapshot.write_text(text,newline='')
             replacements[str(original)] = str(snapshot)
         packet = self.root / 'overlay.json'
         packet.write_text(json.dumps({'Replace': replacements}))

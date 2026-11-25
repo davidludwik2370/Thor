@@ -17,6 +17,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
+from tests.native_paths import thor_launcher
 from thorlang import driver
 from thorlang.publishing import Publisher, PublishError, collect_resources, icon_image, relative_path, write_icon
 from thorlang.publish_deps import pe_imports, windows_dependencies, linux_dependencies
@@ -538,7 +539,7 @@ class PublishTests(PublishFixture):
 class MacPublishTests(PublishFixture):
     def invoke(self, command='publish', flags=(), *, source=None, cwd=None):
         if source is not None: (self.project / 'main.thor').write_text(source)
-        result = subprocess.run([str(ROOT / 'thor'), command, str(self.project), *flags],
+        result = subprocess.run([str(thor_launcher()), command, str(self.project), *flags],
                                 cwd=cwd or self.output, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
@@ -571,7 +572,7 @@ class MacPublishTests(PublishFixture):
         before = path.read_bytes()
         for flags, status, severity in [([], 0, 'warning'), (['-ignore-warnings'], 0, None), (['-warnings-as-errors'], 1, 'error')]:
             with self.subTest(flags=flags):
-                result = subprocess.run([str(ROOT / 'thor'), 'publish', str(self.project), '-json-errors', *flags],
+                result = subprocess.run([str(thor_launcher()), 'publish', str(self.project), '-json-errors', *flags],
                                         cwd=self.output, capture_output=True, text=True, timeout=90)
                 self.assertEqual(result.returncode, status, result.stderr)
                 diagnostics = json.loads(result.stderr)['errors']
@@ -773,7 +774,7 @@ main::proc(){err:=os.write_entire_file(os.args[1],"GUI launch succeeded");assert
         artifact = Path(self.invoke().stdout.strip())
         before = (artifact / 'Contents/MacOS/output').read_bytes()
         (self.project / 'main.thor').write_text('package main\nmain::proc(){\n    x:int="wrong"\n    _=x\n}\n')
-        result = subprocess.run([str(ROOT / 'thor'), 'publish', str(self.project), '-json-errors'],
+        result = subprocess.run([str(thor_launcher()), 'publish', str(self.project), '-json-errors'],
                                 cwd=self.output, capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stdout)
         diagnostics = json.loads(result.stderr)['errors']
@@ -802,6 +803,6 @@ main::proc(){path:=app.resource_path("assets/file.txt");defer delete(path)}
         self.invoke('check', ['-target:linux_amd64'], source=source)
 
     def test_publish_flags_are_not_accepted_by_build(self):
-        result = subprocess.run([str(ROOT / 'thor'), 'build', str(self.project), '--app-type', 'gui'], capture_output=True, text=True)
+        result = subprocess.run([str(thor_launcher()), 'build', str(self.project), '--app-type', 'gui'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 2)
         self.assertIn('only supported by thor publish', result.stderr)

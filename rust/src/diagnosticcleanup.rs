@@ -322,6 +322,11 @@ pub(crate) fn clean(
     let runtime = project.options.root.join("runtime");
     let mut items = vec![];
     for (mut error, origin, purity_cause) in errors {
+        if error["stage"] == "vet" {
+            items.push(Candidate { packet:error, location:None, purity_cause:None,
+                depends_on:vec![], invalid_target:None, concat_operand_failure:false, cascade:false });
+            continue;
+        }
         let mut msgs = messages(&error);
         let original = msgs.clone();
         if msgs.first().is_some_and(|message| {
@@ -456,7 +461,8 @@ pub(crate) fn clean(
             }
         }
         let support = location.as_ref().is_some_and(|(file, _)| {
-            let path = Path::new(file);
+            let original = project.support_source_path(Path::new(file));
+            let path = original.as_path();
             [
                 "sequence/sequence.odin",
                 "sets/compiler.odin",
@@ -469,7 +475,8 @@ pub(crate) fn clean(
         });
         let mut contract = None;
         if let Some((file, _)) = &location {
-            let path = Path::new(file);
+            let original = project.support_source_path(Path::new(file));
+            let path = original.as_path();
             if path.starts_with(runtime.join("format")) {
                 if path == runtime.join("format/format.odin")
                     && msgs.iter().any(|m| {

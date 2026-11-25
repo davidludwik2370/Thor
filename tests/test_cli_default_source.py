@@ -56,6 +56,9 @@ main::proc(){fmt.println("default-source")}
                         self.assertEqual(result.stdout, 'default-source\n')
                     elif command == 'test':
                         self.assertEqual(marker.read_bytes(), b'ok')
+                    elif command == 'vet':
+                        self.assertEqual(result.stdout,'')
+                        self.assertTrue(not result.stderr or result.stderr.startswith('Unverified analysis:'),result.stderr)
                     else:
                         self.assertEqual((result.stdout, result.stderr), ('', ''))
                     self.assertEqual(self.source.read_bytes(), original)

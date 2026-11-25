@@ -3,6 +3,7 @@ import json
 import subprocess
 import unittest
 from tests import test_tls as base
+from tests.native_paths import EXE_SUFFIX
 
 
 class VetTLSTests(unittest.TestCase):
@@ -24,7 +25,7 @@ class VetTLSTests(unittest.TestCase):
         warning = next(error for error in errors if error['code']=='thor/prefer-immutable')
         self.assertEqual(warning['severity'], 2)
         result = subprocess.run([str(base.THOR), 'build', str(path), '--vet=immutable', '-json-errors',
-                                 '-out:'+str(path.parent/'application')],
+                                 '-out:'+str(path.parent/('application'+EXE_SUFFIX))],
                                 cwd=path.parent, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 1, result.stdout+result.stderr)
         packet = json.loads(result.stderr)

@@ -315,7 +315,7 @@ impl Lower<'_, '_> {
         let record=self.struct_tree_value(id,&nodes,&hint)?;
         Ok(Code::concat([self.g("(",id),record,self.g(format!(" when {condition} else "),id),native,self.g(")",id)]))
     }
-    fn struct_tree_operator(node:&crate::ast::Node)->bool {
+    pub(super) fn struct_tree_operator(node:&crate::ast::Node)->bool {
         node.kind=="Unary" && node.op=="~" || node.kind=="Binary" && matches!(node.op.as_str(),"+"|"-"|"*"|"/"|"&"|"|"|"~"|"&~"|"<<"|">>"|"**")
     }
     fn struct_type_anchor(&mut self,id:NodeId,typ:&Type)->NodeId {
@@ -686,6 +686,27 @@ impl Lower<'_, '_> {
                 && self.typ(a).is_unknown()
                 && !self.resolver.denotes_type(self.reference(a))
             {
+                // Native contextual literals (notably bit-set defaults such as
+                // `~{}`) must retain Odin's expected type. A generic helper
+                // cannot infer a type from an untyped literal in its own call.
+                if expected.as_ref().and_then(|h|h.semantic.as_ref()).is_some_and(|t|!t.is_unknown()&&!record(t)){
+                    return Ok(None);
+                }
+                if let Some(annotation)=self.source.value_annotation(id){
+                    let context=self.typ(annotation);
+                    if !context.is_unknown(){
+                        if !record(&context){return Ok(None);}
+                        let hint=Hint{code:self.render(annotation,None,true)?,semantic:Some(context),constant_literal:constant,element_only:false,plain_array:false};
+                        return self.struct_math(id,Some(hint),constant);
+                    }
+                }
+                let implicit=|node:NodeId|{let node=self.unparen(node);self.source.node(node).kind=="Compound"&&self.source.role(node,"type").is_none()};
+                if implicit(a)&&(is_unary||implicit(b)){return Ok(None);}
+                // Enum selectors depend on the surrounding native context.
+                // They cannot denote a struct operand; wrapping them in a
+                // polymorphic struct helper would discard that context.
+                let selector=|node:NodeId|self.source.node(self.unparen(node)).kind=="ImplicitSelector";
+                if selector(a)||selector(b){return Ok(None);}
                 return self
                     .generic_struct_math(id, a, b, compound, expected)
                     .map(Some);

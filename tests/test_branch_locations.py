@@ -231,8 +231,9 @@ main::proc(){
                         from thorlang.sourceidentity import hash_bytes
                         def normalize(text):
                             for path in [baseline,source]:
-                                text=text.replace(str(path),'<source>')
-                                text=text.replace('Fx'+format(hash_bytes(str(path).encode()),'x'),'<file-hash>')
+                                for spelling in dict.fromkeys([str(path),path.as_posix()]):
+                                    text=text.replace(spelling,'<source>')
+                                    text=text.replace('Fx'+format(hash_bytes(spelling.encode()),'x'),'<file-hash>')
                             return text
                         self.assertEqual(normalize(result.stdout),normalize(reference.stdout),result.stderr)
 

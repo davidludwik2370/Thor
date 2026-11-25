@@ -124,8 +124,11 @@ pub fn run(options: ProjectOptions, settings: Options) -> Result<i32> {
             false
         } else { true }
     });
+    let mut unverified = crate::unverified::Summary::default();
+    for diagnostic in &diagnostics { unverified.add(diagnostic); }
     if options.json {
         let mut packet = json!({"error_count":diagnostics.iter().filter(|error|error["type"]=="error").count(),"errors":diagnostics});
+        if unverified.count > 0 { packet["unverified"] = unverified.json(options.unverified); }
         if !information.is_empty() { packet["information"] = json!(information); }
         if options.editor_info {
             packet["slice_access"] = json!(editor_info);
@@ -133,8 +136,11 @@ pub fn run(options: ProjectOptions, settings: Options) -> Result<i32> {
         eprintln!("{packet}");
     } else {
         for error in &diagnostics {
+            if options.unverified == crate::unverified::Mode::Summary && crate::unverified::is_unverified(error) { continue; }
             print_diagnostic(error);
         }
+        let notice = unverified.text(options.unverified,"publish");
+        if !notice.is_empty() { eprintln!("{notice}"); }
     }
     Ok(status)
 }

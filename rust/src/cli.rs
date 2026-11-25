@@ -116,6 +116,13 @@ pub fn root() -> Result<PathBuf> {
     absolute(
         &env::var_os("THOR_ROOT")
             .map(PathBuf::from)
+            .or_else(|| env::current_exe().ok().and_then(|path| {
+                // macOS may report the stable bin/ symlink, not its target.
+                // Keep Windows' existing spelling (no extended-path prefix).
+                #[cfg(target_os = "macos")]
+                let path = path.canonicalize().unwrap_or(path);
+                installation_root(&path)
+            }))
             .unwrap_or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR"))
                     .parent()
@@ -123,6 +130,34 @@ pub fn root() -> Result<PathBuf> {
                     .to_path_buf()
             }),
     )
+}
+fn installation_root(executable: &Path) -> Option<PathBuf> {
+    // Native distributions may live beside their data or in a bin/ layout.
+    // The bounded ancestor search also covers Cargo's target directories.
+    executable.parent()?.ancestors().take(5)
+        .find(|root| root.join("frontend/main.odin").is_file() && root.join("runtime").is_dir())
+        .map(Path::to_path_buf)
+}
+
+#[cfg(test)]
+mod installation_tests {
+    use super::*;
+    #[test]
+    fn native_installations_are_discovered_without_a_build_machine_path() {
+        let base=env::temp_dir().join(format!("thor-install-discovery-{}",std::process::id()));
+        std::fs::create_dir_all(base.join("frontend")).unwrap();
+        std::fs::create_dir_all(base.join("runtime")).unwrap();
+        std::fs::write(base.join("frontend/main.odin"),"package main\n").unwrap();
+        let beside=installation_root(&base.join("thor.exe"));
+        let in_bin=installation_root(&base.join("bin/thor.exe"));
+        std::fs::remove_file(base.join("frontend/main.odin")).unwrap();
+        let incomplete=installation_root(&base.join("thor.exe"));
+        std::fs::remove_dir_all(&base).unwrap();
+        let expected=Some(base.clone());
+        assert_eq!(beside,expected);
+        assert_eq!(in_bin,Some(base));
+        assert_eq!(incomplete,None);
+    }
 }
 pub fn value_option(flag: &str) -> bool {
     matches!(
@@ -155,13 +190,22 @@ pub fn odin_option(args: &[String]) -> String {
                 .find_map(|arg| arg.strip_prefix("--odin=").map(str::to_string))
         })
         .or_else(|| env::var("THOR_ODIN").ok())
-        .unwrap_or_else(|| "odin".into())
+        .unwrap_or_else(|| {
+            // Native distributions carry a tested private SDK. Explicit command
+            // and environment overrides retain their existing precedence.
+            root().ok().map(|r| r.join("odin").join(format!("odin{}",env::consts::EXE_SUFFIX)))
+                .filter(|p| p.is_file()).map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "odin".into())
+        })
 }
 pub fn early(args: &[String]) -> Result<Option<i32>> {
     let Some(command) = args.first().map(String::as_str) else {
         return Ok(None);
     };
     match command {
+        "__symbolize" => {
+            crate::symbolizer::run(&args[1..])?;
+        }
         "version" => {
             if args.len() != 1 {
                 return Err(Error::usage("thor version takes no arguments"));

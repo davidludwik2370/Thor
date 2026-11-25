@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from thorlang.cache import EvaluationCache, canonical
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -24,7 +25,7 @@ class RustEvaluationCacheTests(unittest.TestCase):
             capture_output=True,text=True,timeout=600)
         if result.returncode:
             raise RuntimeError(result.stdout+result.stderr)
-        cls.binary=native.ROOT/'rust/target/release/examples/cache_protocol'
+        cls.binary=rust_binary('cache_protocol', example=True)
 
     def setUp(self):
         temporary=tempfile.TemporaryDirectory(prefix='thor-native-cache-storage-')

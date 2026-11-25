@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 editors/vscode/node_modules/
 editors/vscode/*.vsix
+*.vsix
 tls/bin/
 .DS_Store
 .vscode/bin/
@@ -12,4 +13,7 @@ tls/bin/
 /odin-playground/odin-playground
 /thor-playground/thor-playground
 /rust/target/
+/install/target/
+/dist/
+.install-lock/
 .thor-rust-build/

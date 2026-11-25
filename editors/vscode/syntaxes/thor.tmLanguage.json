@@ -65,6 +65,7 @@
     },
     "statements": {
       "patterns": [
+        {"include": "#scoped-declaration"},
         {
           "include": "#typed-loop-binding"
         },
@@ -350,6 +351,13 @@
         "2": {
           "name": "keyword.operator.assignment.thor"
         }
+      }
+    },
+    "scoped-declaration": {
+      "match": "\\b([A-Za-z_]\\w*)\\s*(~)(?=\\s*(?::\\s*[=>]|,))",
+      "captures": {
+        "1": {"name": "variable.name.thor"},
+        "2": {"name": "keyword.operator.assignment.thor"}
       }
     },
     "variable-assignment": {

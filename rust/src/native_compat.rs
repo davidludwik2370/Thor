@@ -24,6 +24,23 @@ pub(crate) fn source_policies(flags: &[String]) -> bool {
     })
 }
 
+/// Scratch artifacts must satisfy the same native filename rules as user outputs.
+pub(crate) fn artifact_path(directory:&Path,name:&str,flags:&[String])->PathBuf {
+    let target=flags.iter().find_map(|flag|flag.strip_prefix("-target:")).unwrap_or(env::consts::OS);
+    let mode=flags.iter().find_map(|flag|flag.strip_prefix("-build-mode:")).unwrap_or("exe");
+    let windows=target.starts_with("windows");
+    let extension=match mode {
+        "dll"|"dynamic" if windows=>".dll",
+        "obj"|"object" if windows=>".obj",
+        "static" if windows=>".lib",
+        "llvm"|"llvm-ir"=>".ll",
+        "assembly"|"asm"|"assembler"=>".S",
+        _ if windows=>".exe",
+        _=>"",
+    };
+    directory.join(format!("{name}{extension}"))
+}
+
 pub(crate) fn default_output(entry: &Path, file: bool, flags: &[String]) -> Result<PathBuf> {
     let cwd = env::current_dir()?;
     let source_name = if file {

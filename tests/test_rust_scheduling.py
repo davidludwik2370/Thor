@@ -9,6 +9,7 @@ import unittest
 from thorlang.driver import Project, frontend_binary
 from thorlang.evaluation import Evaluator
 from thorlang.compiler import ThorError
+from tests.native_paths import rust_binary, EXE_SUFFIX
 from tests import test_rust_compiler as native
 
 
@@ -21,7 +22,7 @@ class RustSchedulingTests(unittest.TestCase):
                               '--example','scheduling_protocol'],capture_output=True,text=True,timeout=600)
         if build.returncode:
             raise RuntimeError(build.stdout+build.stderr)
-        cls.binary=native.ROOT/'rust/target/release/examples/scheduling_protocol'
+        cls.binary=rust_binary('scheduling_protocol', example=True)
         cls.frontend=frontend_binary('odin')[0]
 
     def compare(self, text, flags=None, files=None, fail=None, reference_failure=None, output=None, reference_specialized_gap=None, values=None):
@@ -69,7 +70,7 @@ class RustSchedulingTests(unittest.TestCase):
             if output is not None:
                 packet=json.loads(result.stdout)
                 manifest=json.loads((entry.parent/'generated/thor-manifest.json').read_text())
-                executable=entry.parent/'program'
+                executable=entry.parent/('program'+EXE_SUFFIX)
                 build=subprocess.run(['odin','build',packet['target'],'-file',*manifest['odin_flags'],'-out:'+str(executable)],
                                      capture_output=True,text=True,timeout=60,env={**os.environ,**manifest['odin_environment']})
                 self.assertEqual(build.returncode,0,build.stderr)

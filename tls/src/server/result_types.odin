@@ -4,11 +4,14 @@ package server
 import "core:odin/ast"
 import "core:fmt"
 import path "core:path/slashpath"
+import "core:path/filepath"
 import "core:strings"
 
 thor_result_query :: proc(symbol: Symbol) -> bool {
     actual, is_proc := symbol.value.(SymbolProcedureValue)
-    if !is_proc || len(actual.orig_arg_types)==0 || !strings.contains(actual.orig_arg_types[0].pos.file,"/intrinsics/") { return false }
+    if !is_proc || len(actual.orig_arg_types)==0 { return false }
+    source_file,_:=filepath.replace_separators(actual.orig_arg_types[0].pos.file,'/',context.temp_allocator)
+    if !strings.contains(source_file,"/intrinsics/") { return false }
     config := indexer.index.collection.config
     if config == nil { return false }
     root, found := config.collections["thor"]
@@ -27,7 +30,8 @@ thor_pmap_mode_field :: proc(field:^ast.Field)->bool {
     if !ok||ident.name!="__thor_pmap_spread" {return false}
     if indexer.index.collection.config==nil {return false}
     root,found:=indexer.index.collection.config.collections["thor"]
-    return found&&field.pos.file==path.join({root,"parallel","pmap.thor"},context.temp_allocator)
+    source_file,_:=filepath.replace_separators(field.pos.file,'/',context.temp_allocator)
+    return found&&source_file==path.join({root,"parallel","pmap.thor"},context.temp_allocator)
 }
 
 thor_pmap_visible_params :: proc(params:[]^ast.Field)->[]^ast.Field {

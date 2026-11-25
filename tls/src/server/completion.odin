@@ -50,6 +50,7 @@ get_completion_list :: proc(
 	spall.trace(#procedure, document.fullpath)
 
 	list: CompletionList
+	if selected,ok:=get_thor_vet_ignore_completion(document,position);ok {return selected,true}
 	if selected,ok:=get_thor_vet_completion(document,position);ok {return selected,true}
 	if selected,ok:=get_thor_import_completion(document,position,config);ok {return selected,true}
 	// Keep the usual space after a separator useful without suggesting globals

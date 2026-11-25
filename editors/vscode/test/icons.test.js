@@ -30,3 +30,11 @@ test('The extension listing uses a supported square PNG emblem', () => {
     assert.equal(png.readUInt32BE(16), 256);
     assert.equal(png.readUInt32BE(20), 256);
 });
+
+test('Odin icons, grammar, colors and activation belong exclusively to the standard OLS extension', () => {
+    assert.deepEqual(manifest.contributes.languages.map(language=>language.id), ['thor']);
+    assert.ok(manifest.contributes.grammars.every(grammar=>grammar.language==='thor'));
+    assert.ok(!manifest.activationEvents.includes('onLanguage:odin'));
+    assert.equal(manifest.contributes.configurationDefaults['[odin]'],undefined);
+    assert.equal(manifest.contributes.configuration.properties['tls.odin.enabled'],undefined);
+});

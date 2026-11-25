@@ -16,10 +16,7 @@ impl Resolver<'_> {
     pub(crate) fn logical_enabled(&self, file: usize) -> bool {
         self.sources[file].thor
             && *self.logical_activation.get_or_init(|| {
-                let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .parent()
-                    .unwrap()
-                    .join("runtime");
+                let root = self.runtime_root();
                 self.sources.iter().enumerate().any(|(file, source)| {
                     let internal = ["pure", "eval", "format"]
                         .iter()

@@ -133,7 +133,7 @@
         "doc",
         "strip-semicolon"
       ],
-      "text": "Caching: transpile, check, build, run, test, vet, publish, ast, doc, strip-semicolon\n  --cache-dir PATH             Choose the parser and compile-time result cache\n                               Default .thor-cache beside the entry package\n  --no-cache                   Bypass parser and compile-time result caches\n  --clear-cache                Clear managed parser and evaluation entries first\n"
+      "text": "Caching: transpile, check, build, run, test, vet, publish, ast, doc, strip-semicolon\n  --cache-dir PATH             Choose the parser, compile-time and vet cache\n                               Default .thor-cache beside the entry package\n  --no-cache                   Bypass parser, compile-time and vet caches\n  --clear-cache                Clear managed parser, evaluation and vet entries first\n"
     },
     {
       "commands": [
@@ -158,7 +158,7 @@
         "vet",
         "publish"
       ],
-      "text": "Thor conventions: check, build, run, test, vet, publish\n  --vet[=CHECKS]               Check immutable,pure,unused,semicolon (default all)\n                                 immutable    Suggest immutable declarations\n                                 pure         Suggest eligible procs become fn\n                                 unused       Report unused bindings, imports, types and procs\n                                 semicolon    Report unnecessary semicolons\n                               Select multiple checks with commas\n                               thor vet enables all four checks by default\n                               Findings are errors for build; warnings otherwise\n"
+      "text": "Thor conventions: check, build, run, test, vet, publish\n  --vet[=CHECKS]               Check immutable,pure,unused,semicolon,lifetime,leak\n                                 immutable    Suggest immutable declarations\n                                 pure         Suggest eligible procs become fn\n                                 unused       Report unused bindings, imports, types and procs\n                                 semicolon    Report unnecessary semicolons\n                                 lifetime     Check reference lifetimes and unverified escapes\n                                 leak         Check cleanup and ownership transfer\n                               Select multiple checks with commas (default all)\n                               --apply never edits ownership or adds suppressions\n                               Other findings are errors for build; warnings otherwise\n  --unverified[=MODE]          Present incomplete analysis (requires Thor vet)\n                                 summary       Count findings and locations (default)\n                                 show          Show details as nonfatal information\n                                 error         Show details and fail on unverified findings\n                               Bare --unverified means show; JSON always retains details\n                               Native -vet and ordinary warning flags retain their behavior\n"
     },
     {
       "commands": [
@@ -916,7 +916,7 @@
     {
       "name": "vet",
       "syntax": "-vet",
-      "description": "Enable Odin’s bundled native vet checks. These policies report errors.",
+      "description": "Enable Odin\u2019s bundled native vet checks. These policies report errors.",
       "commands": [
         "build",
         "check",
@@ -1932,7 +1932,7 @@
     {
       "name": "internal-cached",
       "syntax": "-internal-cached",
-      "description": "Enable the native compiler’s experimental object caching. This is separate from Thor’s compile-time result cache. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "description": "Enable the native compiler\u2019s experimental object caching. This is separate from Thor\u2019s compile-time result cache. Compiler-development option; availability and behavior depend on the selected toolchain.",
       "commands": [
         "build",
         "bundle",
@@ -2051,7 +2051,7 @@
     {
       "name": "internal-global-entity-graph",
       "syntax": "-internal-global-entity-graph",
-      "description": "Use the native compiler’s experimental global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "description": "Use the native compiler\u2019s experimental global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
       "commands": [
         "build",
         "check",
@@ -2085,7 +2085,7 @@
     {
       "name": "internal-check-global-edges",
       "syntax": "-internal-check-global-edges",
-      "description": "Validate edges in the native compiler’s global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "description": "Validate edges in the native compiler\u2019s global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
       "commands": [
         "build",
         "check",

@@ -120,7 +120,7 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
                     '{if true do unused:=1;return value}\nANSWER::#run get(7)\n'
                     'main::proc(){if ANSWER!=7{panic("result")}}\n')
                 for _ in range(2):
-                    result = subprocess.run([str(base.ROOT/'thor'), 'run', str(source), '-json-errors',
+                    result = subprocess.run([str(base.THOR), 'run', str(source), '-json-errors',
                                              '--output-dir', str(root/'output')], capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                     self.assertEqual(json.loads(result.stderr)['error_count'], 0)
@@ -150,7 +150,7 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         warnings = json.loads(result.stderr)['errors']
         self.assertEqual(len(warnings), 1, warnings)
         self.assertEqual(warnings[0]['type'], 'warning')
-        self.assertTrue(warnings[0]['pos']['file'].endswith('/library/work.odin'), warnings)
+        self.assertTrue(warnings[0]['pos']['file'].replace('\\','/').endswith('/library/work.odin'), warnings)
 
 
 if __name__ == '__main__':

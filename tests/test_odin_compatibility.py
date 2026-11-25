@@ -5,6 +5,7 @@ import subprocess
 import unittest
 
 from tests import test_thor as base
+from tests.native_paths import EXE_SUFFIX
 
 
 AUDIT = base.ROOT / 'docs' / 'compatibility-audit-2026-10-29'
@@ -21,7 +22,7 @@ class OdinCompatibilityTests(unittest.TestCase):
                 root, _ = self.invoke(text, command='build')
                 native = root / 'native.odin'
                 native.write_text(text)
-                result = subprocess.run(['odin', 'build', str(native), '-file', '-out:'+str(root/'native')],
+                result = subprocess.run(['odin', 'build', str(native), '-file', '-out:'+str(root/('native'+EXE_SUFFIX))],
                                         capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if case['name'] == 'imported_enum_index':

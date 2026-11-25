@@ -121,6 +121,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             vet: None,
             vet_apply: false,
             vet_ask: false,
+            unverified: Default::default(),
         })?;
         project.inspect_sources()?;
         project.sources

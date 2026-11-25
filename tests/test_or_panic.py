@@ -33,7 +33,7 @@ if calls!=1 {panic("inactive operand")}
             with self.subTest(flags=flags):
                 root, result = self.invoke(text, flags=flags, fail='panic: unexpected failure')
                 line = text[:text.index('get() or_panic')].count('\n')+1
-                self.assertIn(f'{root}/input/main.thor({line}:9)', result.stderr)
+                self.assertIn(f'{root.as_posix()}/input/main.thor({line}:9)', result.stderr.replace('\\','/'))
                 self.assertIn('expression: get()', result.stderr)
                 self.assertIn('procedure: main', result.stderr)
                 self.assertIn('error: false', result.stderr)

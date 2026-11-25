@@ -41,6 +41,7 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         vet: None,
         vet_apply: false,
         vet_ask: false,
+        unverified: Default::default(),
     })?;
     project.inspect_sources()?;
     let request = project

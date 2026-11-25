@@ -1,0 +1,120 @@
+{
+  "environment": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
+  "binary_sha256": {
+    "before": "a7bb6baf6afeeec9dfcc21273f155a01724fd5f3707e8cfe846185acd80a706b",
+    "after": "e17d470a61d6016d8e207ea90b9f1b2fb057edbbbb6ef7d843f26ce7909cdf90"
+  },
+  "cases": {
+    "hilo_test": {
+      "normal_transpile_seconds": {
+        "before": {
+          "samples": [
+            0.19683866697596386,
+            0.19829775000107475,
+            0.1986180839885492,
+            0.19666474999394268,
+            0.19407133301137947
+          ],
+          "median": 0.19683866697596386
+        },
+        "after": {
+          "samples": [
+            0.2035214169882238,
+            0.2578569169854745,
+            0.1937012090056669,
+            0.19219158400665037,
+            0.20463675001519732
+          ],
+          "median": 0.2035214169882238
+        }
+      },
+      "identical_emitted_odin": true,
+      "emitted_sha256": {
+        "before": "676c896329cd4c38a5946e5519b44951653dc6f9e5be43c7d8c38b39390c24ec",
+        "after": "676c896329cd4c38a5946e5519b44951653dc6f9e5be43c7d8c38b39390c24ec"
+      },
+      "analysis_in_normal_build": false,
+      "findings": {
+        "definite": 0,
+        "unverified": 11
+      },
+      "vet_total_seconds": [
+        0.3325737919949461,
+        0.32623054200666957,
+        0.325263917009579
+      ],
+      "vet_analysis_seconds": [
+        0.022847958,
+        0.022922833,
+        0.023425167
+      ],
+      "vet_counters": {
+        "vet.lifetime_objects": 313,
+        "vet.lifetime_steps": 4511
+      }
+    },
+    "poker_pmap": {
+      "normal_transpile_seconds": {
+        "before": {
+          "samples": [
+            0.46643833300913684,
+            0.482737582991831,
+            0.4672855419921689,
+            0.46907824999652803,
+            0.47134291598922573
+          ],
+          "median": 0.46907824999652803
+        },
+        "after": {
+          "samples": [
+            0.4735415840114001,
+            0.4914312500040978,
+            0.4889298749912996,
+            0.4914575419970788,
+            0.4803152499953285
+          ],
+          "median": 0.4889298749912996
+        }
+      },
+      "identical_emitted_odin": true,
+      "emitted_sha256": {
+        "before": "4486b3b4b558057342963fb99e506b44e5c444c846b013fac74e96d1558ae294",
+        "after": "4486b3b4b558057342963fb99e506b44e5c444c846b013fac74e96d1558ae294"
+      },
+      "analysis_in_normal_build": false,
+      "findings": {
+        "definite": 0,
+        "unverified": 35
+      },
+      "vet_total_seconds": [
+        1.0660222090082243,
+        0.9325592090026475,
+        0.9383162500162143
+      ],
+      "vet_analysis_seconds": [
+        0.29255675,
+        0.300359834,
+        0.294084625
+      ],
+      "vet_counters": {
+        "vet.lifetime_objects": 39838,
+        "vet.lifetime_steps": 65840
+      }
+    }
+  },
+  "scope": "Warm alternating CLI samples after two warmups; five timed samples each. Lifetime-only vet has three samples. No validation workers were running.",
+  "sources": {
+    "hilo_test": {
+      "/Users/davidludwik/Code/Thor/hilo_test/hilo_test.thor": "be511962b9df6f1630ffcb5435467157a20bf6d5981295a01b53c2204beed55a"
+    },
+    "poker_pmap": {
+      "/Users/davidludwik/Code/Thor/poker_pmap/judge_test.thor": "80fff1b39febe854a66269ad0b7aa3675bbd58791ea693f8eaf924d0ca696a65",
+      "/Users/davidludwik/Code/Thor/poker_pmap/poker.thor": "9caa48af2f47aac48b1ac96d576b86247d1e2f9f58e60322fe46b4f23302f1a8",
+      "/Users/davidludwik/Code/Thor/poker_pmap/poker_test.thor": "5e3c6a5772c54595ff167c53ecd68ef0e609c4d08e23daec8d2b906a55342dfb",
+      "/Users/davidludwik/Code/Thor/poker_pmap/simulation_test.thor": "f17ad177deb55907f77bc1c0a2ebbb12f6130c22755cd4d44890dc64d15ad5c5"
+    }
+  }
+}

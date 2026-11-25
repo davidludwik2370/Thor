@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from tests import test_rust_scheduling as scheduling
 from tests import test_rust_compiler as native
+from tests.native_paths import native_test_compiler, EXE_SUFFIX
 
 
 class RustCachedExecutionTests(unittest.TestCase):
@@ -42,7 +43,7 @@ class RustCachedExecutionTests(unittest.TestCase):
         packet=json.loads(result.stdout)
         if output is not None:
             manifest=json.loads((self.root/'generated/thor-manifest.json').read_text())
-            executable=self.root/'program'
+            executable=self.root/('program'+EXE_SUFFIX)
             build=subprocess.run(['odin','build',packet['target'],'-file',*manifest['odin_flags'],'-out:'+str(executable)],
                 capture_output=True,text=True,timeout=60,env={**os.environ,**manifest['odin_environment']})
             self.assertEqual(build.returncode,0,build.stderr)
@@ -62,12 +63,10 @@ class RustCachedExecutionTests(unittest.TestCase):
 
     def test_warm_hit_does_not_launch_the_helper_compiler(self):
         log=self.root/'compiler.log'
-        wrapper=self.root/'odin-wrapper'
         actual=shutil.which('odin')
-        wrapper.write_text('#!/usr/bin/env python3\nimport os,sys,json\n'+
-            f'with open({str(log)!r},"a") as stream:stream.write(json.dumps(sys.argv[1:])+"\\n")\n'+
-            f'os.execv({actual!r},[{actual!r},*sys.argv[1:]])\n')
-        wrapper.chmod(0o755);self.odin=wrapper
+        sdk=subprocess.check_output([actual,'root'],text=True).strip()
+        self.odin=native_test_compiler(self.root,'frontend_guard',sdk=sdk,odin=actual,
+            frontend=str(self.root/'unused-frontend'),log=str(log))
         self.write()
         self.invoke()
         cold=[json.loads(line) for line in log.read_text().splitlines()]
@@ -75,7 +74,7 @@ class RustCachedExecutionTests(unittest.TestCase):
         complete=[json.loads(line) for line in log.read_text().splitlines()]
         def helpers(commands):
             return [args for args in commands if args and args[0]=='build' and any(
-                arg.startswith('-out:') and Path(arg.removeprefix('-out:')).name=='helper' for arg in args)]
+                arg.startswith('-out:') and Path(arg.removeprefix('-out:')).name=='helper'+EXE_SUFFIX for arg in args)]
         cold_helpers=helpers(cold);complete_helpers=helpers(complete)
         self.assertEqual(len(cold_helpers),1)
         self.assertEqual(complete_helpers,cold_helpers)

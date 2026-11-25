@@ -24,6 +24,36 @@ fn profiles() -> &'static Profiles {
             .expect("valid reviewed I/O source manifest")
     })
 }
+fn windows_profiles() -> &'static Profiles {
+    static DATA: OnceLock<Profiles> = OnceLock::new();
+    DATA.get_or_init(|| serde_json::from_str(include_str!("../data/noalloc-io-sdk-windows.json"))
+        .expect("valid reviewed Windows I/O source manifest"))
+}
+/// Source effects are unchanged by checkout line endings. Other edits must
+/// still match a reviewed snapshot; normalize CRLF only on this proof path.
+fn source_digest(bytes: &[u8]) -> String {
+    if !bytes.contains(&b'\r') { return crate::digest::sha256(bytes); }
+    let normalized = bytes.iter().enumerate().filter_map(|(i, byte)|
+        (!(*byte == b'\r' && bytes.get(i + 1) == Some(&b'\n'))).then_some(*byte)).collect::<Vec<_>>();
+    crate::digest::sha256(&normalized)
+}
+fn source_matches(expected: &str, bytes: &[u8]) -> bool {
+    expected == crate::digest::sha256(bytes) || bytes.contains(&b'\r') && expected == source_digest(bytes)
+}
+fn sdk_profiles(root: &Path) -> &'static Profiles {
+    // Choose one coherent reviewed snapshot, never a per-file union of SDKs.
+    let anchor = "base/runtime/core.odin";
+    if cfg!(windows) && std::fs::read(root.join(anchor)).ok().is_some_and(|raw|
+        windows_profiles().sdk.get(anchor) == Some(&source_digest(&raw))) {
+        windows_profiles()
+    } else { profiles() }
+}
+pub(super) fn sdk_source_matches(root: &Path, relative: &str, bytes: &[u8]) -> bool {
+    sdk_profiles(root).sdk.get(relative).is_some_and(|hash| source_matches(hash, bytes))
+}
+fn runtime_root(r: &Resolver<'_>) -> std::path::PathBuf {
+    r.runtime_root().to_path_buf()
+}
 fn identity(r: &Resolver<'_>, at: Ref) -> Option<(String, String)> {
     if r.sources[at.file].node(at.node).kind != "Procedure" {
         if let Some(i) = r.symbol(at) {
@@ -40,7 +70,7 @@ fn identity(r: &Resolver<'_>, at: Ref) -> Option<(String, String)> {
                 }
             }
         }
-        for package in ["core:os", "core:io", "core:bufio", "core:fmt"] {
+        for package in ["core:os", "core:io", "core:bufio", "core:fmt", "core:terminal"] {
             if r.standard_library(at, package) {
                 if let Some(name) = r.library_alias_member(at, package) {
                     return Some((package.into(), name));
@@ -62,14 +92,12 @@ fn identity(r: &Resolver<'_>, at: Ref) -> Option<(String, String)> {
     let s = &r.sources[target.file];
     let decl = s.node(target.node).parent?;
     let name = s.group(decl, "names").first().map(|node| s.text(*node))?;
-    let runtime = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()?
-        .join("runtime");
+    let runtime = runtime_root(r);
     if s.path == runtime.join("basic/basic.thor") && name == "print" {
         return Some(("thor:basic".into(), name.into()));
     }
     if let Some(root) = s.info["odin_root"].as_str() {
-        for package in ["os", "io", "bufio", "fmt"] {
+        for package in ["os", "io", "bufio", "fmt", "terminal"] {
             if s.path.parent() == Some(Path::new(root).join("core").join(package).as_path()) {
                 return Some((format!("core:{package}"), name.into()));
             }
@@ -137,17 +165,14 @@ pub(super) fn value(
     }
 }
 fn source_proof(r: &Resolver<'_>, disk: bool) -> std::result::Result<(), String> {
-    let data = profiles();
-    let runtime = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("runtime");
+    let runtime = runtime_root(r);
     let root = r
         .sources
         .iter()
         .find_map(|s| s.info["odin_root"].as_str())
         .map(Path::new)
         .ok_or("cannot prove allocation freedom: missing native SDK root")?;
+    let data = sdk_profiles(root);
     // Hash the reviewed source closure without parsing unrelated SDK packages.
     // Also inspect additions: an added init procedure can change global hooks.
     let mut paths = vec![];
@@ -189,7 +214,7 @@ fn source_proof(r: &Resolver<'_>, disk: bool) -> std::result::Result<(), String>
                     s.path.starts_with(root.join("base"))
                         || s.path.starts_with(root.join("core"))
                         || matches!(
-                            s.path.strip_prefix(&runtime).ok().and_then(|p| p.to_str()),
+                            s.path.strip_prefix(&runtime).ok().map(|p| p.to_string_lossy().replace('\\', "/")).as_deref(),
                             Some("basic/basic.thor" | "format/format.odin")
                         )
                 })
@@ -227,7 +252,7 @@ fn source_proof(r: &Resolver<'_>, disk: bool) -> std::result::Result<(), String>
                 .map_err(|e| format!("cannot inspect I/O SDK {}: {e}", path.display()))?;
             owned.as_slice()
         };
-        if expected.is_none_or(|expected| *expected != crate::digest::sha256(bytes)) {
+        if expected.is_none_or(|expected| !source_matches(expected, bytes)) {
             return Err(format!("cannot prove allocation freedom: SDK I/O effect profile does not match {}; the changed implementation requires review",path.display()));
         }
     }
@@ -265,10 +290,10 @@ impl State {
         for (path, raw) in overlays {
             if let Ok(relative) = path.strip_prefix(root) {
                 let key = relative.to_string_lossy().replace('\\', "/");
-                if profiles()
+                if sdk_profiles(Path::new(root))
                     .sdk
                     .get(&key)
-                    .is_none_or(|expected| *expected != crate::digest::sha256(raw.as_bytes()))
+                    .is_none_or(|expected| !source_matches(expected, raw.as_bytes()))
                 {
                     return Err(format!("cannot prove allocation freedom: SDK effect profile does not match {}; the changed implementation requires review",path.display()));
                 }
@@ -352,7 +377,8 @@ impl State {
                             || r.attributes(Ref { node: decl, ..at })
                                 .iter()
                                 .any(|(name, _)| {
-                                    matches!(name.as_str(), "init" | "test" | "export")
+                                    matches!(name.as_str(), "init" | "export")
+                                        || name == "test" && s.info["test_mode"] == true
                                 })
                             || s.group(decl, "attributes")
                                 .iter()
@@ -457,7 +483,9 @@ impl State {
                 }
                 if n.kind == "Cast" || n.kind == "AutoCast" || n.kind == "Unary" && n.op == "&" {
                     if child(r, at, "expr").is_some_and(|expr| protected_place(r, expr)) {
-                        return Err("cannot prove allocation freedom: native file metadata escapes through an address or cast".into());
+                        let source = &r.sources[at.file];
+                        let (line, column) = source.position(source.node(at.node).span.start);
+                        return Err(format!("cannot prove allocation freedom: native file metadata escapes through an address or cast at {}({line}:{column})", source.path.display()));
                     }
                 }
                 if n.kind == "Call" && child(r, at, "callee").is_some_and(|c| r.denotes_type(c)) {
@@ -484,12 +512,17 @@ impl State {
                                         | "to_reader"
                                         | "to_writer"
                                         | "to_flusher"
+                                        | "is_tty"
                                 )
                                 || p == "core:fmt"
                                     && matches!(
                                         n.as_str(),
                                         "fprint" | "fprintln" | "fprintf" | "fprintfln"
                                     )
+                                // The reviewed terminal wrappers only query the
+                                // file descriptor/handle; they retain no alias
+                                // and never modify the stream callback record.
+                                || p == "core:terminal" && matches!(n.as_str(),"is_terminal" | "_is_terminal")
                         });
                         let user = r.candidates(callee).iter().all(|target| {
                             let source = &r.sources[target.file];
@@ -499,7 +532,8 @@ impl State {
                                     .is_none_or(|root| !source.path.starts_with(root))
                         });
                         if !reviewed && (!user || r.candidates(callee).is_empty()) {
-                            return Err("cannot prove allocation freedom: native file metadata escapes to an unverified call".into());
+                            let (line,column)=s.position(n.span.start);
+                            return Err(format!("cannot prove allocation freedom: native file metadata escapes to an unverified call at {}({line}:{column})",s.path.display()));
                         }
                     }
                 }
@@ -814,8 +848,8 @@ impl Check<'_, '_> {
         match self.flow.deref(value) {
             Fact::StandardFile(_)=>{
                 let flags=&self.r.flags;
-                if flags.iter().find_map(|f|f.strip_prefix("-target:")).map(|target|!target.starts_with("darwin_")&&!target.starts_with("linux_"))
-                    .unwrap_or(!cfg!(any(target_os="macos",target_os="linux"))) {
+                if flags.iter().find_map(|f|f.strip_prefix("-target:")).map(|target|!target.starts_with("darwin_")&&!target.starts_with("linux_")&&!target.starts_with("windows_"))
+                    .unwrap_or(!cfg!(any(target_os="macos",target_os="linux",target_os="windows"))) {
                     return Err(self.error(w,at,"the target has no reviewed allocation-free native I/O boundary"));
                 }
                 Ok(())
@@ -915,4 +949,21 @@ fn protected_place(r: &mut Resolver<'_>, mut at: Ref) -> bool {
         at = next;
     }
     true // An unresolved projection cycle must not acquire a trusted capability.
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::*;
+    #[test]
+    fn source_profiles_allow_only_reviewed_line_ending_variants() {
+        let lf = b"package test\nvalue :: 7\n";
+        let crlf = b"package test\r\nvalue :: 7\r\n";
+        let expected = crate::digest::sha256(lf);
+        assert!(source_matches(&expected, lf));
+        assert!(source_matches(&expected, crlf));
+        let legacy = crate::digest::sha256(crlf);
+        assert!(source_matches(&legacy, crlf));
+        assert!(!source_matches(&expected, b"package test\nvalue :: 8\n"));
+        assert!(!source_matches(&expected, b"package test\rvalue :: 7\r"));
+    }
 }

@@ -857,7 +857,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
                     // The scheduler is a reviewed operation. Keep its ordinary
                     // Thor facade for native lowering without treating its
                     // thread/allocator implementation as user pure code.
-                    let directory=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("runtime/parallel");
+                    let directory=self.r.runtime_root().join("parallel");
                     for (file,source) in self.r.sources.iter().enumerate() {
                         if source.thor && source.path.parent()==Some(directory.as_path()) {
                             self.graph.keep.insert(Ref{file,node:NodeId(0)});

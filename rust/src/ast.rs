@@ -349,14 +349,17 @@ impl Source {
                 node.data["automatic"] = Value::Bool(first.is_some_and(|span|automatic.contains(&(span.start as u64))));
             }
             if node.kind == "Declaration" {
-                node.immutable = immutables.contains(&node.span.start);
-                node.data["immutable"] = Value::Bool(node.immutable);
                 let first = node.data["lists"]["names"]
                     .as_array()
                     .and_then(|names| names.first())
                     .and_then(Span::from_wire)
                     .map(|span| span.start)
                     .unwrap_or(node.span.start);
+                // The exported declaration span includes preceding attributes;
+                // parser storage metadata starts at the first declared name.
+                // Attributes must never erase :> permissions.
+                node.immutable = immutables.contains(&first);
+                node.data["immutable"] = Value::Bool(node.immutable);
                 if let Some(separator) = separators.get(&(first as u64)) {
                     node.data["roles"]["separator"] = serde_json::json!(separator);
                     changed_roles[index] = true;

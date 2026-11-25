@@ -6476,6 +6476,15 @@
       "sources": [
         "core/simd/x86/adx.odin"
       ]
+    },
+    "llvm.x86.pclmulqdq.256": {
+      "record": "int_x86_pclmulqdq_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/pclmulqdq.odin"
+      ]
     }
   }
 }

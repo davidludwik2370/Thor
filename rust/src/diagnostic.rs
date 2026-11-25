@@ -144,6 +144,7 @@ fn render(error: &Value, raw: Option<&str>, terse: bool, unix: bool, color: bool
     let severity = match error["type"].as_str().unwrap_or("error") {
         "warning" => "Warning",
         "note" => "Note",
+        "info" => "Info",
         _ => "Error",
     };
     let messages = error["msgs"]

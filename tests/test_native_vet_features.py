@@ -21,6 +21,21 @@ class NativeFeatureVetTests(unittest.TestCase):
             self.assertTrue(all(e.get('pos',{}).get('file')==str(self.source) for e in packet['errors']),packet)
         return result,packet
 
+    def test_native_tab_policy_excludes_support_but_checks_original_sources(self):
+        declarations='Mode :: enum {A, B}\nFlags :: bit_set[Mode]\nmerge :: proc(a, b: $T) -> T {return a | b}\n'
+        body='\n\tbits := merge(Flags{.A}, Flags{.B})\n\tvalues := [x for x in 0..<2]\n\tfmt.println(f"{bits} {values}")\n'
+        flags=['-vet','-strict-style','-vet-style','-warnings-as-errors','-disallow-do']
+        self.check(body,'-vet-tabs',declarations=declarations,flags=flags)
+        self.check(body.replace('\tbits','    bits'),'-vet-tabs',declarations=declarations,flags=flags,fail='tabs')
+        self.source.write_text('package main\nmain :: proc() {extra()}\n')
+        extra=self.app/'extra.odin'
+        extra.write_text('package main\nextra :: proc() {\n    value := 7\n    _ = value\n}\n')
+        result=subprocess.run([str(base.RUST),'check',str(self.app),'-vet-tabs','-json-errors',
+            '--output-dir',str(self.root/'native-tabs')],capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,1,result.stdout+result.stderr)
+        errors=json.loads(result.stderr)['errors']
+        self.assertTrue(any('tabs'in str(e['msgs'])and e.get('pos',{}).get('file')==str(extra)for e in errors),errors)
+
     def test_fstring_reads_and_casts_are_checked_in_caller(self):
         for flag,decl,expr,error in [('-vet-nil-deref','p:^int','p^','always nil'),
                                     ('-vet-uninitialized','x:int=---','x','before anything'),

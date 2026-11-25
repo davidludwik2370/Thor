@@ -1,7 +1,7 @@
 'use strict';
 const path = require('node:path');
 const {sourceDirectory} = require('./run-extension');
-const {findToolchain} = require('./toolchain');
+const {findToolchain, findCompiler, findBundledOdin} = require('./toolchain');
 
 const taskType = 'thor-debug-build';
 
@@ -12,9 +12,9 @@ function buildTask(vscode, definition, folder) {
     const config = vscode.workspace.getConfiguration('tls', folder.uri);
     const configured = config.get('compiler.path', '');
     const root = findToolchain(cwd) || findToolchain(folder.uri.fsPath);
-    const command = configured ? path.resolve(folder.uri.fsPath, configured) : root ? path.join(root, 'thor') : 'thor';
+    const command = configured ? path.resolve(folder.uri.fsPath, configured) : (root && findCompiler(root)) || 'thor';
     const args = ['build', '.', '-debug', '-o:none', '--output-dir', generated, '-out:' + binary];
-    const odinRoot = config.get('odinRoot', '');
+    const odinRoot = config.get('odinRoot', '') || findBundledOdin(root);
     if (odinRoot) args.push('--odin', path.join(odinRoot, process.platform === 'win32' ? 'odin.exe' : 'odin'));
     const task = new vscode.Task(definition, folder, 'Build Thor: ' + cwd, 'Thor',
         new vscode.ProcessExecution(command, args, {cwd}), []);

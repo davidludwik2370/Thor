@@ -72,9 +72,8 @@ absolute paths to installed third-party libraries.
 `assets/icon.png` or `assets/icon.ico` is discovered automatically. If both exist,
 select one explicitly. Both formats work on all three platforms: PNG or the
 largest image in an ICO becomes ICNS on macOS, an embedded ICO resource on
-Windows, and PNG on Linux. PNG/ICO conversion requires
-`python3 -m pip install Pillow`; publishing without an icon needs no image
-package. Rectangular icons are cropped to a square without stretching. The crop
+Windows, and PNG on Linux. The maintained native publisher converts icons
+directly; no Python or image package installation is required. Rectangular icons are cropped to a square without stretching. The crop
 starts centered and shifts over transparent padding when that can retain all
 visible artwork. A warning is emitted only if the crop removes pixels with
 nonzero alpha; fully transparent padding, including hidden RGB colors, is quiet.
@@ -88,9 +87,9 @@ normalization is regenerated from its largest image. A 1024-pixel PNG is a usefu
 source; resizing cannot restore detail missing from a small source icon. Normal
 image-decoder limits still apply to malformed or exceptionally large inputs.
 
-Reading TOML uses Python 3.11's `tomllib`. On Python 3.10, install `tomli` to read
-`thor.toml`. Publishing without that file, and the rest of the compiler, continue
-to support Python 3.10.
+The native publisher reads `thor.toml` directly. The frozen `thor-python`
+reference additionally needs Pillow for icons, and `tomli` on Python 3.10 for
+TOML files; these are not native Thor installation requirements.
 
 ## Options and outputs
 

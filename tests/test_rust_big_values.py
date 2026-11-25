@@ -6,8 +6,9 @@ from types import SimpleNamespace
 from thorlang import bigvalues, values
 from thorlang.bigconstants import BigConstants
 
+from tests.native_paths import rust_binary
 ROOT=Path(__file__).resolve().parents[1]
-BINARY=ROOT/'rust/target/release/examples/big_protocol'
+BINARY=rust_binary('big_protocol', example=True)
 
 
 def reference(request):

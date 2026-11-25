@@ -13,7 +13,7 @@ its status and transitive-call paragraph reflect the implemented language.
 Collection comprehensions are specified in [their reference](comprehensions.md).
 The exhaustive [attribute and directive reference](attributes-and-directives.md)
 also specifies automatic `:>` caller metadata parameters, `#runtime`, `#ro`, and
-`@(vet_ignore="...")`. See the runnable
+`@(vet_ignore={.unused})`. See the runnable
 [parameter-contract demo](../examples/parameter_contracts/demo.thor).
 
 Allocation-free procedure and file contracts are specified separately in
@@ -433,6 +433,22 @@ Syntax:
 - Preserve case matching rules, including supported multi-value/range cases and
   rejection of invalid or duplicate constant cases. A ternary lowering must not
   accidentally accept a switch Odin would reject.
+- Value switches also accept comparison prefixes: `case < limit:`, `<=`, `>`,
+  `>=`, and `!=`. Use an ordinary `case value:` for equality; prefix `==` is
+  rejected. Prefixes work in statements, value expressions and `#switch`,
+  including generics, pure functions and `#run`. They require a value selector;
+  selectorless and type switches do not accept them.
+- A comparison case uses the ordinary comparison between the captured selector
+  and its operand. The comparison must be valid and produce a Boolean. It does
+  not manufacture a range, so integer extremes, floating infinities and NaN keep
+  their normal comparison behavior. Comma-separated alternatives may mix
+  comparisons, ordinary values and ranges: `case < 0, 100..<200, >= 300:`.
+  Alternatives are tested lazily in source order. Predicate overlaps are allowed
+  and the first matching arm wins. Ordinary duplicate/range checks remain active.
+- Comparison prefixes do not establish enum exhaustiveness. Retain explicit
+  coverage of all enum values, or use `#partial` (with a default for expressions).
+  A default alone does not relax Odin's enum coverage checks. Expression defaults
+  and the other existing switch rules still apply.
 - Evaluate an explicit selector once. Evaluate case matches/boolean conditions
   at most once each, according to switch order, and stop after the first match.
   Apply the same short-circuit order within comma-separated cases. Evaluate only

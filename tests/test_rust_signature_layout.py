@@ -12,7 +12,7 @@ class RustSignatureLayoutTests(unittest.TestCase):
     program = native.RustCompilerTests.program
 
     def run_code(self, code, flags, command='run'):
-        self.source.write_text(code)
+        self.source.write_text(code,newline='')
         path = self.root/'profile.json'
         result = self.invoke('rust', command=command, flags=flags,
                              env={**os.environ, 'THOR_PROFILE': str(path)})

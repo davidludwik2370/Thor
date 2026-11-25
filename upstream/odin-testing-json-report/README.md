@@ -27,3 +27,8 @@ The Thor integration comparisons use that working pinned compiler.
 - [Minimal source](main.odin)
 
 The reproducer was verified on Ubuntu 24.04 ARM64 on November 15, 2026.
+
+The same SDK error was reproduced on native Windows x64 with revision `9a69916`
+on November 23, 2026. Windows integration runs use the ordinary native test-state
+log (`ODIN_TEST_LOG_STATE_CHANGES=true`) and compare complete per-case verdicts
+without enabling the broken optional JSON writer. The installed SDK is unchanged.

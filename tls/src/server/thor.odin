@@ -45,6 +45,13 @@ thor_exprs :: proc(nodes: ..^ast.Expr) -> []^ast.Expr {
 thor_adapt_expressions :: proc(p: ^parser.Parser,file:^ast.File){
     wanted:=make(map[int]int)
     defer delete(wanted)
+    matrix_layouts:=make(map[[2]int]string)
+    defer delete(matrix_layouts)
+    for feature in p.features {
+        if feature.kind=="MatrixRowMajor" || feature.kind=="MatrixColumnMajor" {
+            matrix_layouts[{feature.start,feature.end}]="row_major" if feature.kind=="MatrixRowMajor" else "column_major"
+        }
+    }
     results:=make(map[[2]int]int)
     defer delete(results)
     for feature in p.features {if feature.kind=="SetType"{wanted[feature.start]=feature.end}}
@@ -57,11 +64,20 @@ thor_adapt_expressions :: proc(p: ^parser.Parser,file:^ast.File){
     import_decl.relpath={kind=.String,text="\"thor:sets\"",pos=file.pos}
     import_decl.fullpath="\"thor:sets\""
     if len(wanted)>0{append(&file.imports,import_decl)}
-    State::struct{wanted:map[int]int,results:map[[2]int]int,alias:string}
-    state:=State{wanted=wanted,results=results,alias=alias}
+    State::struct{wanted:map[int]int,results:map[[2]int]int,matrix_layouts:map[[2]int]string,alias:string}
+    state:=State{wanted=wanted,results=results,matrix_layouts=matrix_layouts,alias=alias}
     visit::proc(v:^ast.Visitor,node:^ast.Node)->^ast.Visitor{
         if node==nil{return v}
         state:=cast(^State)v.data
+        if helper,ok:=node.derived.(^ast.Helper_Type);ok {
+            if layout,found:=state.matrix_layouts[{node.pos.offset,node.end.offset}];found {
+                tag:=ast.new(ast.Tag_Expr,node.pos,node.end)
+                tag.expr,tag.name=helper.type,layout
+                tag.op={kind=.Hash,text="#",pos=node.pos}
+                node.derived=tag
+                (cast(^ast.Expr)node).derived_expr=tag
+            }
+        }
         if decl,found:=node.derived.(^ast.Value_Decl);found&&!decl.is_mutable {
             for value in decl.values {
                 if call,found:=value.derived.(^ast.Call_Expr);found {
@@ -100,7 +116,9 @@ thor_case_condition :: proc(selector:^ast.Expr,matches:[]^ast.Expr,pos:tokenizer
     for match in matches{
         item:=match
         if selector!=nil{
-            if range,ok:=match.derived.(^ast.Binary_Expr);ok&&(range.op.kind==.Range_Half||range.op.kind==.Range_Full||range.op.kind==.Ellipsis){
+            if comparison,ok:=match.derived.(^ast.Unary_Expr);ok && comparison.expr!=nil && parser.thor_case_comparison(comparison.op.kind) {
+                item=thor_binary(selector,comparison.op.kind,comparison.expr)
+            }else if range,ok:=match.derived.(^ast.Binary_Expr);ok&&(range.op.kind==.Range_Half||range.op.kind==.Range_Full||range.op.kind==.Ellipsis){
                 high_kind:tokenizer.Token_Kind=.Lt
                 if range.op.kind==.Range_Full{high_kind=.Lt_Eq}
                 item=thor_binary(thor_binary(selector,.Gt_Eq,range.left),.Cmp_And,thor_binary(selector,high_kind,range.right))
@@ -117,14 +135,43 @@ thor_adapt_switches :: proc(p:^parser.Parser,file:^ast.File){
     state:=State{features=make(map[[2]int]parser.Feature)}
     defer delete(state.features)
     for feature in p.features{
-        if feature.kind=="CompileSwitch"||feature.kind=="CompileSwitchExpr"{state.features[{feature.start,feature.end}]=feature}
+        if feature.kind=="CompileSwitch"||feature.kind=="CompileSwitchExpr"||p.case_comparisons && feature.kind=="SwitchExpr"{state.features[{feature.start,feature.end}]=feature}
     }
-    if len(state.features)==0{return}
+    if len(state.features)==0 && !p.case_comparisons {return}
     visit::proc(v:^ast.Visitor,node:^ast.Node)->^ast.Visitor{
         if node==nil{return v}
         state:=cast(^State)v.data
         feature,found:=state.features[{node.pos.offset,node.end.offset}]
-        if !found{return v}
+        if !found || feature.kind=="SwitchExpr" {
+            if sw,ok:=node.derived.(^ast.Switch_Stmt);ok && sw.cond!=nil {
+                if block,ok:=sw.body.derived.(^ast.Block_Stmt);ok {
+                    for statement in block.stmts {
+                        clause:=statement.derived.(^ast.Case_Clause) or_continue
+                        for item,i in clause.list {
+                            if comparison,ok:=item.derived.(^ast.Unary_Expr);ok && comparison.expr!=nil && parser.thor_case_comparison(comparison.op.kind) {
+                                replacement:=thor_binary(sw.cond,comparison.op.kind,comparison.expr)
+                                replacement.pos=item.pos
+                                clause.list[i]=replacement
+                            }
+                        }
+                    }
+                }
+            } else if found {
+                if call,ok:=node.derived.(^ast.Call_Expr);ok {
+                    selector:^ast.Expr
+                    for arg in call.args {if arg.pos.offset==feature.selector[0]&&arg.end.offset==feature.selector[1]{selector=arg}}
+                    if selector==nil {return v}
+                    for arg,i in call.args {
+                        if comparison,ok:=arg.derived.(^ast.Unary_Expr);ok && comparison.expr!=nil && parser.thor_case_comparison(comparison.op.kind) {
+                            replacement:=thor_binary(selector,comparison.op.kind,comparison.expr)
+                            replacement.pos=arg.pos
+                            call.args[i]=replacement
+                        }
+                    }
+                }
+            }
+            return v
+        }
         if sw,ok:=node.derived.(^ast.Switch_Stmt);ok{
             block:=sw.body.derived.(^ast.Block_Stmt)
             ordered:=make([dynamic]^ast.Case_Clause)
@@ -195,6 +242,33 @@ thor_is_immutable :: proc(attributes: []^ast.Attribute) -> bool {
         }
     }
     return false
+}
+
+thor_is_scoped :: proc(attributes: []^ast.Attribute, offset: int) -> bool {
+    for attr in attributes { for elem in attr.elems {
+        if ident,ok:=elem.derived.(^ast.Ident);ok && ident.name=="__thor_scoped" && ident.pos.offset==offset {return true}
+    }}
+    return false
+}
+
+thor_mark_scoped :: proc(p: ^parser.Parser, file: ^ast.File) {
+    if len(p.scoped)==0 {return}
+    State :: struct {starts:map[int]bool}
+    state:=State{starts=make(map[int]bool)}
+    for entry in p.scoped {state.starts[entry[0]]=true}
+    visit :: proc(v:^ast.Visitor,node:^ast.Node)->^ast.Visitor {
+        if node==nil {return v}
+        state:=cast(^State)v.data
+        if decl,ok:=node.derived.(^ast.Value_Decl);ok {for name in decl.names {if state.starts[name.pos.offset] {
+            attr:=ast.new(ast.Attribute,name.pos,name.pos)
+            attr.elems=thor_exprs(thor_ident("__thor_scoped",name.pos))
+            append(&decl.attributes,attr)
+        }}}
+        return v
+    }
+    visitor:=ast.Visitor{visit=visit,data=&state}
+    for declaration in file.decls {ast.walk(&visitor,declaration)}
+    delete(state.starts)
 }
 
 thor_mark_immutables :: proc(p: ^parser.Parser, file: ^ast.File) {

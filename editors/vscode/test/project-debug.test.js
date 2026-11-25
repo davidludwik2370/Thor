@@ -2,6 +2,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const {activateProjectDebugging, taskType} = require('../project-debug');
 
 function fixture({workspace='/projects', file='/projects/game/game.thor', saved=true, configurations=[]}={}) {
@@ -76,6 +78,24 @@ test('resolved build tasks keep the original task definition identity',()=>{
     const resolved=providers[taskType].resolveTask({definition,scope:folder});
     assert.equal(resolved.definition,definition);
     assert.equal(providers[taskType].resolveTask({definition:{type:taskType}}),undefined);
+});
+
+test('debug builds select the native compiler in a checkout containing the shell launcher',()=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),'thor-debug-toolchain-'));
+    const previous=process.env.THOR_ROOT;
+    try {
+        fs.mkdirSync(path.join(root,'tls'));
+        fs.mkdirSync(path.join(root,'bin'));
+        fs.writeFileSync(path.join(root,'thor'),'shell launcher');
+        fs.writeFileSync(path.join(root,'bin','thor.exe'),'native compiler fixture');
+        process.env.THOR_ROOT=root;
+        const {providers,folder}=fixture();
+        const task=providers[taskType].resolveTask({definition:{type:taskType,directory:'/projects/game'},scope:folder});
+        assert.equal(task.execution.command,path.join(root,process.platform==='win32'?'bin/thor.exe':'thor'));
+    } finally {
+        if(previous===undefined)delete process.env.THOR_ROOT;else process.env.THOR_ROOT=previous;
+        fs.rmSync(root,{recursive:true,force:true});
+    }
 });
 
 test('untrusted workspaces, failed saves, and missing workspace stop before building or debugging',async()=>{

@@ -33,11 +33,12 @@ class DiagnosticHardeningTests(unittest.TestCase):
 
     def test_exact_mapping_expands_native_points_but_keeps_generated_expression_ranges(self):
         original=b'using value'
-        renderer=Diagnostics(maps={'/copied.odin':SourceMap([[0,len(original),'/source.thor',0,len(original),'source',True]]),
-                                   '/helper.odin':SourceMap([[0,6,'/source.thor',1,3,'generated',False]])},
-                             generated={'/copied.odin':original,'/helper.odin':b'helper'})
-        renderer.raw['/source.thor']=original
-        for file,expected in [('/copied.odin',(0,5)),('/helper.odin',(1,3))]:
+        copied,source,helper=[str(Path(name).resolve()) for name in ['/copied.odin','/source.thor','/helper.odin']]
+        renderer=Diagnostics(maps={copied:SourceMap([[0,len(original),source,0,len(original),'source',True]]),
+                                   helper:SourceMap([[0,6,source,1,3,'generated',False]])},
+                             generated={copied:original,helper:b'helper'})
+        renderer.raw[source]=original
+        for file,expected in [(copied,(0,5)),(helper,(1,3))]:
             native={'type':'error','pos':{'file':file,'offset':0,'line':1,'column':1,'end_column':2},'msgs':['invalid use']}
             errors=renderer.translate([native])
             self.assertEqual((errors[0]['pos']['offset'],errors[0]['pos']['end_offset']),expected,errors)

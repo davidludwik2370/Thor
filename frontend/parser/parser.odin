@@ -26,10 +26,12 @@ Parser :: struct {
 	edits: [dynamic]Edit,
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
+	scoped: [dynamic][3]int, // identifier offset, marker start, marker end
 	mut_parameters: [dynamic][3]int, // parameter-name offset, directive start/end
 	ro_parameters: [dynamic][3]int,
 	auto_parameters: [dynamic][3]int, // field-name offset, :> separator start/end
 	features: [dynamic]Feature,
+	case_comparisons: bool,
 	declaration_separators: [dynamic][3]int,
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
@@ -1097,7 +1099,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	return for_stmt
 }
 
-parse_case_clause :: proc(p: ^Parser, is_type_switch: bool) -> ^ast.Case_Clause {
+parse_case_clause :: proc(p: ^Parser, is_type_switch: bool, has_selector: bool) -> ^ast.Case_Clause {
 	tok := expect_token(p, .Case)
 
 	list: []^ast.Expr
@@ -1107,7 +1109,7 @@ parse_case_clause :: proc(p: ^Parser, is_type_switch: bool) -> ^ast.Case_Clause 
 		defer p.allow_range, p.allow_in_expr = prev_allow_range, prev_allow_in_expr
 		p.allow_range, p.allow_in_expr = !is_type_switch, !is_type_switch
 
-		list = parse_rhs_expr_list(p)
+		list = thor_case_list(p, has_selector, is_type_switch) if p.thor else parse_rhs_expr_list(p)
 	}
 
 	terminator := expect_token(p, .Colon)
@@ -1171,7 +1173,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
         if .Native_Strict in p.flags && p.curr_tok.pos.column > tok.pos.column {
             error(p,p.curr_tok.pos,"With '-strict-style' the 'case' token must be in the same column as its 'switch' token")
         }
-		clause := parse_case_clause(p, is_type_switch)
+		clause := parse_case_clause(p, is_type_switch, tag != nil)
 		append(&clauses, clause)
 	}
 
@@ -1629,7 +1631,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		case "partial":
 			stmt := parse_stmt(p)
 			#partial switch s in stmt.derived_stmt {
-			case ^ast.Switch_Stmt:      s.partial = true
+			case ^ast.Switch_Stmt:
+                s.partial = true
+                if p.thor {s.pos = tok.pos}
 			case ^ast.Type_Switch_Stmt: s.partial = true
 			case: error(p, stmt.pos, "#partial can only be applied to a switch statement")
 			}
@@ -3340,12 +3344,21 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	return nil
 }
 
-is_literal_type :: proc(expr: ^ast.Expr) -> bool {
+is_literal_type :: proc(p: ^Parser, expr: ^ast.Expr) -> bool {
 	val := ast.unparen_expr(expr)
 	if val == nil {
 		return false
 	}
-	#partial switch _ in val.derived_expr {
+	#partial switch node in val.derived_expr {
+	case ^ast.Helper_Type:
+		// Layout wrappers stand in for the newer native matrix-type flag.
+		// Preserve compound literals without enabling literals for #type.
+		for feature in p.features {
+			if feature.start == val.pos.offset && (feature.kind == "MatrixRowMajor" || feature.kind == "MatrixColumnMajor") {
+				return is_literal_type(p, node.type)
+			}
+		}
+		return false
 	case ^ast.Bad_Expr,
 		^ast.Ident,
 		^ast.Selector_Expr,
@@ -3722,7 +3735,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 					}
 				}
 			}
-			if !is_lhs && is_literal_type(operand) && (p.expr_level >= 0 || set_literal) {
+			if !is_lhs && is_literal_type(p, operand) && (p.expr_level >= 0 || set_literal) {
 				operand = parse_literal_value(p, operand)
 			} else {
 				loop = false
@@ -3951,7 +3964,36 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 	start_tok := p.curr_tok
 	docs := p.lead_comment
 
-	lhs := parse_lhs_expr_list(p)
+	// Recognize the declaration suffix without reserving Odin's binary xor.
+	// Look ahead through an identifier list before consuming anything.
+	scoped_decl := false
+	if p.thor && p.curr_tok.kind == .Ident {
+		i := 0
+		for {
+			t := peek_token(p, i)
+			if t.kind == .Xor { scoped_decl = true; i += 1; t = peek_token(p, i) }
+			if t.kind == .Colon { break }
+			if t.kind != .Comma || peek_token(p, i+1).kind != .Ident { scoped_decl = false; break }
+			i += 2
+		}
+	}
+	lhs: []^ast.Expr
+	if scoped_decl {
+		list: [dynamic]^ast.Expr
+		for {
+			name := parse_ident(p)
+			append(&list, name)
+			if p.curr_tok.kind == .Xor {
+				marker := advance_token(p)
+				append(&p.scoped, [3]int{name.pos.offset, marker.pos.offset, marker.pos.offset+len(marker.text)})
+				append(&p.edits, Edit{marker.pos.offset, marker.pos.offset+len(marker.text), ""})
+				if p.curr_proc == nil { error(p, marker.pos, "scoped storage '~' is only allowed on local declarations") }
+				if name.name == "_" { error(p, marker.pos, "scoped storage requires a named owner") }
+			}
+			if !allow_token(p, .Comma) { break }
+		}
+		lhs = list[:]
+	} else { lhs = parse_lhs_expr_list(p) }
 	op := p.curr_tok
 	switch {
 	case tokenizer.is_assignment_operator(op.kind):
@@ -3990,6 +4032,9 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		}
 	case op.kind == .Colon:
 		expect_token_after(p, .Colon, "identifier list")
+		if scoped_decl && p.curr_tok.kind != .Eq && p.curr_tok.kind != .Gt {
+			error(p, p.curr_tok.pos, "scoped storage '~' requires ':=' or ':>' initialization")
+		}
 		if .Label in flags && len(lhs) == 1 {
 			is_partial := false
 			is_reverse := false

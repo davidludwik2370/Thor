@@ -61,6 +61,7 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
         vet: None,
         vet_apply: false,
         vet_ask: false,
+        unverified: Default::default(),
     })
     .map_err(|error| error.to_string())?;
     project

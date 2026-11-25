@@ -585,3 +585,13 @@ test('invalid bare format names stay whole and do not color individual letters a
         }
     }
 });
+
+test('scoped ownership suffix preserves variable names and xor syntax',()=>{
+    for(const line of ['nums~ := make([]int, 5)','nums ~:= make([]int, 5)','nums~ :> make([]int, 5)','nums ~:> make([]int, 5)']){
+        check(line,'nums','variable.name.thor');
+        check(line,'~','keyword.operator.assignment.thor');
+    }
+    const tokens=tokenize('x := a ~ b')[0];
+    assert.ok(tokens.some(t=>t.text.includes('~')));
+    assert.ok(!tokens.some(t=>t.scopes.includes('meta.definition.variable.scoped.thor')));
+});

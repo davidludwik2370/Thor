@@ -47,7 +47,7 @@ semicolon policy. Thor consumes only `no_alloc`; other native vet checks keep
 their native meanings through original-source validation. See the
 [native vet audit](native-vet-audit.md) for supported checking-view forms. A bare `#+vet` does not
 enable `no_alloc`. There is no `!no_alloc`, command-line vet switch, or
-`vet_ignore="no_alloc"` exemption. Remove the contract to stop requiring it.
+`vet_ignore={.no_alloc}` exemption. Remove the contract to stop requiring it.
 
 ## What the proof permits
 

@@ -314,7 +314,7 @@ larger::fn()->bool{return BIG+1>BIG}
                                env={**os.environ,'THOR_JOBS':jobs})
             self.assertEqual(result.returncode,1,result.stdout+result.stderr)
             packet=json.loads(result.stderr)
-            self.assertTrue(all('/leaf/' in row['pos']['file'] for row in packet['errors']))
+            self.assertTrue(all('leaf' in Path(row['pos']['file']).parts for row in packet['errors']))
             outputs.append(result.stderr)
         self.assertEqual(outputs[0],outputs[1])
 

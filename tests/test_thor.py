@@ -12,8 +12,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tests.native_paths import thor_launcher
 ROOT = Path(__file__).resolve().parents[1]
-THOR = Path(os.environ.get("THOR_TEST_COMPILER", ROOT / "thor"))
+THOR = Path(os.environ.get("THOR_TEST_COMPILER", thor_launcher()))
 
 
 def runtime_flags(flags, *, platform=None):

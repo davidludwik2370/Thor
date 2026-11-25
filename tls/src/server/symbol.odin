@@ -26,6 +26,8 @@ SymbolStructTag :: enum {
 SymbolStructTags :: bit_set[SymbolStructTag]
 
 SymbolStructValue :: struct {
+    origin: ^ast.Struct_Type,
+    instantiation: ^ast.Call_Expr,
 	names:             []string,
 	ranges:            []common.Range,
 	types:             []^ast.Expr,
@@ -119,6 +121,8 @@ SymbolEnumValue :: struct {
 }
 
 SymbolUnionValue :: struct {
+    origin: ^ast.Union_Type,
+    instantiation: ^ast.Call_Expr,
 	types:         []^ast.Expr,
 	poly:          ^ast.Field_List,
 	poly_names:    []string,
@@ -179,6 +183,7 @@ SymbolMapValue :: struct {
 }
 
 SymbolMatrixValue :: struct {
+    row_major: bool,
 	x:    ^ast.Expr,
 	y:    ^ast.Expr,
 	expr: ^ast.Expr,
@@ -230,6 +235,7 @@ SymbolFlag :: enum {
 	Variable, // or type
 	Mutable, // or constant
 	Immutable, // Thor runtime storage, independent from compile-time constants
+	Scoped, // Binding owns shallow cleanup at its lexical scope exit.
 	Local,
 	ObjC,
 	ObjCIsClassMethod, // should be set true only when ObjC is enabled
@@ -280,6 +286,8 @@ SymbolType :: enum {
 }
 
 SymbolStructValueBuilder :: struct {
+    origin: ^ast.Struct_Type,
+    instantiation: ^ast.Call_Expr,
 	symbol:            Symbol,
 	names:             [dynamic]string,
 	types:             [dynamic]^ast.Expr,
@@ -356,6 +364,7 @@ symbol_struct_value_builder_make_symbol_symbol_struct_value :: proc(
 	return SymbolStructValueBuilder {
 		symbol = symbol,
 		names = slice.to_dynamic(v.names, allocator),
+        origin=v.origin, instantiation=v.instantiation,
 		types = slice.to_dynamic(v.types, allocator),
 		args = slice.to_dynamic(v.args, allocator),
 		ranges = slice.to_dynamic(v.ranges, allocator),
@@ -390,6 +399,7 @@ to_symbol :: proc(b: SymbolStructValueBuilder) -> Symbol {
 
 to_symbol_struct_value :: proc(b: SymbolStructValueBuilder) -> SymbolStructValue {
 	return SymbolStructValue {
+        origin=b.origin, instantiation=b.instantiation,
 		names = b.names[:],
 		types = b.types[:],
 		ranges = b.ranges[:],
@@ -1103,6 +1113,13 @@ symbol_to_expr :: proc(symbol: Symbol, file: string, allocator := context.temp_a
 		type.row_count = v.x
 		type.column_count = v.y
 		type.elem = v.expr
+        if v.row_major {
+            tag := new_type(ast.Tag_Expr,pos,end,allocator)
+            tag.expr=type
+            tag.name="row_major"
+            tag.op={kind=.Hash,text="#",pos=pos}
+            return tag
+        }
 		return type
 	case SymbolProcedureValue:
 		type := new_type(ast.Proc_Type, pos, end, allocator)

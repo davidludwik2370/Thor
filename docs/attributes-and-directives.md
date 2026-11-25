@@ -126,15 +126,27 @@ future_limit :: 100
 ```
 
 <a id="attr-vet_ignore"></a>
-#### `@(vet_ignore="checks")` — Thor
+#### `@(vet_ignore={.checks})` — Thor
 
 Suppresses selected Thor vet recommendations for the annotated declaration or
-import, including their `vet --apply` edits. Supply a nonempty constant string of
-comma-separated check names: `immutable`, `pure` (alias `fn`), `unused`, and/or
-`semicolon`. Unknown/empty names and duplicate attributes are errors. For example,
-`@(vet_ignore="fn, unused")` can retain an intentionally public `proc` without
+import, including their `vet --apply` edits. Supply a nonempty set of contextual
+rule names: `@(vet_ignore={.immutable, .unused})`. Rules are `.immutable`, `.pure`
+(alias `.fn`), `.unused`, `.semicolon`, `.lifetime_unknown`, and `.leak_unknown`.
+Use braces for one rule too, e.g. `@(vet_ignore={.unused})`. Members are metadata
+labels, not references to ordinary variables; no global enum/type or runtime
+collection is created. Multiline sets and trailing commas follow ordinary
+compound-literal syntax. Repeated members collapse to one rule.
+
+The additional `.lifetime_unknown` and `.leak_unknown` names acknowledge
+unverified lifetime/cleanup effects rooted in this declaration, including uses
+through aliases. Definite lifetime and leak findings cannot be suppressed;
+`lifetime` and `leak` are not valid suppression names. See [Lifetime vet](lifetime-vet.md).
+Unknown/empty names and duplicate attributes are errors. For example,
+`@(vet_ignore={.fn, .unused})` can retain an intentionally public `proc` without
 converting or removing it. Normal source visibility and linker retention rules
-still apply.
+still apply. TLS offers the supported rules after a dot inside the set, filters
+as you type, and omits rules already selected. Existing constant-string forms
+such as `@(vet_ignore="unused, pure")` remain accepted for compatibility.
 
 This does not suppress compiler errors, purity/access violations, native Odin
 vet policies, or findings on other declarations. A procedure annotation does not
@@ -209,6 +221,16 @@ instance for each call. It takes no argument. The value is shared across calls
 and, without other arrangements, across threads. This is not an implicit lock,
 lazy initializer, or per-thread value. File-scope variables already have persistent
 storage. It is invalid on a compile-time constant value declaration.
+
+Storage duration and mutability are independent. `@static x :> 10` remains
+immutable: assigning to `x`, compound assignment, and taking `&x` are errors.
+Use `@static x := 10` when persistent mutable state is intended. The same
+permission rules apply with any preceding attributes, including `vet_ignore`.
+Generic instantiations have distinct static storage, matching native Odin.
+
+A `fn` or `#run` call chain cannot read or write mutable static state. Immutable
+static values and direct reads from constant `@(static, rodata)` tables remain
+eligible. Read-only tables do not grant mutable references in pure code.
 
 <a id="attr-rodata"></a>
 #### `@(rodata)`

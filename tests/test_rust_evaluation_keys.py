@@ -1,6 +1,7 @@
 """Toolchain, resource and emitted-dependency cache keys."""
 import copy
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
@@ -8,6 +9,7 @@ from thorlang.cache import EvaluationCache
 from thorlang.compiler import Source
 from thorlang.driver import frontend_binary
 from tests import test_rust_evaluation_cache as storage
+from tests.native_paths import native_test_compiler
 
 
 class RustEvaluationKeyTests(unittest.TestCase):
@@ -36,10 +38,7 @@ class RustEvaluationKeyTests(unittest.TestCase):
         (support/'frontend/parser.odin').write_text('package parser\n')
         (support/'runtime/pure.odin').write_text('package pure\n')
         (support/'runtime/basic.thor').write_text('package basic\nVALUE::1\n')
-        compiler=native/'odin'
-        compiler.write_text('#!/usr/bin/env python3\nimport sys\n'+
-            f'print({str(native)!r} if sys.argv[1]=="root" else "identity test compiler")\n')
-        compiler.chmod(0o755)
+        compiler=native_test_compiler(native,'identity',sdk=str(native))
         return compiler,support
 
     def identity(self,compiler,support):
@@ -74,7 +73,7 @@ class RustEvaluationKeyTests(unittest.TestCase):
     def test_compiler_executable_change_invalidates_identity(self):
         compiler,support=self.toolchain()
         before=self.identity(compiler,support)
-        compiler.write_text(compiler.read_text()+'# locally rebuilt executable\n')
+        compiler.write_bytes(compiler.read_bytes()+b'# locally rebuilt executable\n')
         after=self.identity(compiler,support)
         self.assertNotEqual(before,after)
 
@@ -98,7 +97,7 @@ class RustEvaluationKeyTests(unittest.TestCase):
 
     def test_failed_compiler_query_is_optional(self):
         compiler,support=self.toolchain()
-        compiler.write_text('#!/bin/sh\nexit 2\n')
+        compiler.with_suffix('.json').write_text(json.dumps({'mode':'locationless'}))
         answer=self.identity(compiler,support)
         self.assertIsNone(answer)
 
@@ -213,7 +212,7 @@ class RustEvaluationKeyTests(unittest.TestCase):
         dynamic=self.run_native([operation],sources=[source])
         self.assertEqual(dynamic['answers'],[None])
         self.assertEqual(dynamic['stats']['bypasses'],1)
-        compiler.write_text('#!/bin/sh\nexit 2\n')
+        compiler.with_suffix('.json').write_text(json.dumps({'mode':'locationless'}))
         failed=self.run_native([operation])
         self.assertEqual(failed['answers'],[None])
         self.assertEqual(failed['stats']['bypasses'],1)

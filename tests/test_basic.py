@@ -162,7 +162,7 @@ if len(values)!=3 || 2 not_in values {panic("native parameter witness")}
             with self.subTest(flags=flags):
                 root,_=self.invoke(code,flags=flags)
                 manifest=json.loads((root/'output/thor-manifest.json').read_text())
-                sources=[name for name in manifest['generated'] if name.endswith('/sets/sets.odin')]
+                sources=[name for name in manifest['generated'] if name.replace('\\','/').endswith('/sets/sets.odin')]
                 self.assertEqual(len(sources),1,sources)
                 generated=root/'output'/sources[0]
                 self.assertTrue(generated.is_file())
@@ -172,7 +172,7 @@ if len(values)!=3 || 2 not_in values {panic("native parameter witness")}
                 self.assertIn('return to_set_slice(values[:], allocator)',generated_code)
         root,_=self.invoke(code,command='transpile')
         manifest=json.loads((root/'output/thor-manifest.json').read_text())
-        sources=[name for name in manifest['generated'] if name.endswith('/sets/sets.odin')]
+        sources=[name for name in manifest['generated'] if name.replace('\\','/').endswith('/sets/sets.odin')]
         self.assertEqual(len(sources),1,sources)
         generated=root/'output'/sources[0]
         mapping=json.loads(generated.with_suffix('.odin.map.json').read_text())
@@ -351,16 +351,16 @@ helpers :: proc(t: ^testing.T) {
 expected_lines := []string{"first", "", "é😀", "last"}
 for expected in expected_lines {
     line, err := basic.input()
-    assert(line == expected)
-    if expected == "last" { assert(err == .EOF) } else { assert(err == nil) }
+    if line != expected { panic("input line") }
+    if expected == "last" { if err != .EOF { panic("partial EOF") } } else { if err != nil { panic("input error") } }
     delete(line)
 }
 empty, err := basic.input()
-assert(empty == "" && err == .EOF)
+if empty != "" || err != .EOF { panic("empty EOF") }
 delete(empty)
 ''', 'import "thor:basic"\n'), command='build')
-        result = subprocess.run([str(root / (root.name + ('.exe' if os.name == 'nt' else '')))], input='first\n\né😀\r\nlast',
-                                capture_output=True, text=True, timeout=10)
+        result = subprocess.run([str(root / (root.name + ('.exe' if os.name == 'nt' else '')))], input='first\n\né😀\r\nlast'.encode('utf-8'),
+                                capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_input_owned_strings_can_be_freed_by_size_checking_allocators(self):
@@ -372,7 +372,7 @@ strict::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,
     tracker:=(^mem.Tracking_Allocator)(data)
     if old!=nil {
         entry,ok:=tracker.allocation_map[old]
-        assert(!ok || entry.size==old_size,"incorrect allocation size at free/resize")
+        if ok && entry.size!=old_size { panic("incorrect allocation size at free/resize") }
     }
     allocator:=mem.tracking_allocator(tracker)
     return allocator.procedure(allocator.data,mode,size,alignment,old,old_size,loc)
@@ -384,20 +384,20 @@ main::proc(){
     allocator:=mem.Allocator{strict,&tracker}
     for expected in ([]string{"first","","é😀","last"}) {
         line,err:=basic.input(allocator=allocator)
-        assert(line==expected)
-        if expected=="last" { assert(err==.EOF) } else { assert(err==nil) }
+        if line!=expected { panic("input line") }
+        if expected=="last" { if err!=.EOF { panic("partial EOF") } } else { if err!=nil { panic("input error") } }
         delete(line,allocator)
     }
-    assert(len(tracker.allocation_map)==0,"input leaked storage")
+    if len(tracker.allocation_map)!=0 { panic("input leaked storage") }
 }
 '''
-        for flags in [(),('-debug',)]:
+        for flags in [(),('-debug',),('-o:speed','-disable-assert','-no-bounds-check','-no-type-assert')]:
             with self.subTest(flags=flags):
                 root,_=self.invoke(source,command='build',flags=flags)
                 result=subprocess.run([str(root/(root.name+('.exe' if os.name=='nt' else '')))],
-                    input='first\n\né😀\r\nlast',capture_output=True,text=True,timeout=10)
+                    input='first\n\né😀\r\nlast'.encode('utf-8'),capture_output=True,timeout=10)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-                self.assertEqual(result.stderr,'')
+                self.assertEqual(result.stderr,b'')
 
     def test_input_allocation_failure_returns_io_error(self):
         root,_=self.invoke('''package main

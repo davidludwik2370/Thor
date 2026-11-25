@@ -9,8 +9,9 @@ import subprocess
 import tempfile
 import unittest
 
+from tests.native_paths import rust_binary, native_test_compiler, EXE_SUFFIX
 ROOT = Path(__file__).resolve().parents[1]
-COMPILER = Path(os.environ.get('THOR_MIGRATE_TEST_COMPILER', ROOT/'rust/target/release/thor-rust'))
+COMPILER = Path(os.environ.get('THOR_MIGRATE_TEST_COMPILER', rust_binary()))
 UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']
 
 
@@ -53,7 +54,7 @@ class MigrationTests(unittest.TestCase):
         return result
 
     def compare_builds(self, flags=(), expected=None):
-        binary = self.root/'original-program'
+        binary = self.root/('original-program.exe' if os.name=='nt' else 'original-program')
         built = subprocess.run(['odin','build','.', '-thread-count:1',*flags,'-out:'+str(binary)],
             cwd=self.source,capture_output=True,text=True,timeout=45)
         self.assertEqual(built.returncode,0,built.stderr)
@@ -61,7 +62,7 @@ class MigrationTests(unittest.TestCase):
         built = subprocess.run([str(COMPILER),'build','.', '-thread-count:1',*flags],
             cwd=self.output,capture_output=True,text=True,timeout=60)
         self.assertEqual(built.returncode,0,built.stdout+built.stderr)
-        actual = subprocess.run([str(self.output/self.output.name)],cwd=self.output,capture_output=True,text=True,timeout=10)
+        actual = subprocess.run([str(self.output/(self.output.name+('.exe' if os.name=='nt' else '')))],cwd=self.output,capture_output=True,text=True,timeout=10)
         self.assertEqual((actual.returncode,actual.stdout),(baseline.returncode,baseline.stdout),actual.stderr)
         if expected is not None:
             self.assertEqual(actual.stdout,expected)
@@ -76,12 +77,13 @@ main::proc(){fn:=7;fmt.println(fn,"fn set or_panic Integer Rational")}
         self.write(text, {'assets/data.bin':b'\x00\xff\x01','.vscode/settings.json':'{"hello":true}',
             '.git/config':'saved git data','.thor-cache/old':'cache','empty/.keep':''})
         (self.source/'main.odin').chmod(0o640)
+        original_mode=stat.S_IMODE((self.source/'main.odin').stat().st_mode)
         self.output.parent.mkdir()
         self.migrate(destination=False)
         self.assertEqual((self.output/'assets/data.bin').read_bytes(),b'\x00\xff\x01')
         self.assertFalse((self.output/'.git').exists())
         self.assertFalse((self.output/'.thor-cache').exists())
-        self.assertEqual(stat.S_IMODE((self.output/'main.thor').stat().st_mode),0o640)
+        self.assertEqual(stat.S_IMODE((self.output/'main.thor').stat().st_mode),original_mode)
         migrated=(self.output/'main.thor').read_bytes()
         self.assertIn(b'// fn set or_panic Integer Rational',migrated)
         self.assertIn(b'"fn set or_panic Integer Rational"',migrated)
@@ -292,14 +294,17 @@ set :: proc(fn:int)->int {return fn+1}
         native=Path(shutil.which('odin')).resolve()
         (self.source/'base').symlink_to(native.parent/'base',target_is_directory=True)
         (self.source/'vendor').symlink_to(native.parent/'vendor',target_is_directory=True)
+        if os.name=='nt':
+            # ODIN_ROOT also selects the native linker. This intentionally
+            # minimal SDK needs the selected backend's ordinary Windows linker.
+            (self.source/'bin').mkdir()
+            (self.source/'bin/radlink.exe').symlink_to(native.parent/'bin/radlink.exe')
         for entry in (native.parent/'core').iterdir():
             target=self.source/'core'/entry.name
             if not target.exists():
                 target.symlink_to(entry,target_is_directory=entry.is_dir())
-        wrapper=self.root/'native-wrapper'
-        wrapper.write_text('#!/bin/sh\nexport ODIN_ROOT='+shlex.quote(str(self.source))
-            +'\nexec '+shlex.quote(str(native))+' "$@"\n')
-        wrapper.chmod(0o755)
+        wrapper=native_test_compiler(self.root,'frontend_guard',sdk=str(self.source),
+            odin=str(native),frontend=str(self.root/'unused-frontend'))
         self.migrate(['--odin',str(wrapper)])
         migrated=(self.output/'main.thor').read_text()
         self.assertIn('probe.set(fn=6)',migrated)
@@ -437,9 +442,10 @@ main::proc(){
         self.compare_builds()
 
     def test_structured_editor_tasks_and_launch_settings(self):
+        artifact='debug'+EXE_SUFFIX
         tasks={'version':'2.0.0','tasks':[{'label':'debug','type':'process','command':'odin',
-            'args':['build','main.odin','-file','-debug','-vet','-thread-count:1','-out:debug'],'options':{'cwd':'${workspaceFolder}'},'problemMatcher':[]}]}
-        launch={'version':'0.2.0','configurations':[{'name':'Mine','type':'lldb','request':'launch','program':'${workspaceFolder}/debug',
+            'args':['build','main.odin','-file','-debug','-vet','-thread-count:1','-out:'+artifact],'options':{'cwd':'${workspaceFolder}'},'problemMatcher':[]}]}
+        launch={'version':'0.2.0','configurations':[{'name':'Mine','type':'lldb','request':'launch','program':'${workspaceFolder}/'+artifact,
             'preLaunchTask':'debug','args':['keep me']}]}
         self.write('package main\nmain::proc(){}\n',{
             '.vscode/tasks.json':json.dumps(tasks),'.vscode/launch.json':json.dumps(launch)})
@@ -457,7 +463,7 @@ main::proc(){
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         manifest=config['manifest'].replace('${workspaceFolderBasename}',self.output.name).replace('${workspaceFolder}',str(self.output))
         self.assertTrue(Path(manifest).is_file(),manifest)
-        result=subprocess.run([str(self.output/'debug')],cwd=self.output,capture_output=True,text=True,timeout=10)
+        result=subprocess.run([str(self.output/artifact)],cwd=self.output,capture_output=True,text=True,timeout=10)
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_absolute_editor_paths_are_rebased_and_complex_shell_tasks_are_reported(self):
@@ -502,6 +508,10 @@ main::proc(){fmt.println(TEXT)}
         self.assertIn('mkdir -p "${workspaceFolder}/.vscode/bin"',task['command'])
         self.assertIn('-vet',task['command'])
         self.assertIn('--odin-compatible',task['command'])
+        if os.name=='nt':
+            # This fixture deliberately preserves a POSIX shell script. Native
+            # Windows process tasks are executed by the structured-task test.
+            return
         converted=task['command'].replace('${workspaceFolder}',str(self.output)).replace('thor build ',shlex.quote(str(COMPILER))+' build ')
         built=subprocess.run(converted,shell=True,cwd=self.output,capture_output=True,text=True,timeout=60)
         self.assertEqual(built.returncode,0,built.stdout+built.stderr)

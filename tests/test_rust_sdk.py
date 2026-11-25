@@ -161,7 +161,8 @@ work::fn(d:time.Duration)->f64{return time.duration_seconds(d)}
         sdk=Path(manifest['odin_environment']['ODIN_ROOT'])
         generated=sdk/'core/time/time.odin'
         mapping=json.loads(Path(str(generated)+'.map.json').read_text())
-        self.assertIn('core/time/time.odin',json.dumps(mapping))
+        self.assertTrue(any(Path(name).parts[-3:]==('core','time','time.odin')
+                            for name in mapping['sources']),mapping)
         self.assertIn('checked_',generated.read_text())
 
     def test_existing_symlink_parent_is_rejected_before_sdk_write(self):

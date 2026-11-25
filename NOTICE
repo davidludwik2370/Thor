@@ -1,0 +1,22 @@
+Thor-owned code is distributed under the BSD Zero Clause License in LICENSE.
+This grant does not relicense incorporated third-party code, contributed code
+with its own license, or separately licensed integration fixtures.
+
+The frontend parser/tokenizer and CLI metadata contain modified Odin code,
+copyright Ginger Bill and contributors, under the zlib license. Their original
+notices remain in frontend/parser/LICENSE, frontend/tokenizer/LICENSE and
+cli/LICENSE. These copies are modified for Thor, not upstream Odin originals.
+
+TLS is a modified OLS fork, copyright Daniel Gavin and contributors, under MIT;
+see tls/LICENSE. The VS Code extension incorporates OLS-derived work; see
+editors/vscode/LICENSE. Original notices are retained.
+
+The frozen Python reference and historical fixtures remain in the repository
+for development/reference; native distributions do not include them. Third-party
+projects and upstream reproductions retain their accompanying licenses.
+
+Native distributions additionally include a private Odin compiler/SDK and its
+original licenses, runtime library notices, and a generated licenses/index.json
+inventory of Rust dependencies. Thor's LICENSE does not replace any of these
+terms. CodeLLDB and VS Code are installed separately from their publishers and
+retain their own licenses.

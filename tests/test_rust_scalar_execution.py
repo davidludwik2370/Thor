@@ -1,5 +1,6 @@
 """Scalar site records validate bindings, bodies and external inputs on reuse."""
 import shutil
+import os
 import unittest
 from tests import test_rust_cached_execution as cached
 from tests import test_rust_compiler as native
@@ -114,7 +115,7 @@ class RustScalarExecutionTests(unittest.TestCase):
     def test_platform_excluded_project_files_keep_valid_site_result(self):
         library=self.root/'sdk/sample';library.mkdir(parents=True)
         (library/'sample.odin').write_text('package sample\nwork::proc()->int{return 6}\n')
-        inactive=library/'inactive_windows.odin'
+        inactive=library/('inactive_linux.odin' if os.name=='nt' else 'inactive_windows.odin')
         inactive.write_text('package sample\nunused::1\n')
         self.source.write_text('package main\nimport lib "extras:sample"\nVALUE::#run lib.work()\nmain::proc(){_=VALUE}\n')
         flags=['-debug','-collection:extras='+str(library.parent)]

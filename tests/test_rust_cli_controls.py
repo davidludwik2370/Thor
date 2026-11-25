@@ -3,6 +3,7 @@ from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import unittest
 from unittest.mock import MagicMock, call, patch
@@ -72,7 +73,8 @@ class RustCliControlTests(unittest.TestCase):
     program=native.RustCompilerTests.program
 
     def test_no_arguments_shows_short_help_through_native_launchers(self):
-        for compiler in (native.ROOT/'thor', native.ROOT/'thor-rust', native.RUST):
+        compilers=(native.RUST,) if os.name=='nt' else (native.ROOT/'thor',native.ROOT/'thor-rust',native.RUST)
+        for compiler in compilers:
             with self.subTest(compiler=compiler):
                 result = subprocess.run([str(compiler)], cwd=self.root,
                                         capture_output=True, text=True, timeout=20)
@@ -146,7 +148,8 @@ class RustCliControlTests(unittest.TestCase):
                 for option in included:
                     self.assertIn(option, result.stdout)
                 for option in excluded:
-                    self.assertNotIn(option, result.stdout)
+                    # An option mentioned in explanatory prose is not an option entry.
+                    self.assertNotRegex(result.stdout, r'(?m)^  '+re.escape(option))
         self.assertEqual(list(self.root.iterdir()), [self.app])
 
     def test_missing_project_names_and_unknown_commands_are_usage_errors(self):
@@ -331,6 +334,10 @@ raise SystemExit(status)
         actual=shutil.which('odin')
         wrapper=self.root/'odin-wrapper'
         outputs=[str(self.root/engine) for engine in compiler_engines()]
+        if os.name=='nt':
+            from tests.native_paths import native_test_compiler
+            sdk=subprocess.check_output([actual,'root'],text=True).strip()
+            return native_test_compiler(self.root,'toolchain',sdk=sdk,odin=actual,outputs=outputs)
         wrapper.write_text('#!'+sys.executable+'\nimport os,signal,sys\n'+
             'args=sys.argv[1:]\n'+f'outputs={outputs!r}\n'+
             'if args and args[0]=="check" and any(args[1].startswith(path+os.sep) for path in outputs):\n'+
@@ -349,17 +356,13 @@ raise SystemExit(status)
 
     def test_vet_validation_preserves_native_warning_policy(self):
         import shutil
-        import sys
+        from tests.native_paths import native_test_compiler
         self.write(body='fmt.println(increment(VALUE))',prefix='increment::proc(n:int)->int{return n+1}\nVALUE::7')
         actual=shutil.which('odin')
-        wrapper=self.root/'warning-policy-compiler'
         log=self.root/'warning-policy.jsonl'
-        wrapper.write_text('#!'+sys.executable+'\nimport json,os,pathlib,sys\n'+
-            f'args=sys.argv[1:]\nroot={str(self.root)!r}\nlog=pathlib.Path({str(log)!r})\n'+
-            'if args and args[0] in {"check","build"} and (args[1].startswith(root+os.sep) or "thor-vet" in args[1]):\n'+
-            ' with log.open("a") as output:output.write(json.dumps(args)+"\\n")\n'+
-            f'os.execv({actual!r},[{actual!r},*args])\n')
-        wrapper.chmod(0o755)
+        sdk=subprocess.check_output([actual,'root'],text=True).strip()
+        wrapper=native_test_compiler(self.root,'frontend_guard',sdk=sdk,odin=actual,
+            frontend=str(self.root/'unused-frontend'),log=str(log))
         original=self.source.read_text()
         for engine in compiler_engines():
             self.source.write_text(original)
@@ -367,30 +370,18 @@ raise SystemExit(status)
             result=self.invoke(engine,'vet',flags=['--apply','--odin',str(wrapper),'-warnings-as-errors','-thread-count:1'])
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             attempts=[json.loads(line) for line in log.read_text().splitlines()]
-            validation=[arguments for arguments in attempts if 'thor-vet' in arguments[1]]
+            validation=[arguments for arguments in attempts if len(arguments)>1 and 'thor-vet' in arguments[1]]
             self.assertTrue(validation,attempts)
             for arguments in validation:self.assertIn('-warnings-as-errors',arguments)
 
     def test_generic_linker_collision_retries_once_without_hiding_source_or_external_errors(self):
         import shutil
-        import sys
+        from tests.native_paths import native_test_compiler
         self.write(body='if VALUE!=7 {panic("value")}',prefix='VALUE::7')
         actual=shutil.which('odin')
-        wrapper=self.root/'module-compiler'
         log=self.root/'module-attempts.jsonl'
-        wrapper.write_text('#!'+sys.executable+'\n'+'''import json,os,pathlib,sys
-args=sys.argv[1:]
-'''+f'root={str(self.root)!r}\nlog=pathlib.Path({str(log)!r})\n'+'''if args and args[0]=="build" and args[1].startswith(root+os.sep):
- with log.open('a') as output:output.write(json.dumps(args)+'\\n')
- mode=os.environ['THOR_TEST_MODULE_FAILURE']
- if '-use-single-module' not in args or mode=='always':
-  if mode=='source':
-   source=pathlib.Path(args[1]);source=next(source.rglob('*.odin')) if source.is_dir() else source
-   print(json.dumps({'errors':[{'type':'error','pos':{'file':str(source),'offset':0,'line':1,'column':1},'msgs':['Source failure']}]}),file=sys.stderr)
-  print("duplicate symbol '_external_name'" if mode=='external' else "duplicate symbol '_sample::helper:proc(v:int)->(:int)'",file=sys.stderr)
-  raise SystemExit(1)
-'''+f'os.execv({actual!r},[{actual!r},*args])\n')
-        wrapper.chmod(0o755)
+        sdk=subprocess.check_output([actual,'root'],text=True).strip()
+        wrapper=native_test_compiler(self.root,'collision',sdk=sdk,odin=actual,project=str(self.root),log=str(log))
         for engine in compiler_engines():
             for mode,count in [('recover',2),('always',2),('source',1),('external',1)]:
                 with self.subTest(engine=engine,mode=mode):
@@ -398,7 +389,8 @@ args=sys.argv[1:]
                     result=self.invoke(engine,'build',flags=['--odin',str(wrapper),'-use-separate-modules','-thread-count:1','-json-errors'],
                         env={**os.environ,'THOR_TEST_MODULE_FAILURE':mode})
                     self.assertEqual(result.returncode,0 if mode=='recover' else 1,result.stderr)
-                    attempts=[json.loads(line) for line in log.read_text().splitlines()]
+                    attempts=[args for line in log.read_text().splitlines() if (args:=json.loads(line))
+                        and args[0]=='build' and Path(args[1]).is_relative_to(self.root)]
                     self.assertEqual(len(attempts),count,attempts)
                     if count==2:
                         self.assertIn('-use-single-module',attempts[1])

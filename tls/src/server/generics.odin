@@ -537,13 +537,16 @@ resolve_generic_function_ast :: proc(
 		return Symbol{}, false
 	}
 
-	raw := cast(rawptr)proc_lit
-	if _, ok := ast_context.generic_recursion_map[raw]; ok {
+	// Distinct calls to the same generic procedure may depend on one another:
+	// square(FIRST), where FIRST is square(3), or simply square(square(3)).
+	// Only reentering the same procedure at the same call site is a cycle.
+	key := Generic_Call_Key{proc_lit, ast_context.call}
+	if _, ok := ast_context.generic_recursion_map[key]; ok || len(ast_context.generic_recursion_map) >= DeferredDepth {
 		return proc_symbol, true
 	}
 
-	ast_context.generic_recursion_map[raw] = {}
-	defer delete_key(&ast_context.generic_recursion_map, raw)
+	ast_context.generic_recursion_map[key] = {}
+	defer delete_key(&ast_context.generic_recursion_map, key)
 
 	params: []^ast.Field
 	if proc_lit.type.params != nil {

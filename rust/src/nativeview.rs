@@ -178,6 +178,16 @@ impl View<'_, '_, '_> {
         if matches!(kind.as_str(), "Attribute" | "SetType") {
             return self.lower.render(id, None, true);
         }
+        if kind == "CompileSwitch" {
+            // Keep original reads and construction in the checking view, then
+            // reuse the normal lazy when lowering and its case validation.
+            let statements = self.s().node(id).data["cases"].as_array().into_iter().flatten()
+                .flat_map(|case| case["statements"].as_array().into_iter().flatten())
+                .filter_map(Span::from_wire).filter_map(|span| self.s().at(span, id)).collect::<Vec<_>>();
+            let mut children = vec![];
+            for statement in statements {children.push((statement, self.node(statement)?));}
+            return self.plain(id, children);
+        }
         if kind == "When" {
             if let Some(cond) = self.s().role(id, "cond") {
                 if let Some(selected) = self.lower.resolver.condition(Ref {
@@ -382,6 +392,11 @@ impl View<'_, '_, '_> {
         } else {
             code.push(self.g(format!("{selector_name} := true\n"), id));
         }
+        if cases.iter().any(|(values, _)| values.iter().any(|value| self.s().node(*value).kind == "CaseComparison")) {
+            code.push(self.lower.comparison_validation(id, self.g(&selector_name, id),
+                &cases.iter().map(|(values, _)| values.clone()).collect::<Vec<_>>(),
+                !cases.iter().any(|(values, _)| values.is_empty()))?);
+        }
         code.push(self.g(format!("{matched} := -1\n"), id));
         let mut fallback = None;
         for (index, (matches, _)) in cases.iter().enumerate() {
@@ -413,10 +428,11 @@ impl View<'_, '_, '_> {
                         self.g(")", *operand),
                     ])
                 } else {
-                    let e = self.expr(*operand)?;
+                    let value = if self.s().node(*operand).kind == "CaseComparison" {self.s().role(*operand, "expr").unwrap()} else {*operand};
+                    let e = self.expr(value)?;
                     code.extend(e.before);
                     Code::concat([
-                        self.g(format!("{selector_name} == ("), *operand),
+                        self.g(format!("{selector_name} {} (", if self.s().node(*operand).kind == "CaseComparison" {self.s().node(*operand).op.as_str()} else {"=="}), *operand),
                         e.value,
                         self.g(")", *operand),
                     ])
@@ -585,6 +601,9 @@ impl View<'_, '_, '_> {
             return Ok(Code::concat(code));
         }
         if kind == "Switch" {
+            if self.s().role(id, "expr").is_some_and(|selector| self.lower.typ(selector).big_name().is_some()) {
+                if let Some(code) = self.lower.comparison_switch_statement(id)? {return Ok(code);}
+            }
             let body = self.s().role(id, "body").unwrap();
             let case_ids = self.s().node(body).children.to_vec();
             let selector = self.s().role(id, "expr");
@@ -593,7 +612,7 @@ impl View<'_, '_, '_> {
                     self.s()
                         .group(*c, "types")
                         .iter()
-                        .any(|m| self.statements(*m))
+                        .any(|m| self.statements(*m) || self.s().node(*m).kind == "CaseComparison")
                 })
             {
                 let mut cases = vec![];

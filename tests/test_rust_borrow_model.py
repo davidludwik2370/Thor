@@ -11,6 +11,7 @@ from thorlang.driver import frontend_binary
 from thorlang.semantics import Resolver
 from thorlang.purity import Purity
 from thorlang.pureborrow import Permission,OWNED
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -85,7 +86,7 @@ class RustBorrowModelTests(unittest.TestCase):
             expected=canonical({'converged':reference_converged,'checks':checks,'profiles':profiles,
                 'mutates':[location(proc,qualified) for proc in pure.borrowing.mutates],
                 'escapes':[[location(node,qualified),message] for node,message in pure.borrowing.escapes.items()]})
-            result=subprocess.run([str(native.ROOT/'rust/target/release/examples/borrow_protocol'),str(entry),*(['--project'] if sdk else [])],
+            result=subprocess.run([str(rust_binary('borrow_protocol', example=True)),str(entry),*(['--project'] if sdk else [])],
                 capture_output=True,text=True,timeout=30)
             self.assertEqual(result.returncode,0,result.stderr)
             actual=canonical(json.loads(result.stdout))

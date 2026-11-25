@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def differences(root=ROOT):
     recorded = json.loads((root/'docs/python-reference-frozen.json').read_text())['sha256']
     paths = [root/'thor-python', *sorted((root/'thorlang').rglob('*.py'))]
-    actual = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+    actual = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in paths if path.is_file()}
     return sorted(name for name in recorded.keys() | actual.keys()
                   if recorded.get(name) != actual.get(name))

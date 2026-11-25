@@ -1,11 +1,36 @@
 # Thor Language for VS Code
 
-Local Thor T01-T23 syntax highlighting and a client for the TLS fork in this
-repository. `.thor` files have their own language identity; existing Odin support
-continues to own `.odin` files.
+For a prebuilt toolchain, use the repository-root
+`./thor-install --vscode --profile Thor`; see the
+[installation guide](../../docs/installing.md). A named profile is optional.
+Existing profile settings, keybindings and project configurations are preserved.
+The extension discovers registered installations as well as development
+checkouts; installed Run/Debug/TLS commands do not require shell PATH changes.
+The installer also installs the standard `DanielGavin.ols` extension for Odin
+syntax, file icons, semantic highlighting, hover and completion, and CodeLLDB
+for debugging. TLS serves only `.thor`; OLS serves `.odin`. OLS manages its own
+server download and configuration prompts. On ARM64 Linux, the installer builds
+and configures unmodified upstream OLS automatically to cover its missing
+automatic platform download.
+The Thor extension supplies the registered command directory to new integrated
+terminals using VS Code's environment API, without editing terminal settings.
+Reload the window after updating the extension and relaunch existing terminals
+if VS Code marks their environment as stale. TLS starts when a Thor file opens;
+terminal PATH support is available after editor startup even in Odin-only windows.
 
-Thor supplies a yellow T file icon with a transparent background through the
-same language-icon contribution Odin uses. Explorer rows and editor tabs keep
+**Thor: Apply Recommended Colors** enables an optional, profile-scoped color
+preset for Thor semantic tokens. It keeps explicit customizations and the current
+theme, changes no other language, and adjusts for light/dark themes. **Thor:
+Restore Previous Colors** removes only unchanged rules the preset added. Existing
+color preview commands remain available independently. New installer profiles
+enable the preset by default; ordinary extension installation does not.
+
+Local Thor T01-T23 syntax highlighting and a client for the TLS fork in this
+repository. `.thor` files have their own language identity; the standard OLS
+extension owns `.odin` files and their normal Odin appearance.
+
+Thor supplies a yellow T file icon with a transparent background.
+Explorer rows and editor tabs keep
 the editor's background visible around the glyph. Dark themes use bright yellow;
 light themes use a darker gold from the same palette. No icon-theme switch is
 required. Themes with their own explicit Thor mapping can override the language
@@ -108,6 +133,15 @@ conversions that Thor has validated, including in unsaved files. Editing the
 buffer invalidates older correction snapshots. The compiler supports the same
 checks with `thor vet .` and `thor build . --vet`; use `thor vet . --apply` to apply
 all verified corrections or `thor vet . --ask` to review and confirm them.
+
+With vet enabled, `"tls.unverified": "summary"` shows one informational count
+per affected file for analyses that could not be completed. These counts are
+not confirmed bugs. `"show"` displays individual information diagnostics with
+reasons and review guidance; `"error"` displays them as errors. Ordinary vet
+warnings, definite memory findings, original ranges and validated quick fixes
+remain visible. Unverified notices never offer automatic corrections. The
+resource-scoped setting restarts TLS; other clients can use
+`checker_args: "--vet --unverified=show"` (or `summary`/`error`).
 
 ## Compile-time execution policy
 
@@ -465,3 +499,40 @@ stay orange, width/precision digits use numeric colors, verbs use keyword blue,
 and flags/punctuation stay neutral. TLS checks the same format contracts as the
 compiler, including explicit precision for Rational g/G, using unsaved source
 locations. Reload the window after installing an updated grammar.
+
+Comparison switch cases (`case < limit:`, `<=`, `>`, `>=`, `!=`) retain operand
+hover, definition, enum completion and source-mapped diagnostics in statements,
+switch expressions and `#switch`. Use `case value:` for equality.
+
+### Compact hover sizes
+
+Hovers show a small, muted size line below the declaration by default:
+`4 bytes`, `8 bytes · pointer · target dependent`, or
+`16 bytes · slice header · target dependent`. Pointer and container-header
+sizes exclude referenced allocations. `Integer` and `Rational`, when resolved,
+show their fixed representation size with `variable storage` for their backing
+memory. Alignment and padding stay out of this default display.
+
+Sizes use the active TLS profile's OS/architecture, defaulting to the computer
+running TLS. Target-sized fields, target-dependent counts derived from
+`size_of`/`align_of`, and ABI-sensitive aggregate padding propagate the
+`target dependent` qualifier.
+Alignment differences alone do not add that qualifier: a struct containing two
+`f64` fields shows `16 bytes`, since its size stays fixed across targets.
+Incomplete, unsupported or excessively large type graphs omit the size line
+instead of guessing. Calculation is bounded and cached within each hover; it
+never builds or executes a program to answer a hover.
+Potentially variable sizes are compared across Odin's ABI layout families, so
+fixed padding, fixed union storage, and constant count expressions do not gain
+an unnecessary qualifier. Scalar, matrix and SIMD alignment use the selected
+target's rules. The comparison caches are request-local and distinguish generic
+instantiations; shared type graphs reuse results instead of expanding as trees.
+Generic count and alignment expressions retain their type/value arguments and
+caller scopes, including nested generics and same-named caller declarations.
+
+Set `tls.hoverSize` to `false` to hide the line. Other LSP clients can use
+`enable_hover_size: false` in `tls.json` or initialization options. Existing
+`enable_hover_layout: true` remains an independent option for detailed size,
+alignment, padding and field-offset comments. Non-VS Code clients receive an
+ordinary Markdown size paragraph; the Thor extension supplies the smaller,
+theme-aware text style without enabling HTML in source documentation.

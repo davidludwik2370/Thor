@@ -13,8 +13,9 @@ import threading
 import time
 import unittest
 
+from tests.native_paths import thor_launcher
 ROOT = Path(__file__).resolve().parents[1]
-THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
+THOR = Path(os.environ.get('THOR_TEST_COMPILER', thor_launcher()))
 
 
 def backend_path():
@@ -27,9 +28,10 @@ def backend_path():
 
 
 class DAP:
-    def __init__(self, directory):
+    def __init__(self, directory, *, bridge=None, trace=None):
+        self.trace = trace
         self.log = tempfile.TemporaryFile()
-        self.process = subprocess.Popen(['node', str(ROOT/'editors/vscode/debug-adapter.js'), str(backend_path())],
+        self.process = subprocess.Popen(['node', str(bridge or ROOT/'editors/vscode/debug-adapter.js'), str(backend_path())],
             cwd=directory, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log)
         self.messages = queue.Queue()
         self.events = []
@@ -53,13 +55,17 @@ class DAP:
                         break
                     key, value = line.decode().split(':', 1)
                     headers[key.lower()] = value.strip()
-                self.messages.put(json.loads(self.process.stdout.read(int(headers['content-length']))))
+                message=json.loads(self.process.stdout.read(int(headers['content-length'])))
+                if self.trace is not None:self.trace.append({'direction':'received','message':message})
+                self.messages.put(message)
         except Exception as error:
             self.messages.put({'error': str(error)})
 
     def send(self, command, arguments=None):
         self.seq += 1
-        data = json.dumps({'seq': self.seq, 'type': 'request', 'command': command, 'arguments': arguments or {}}).encode()
+        message={'seq': self.seq, 'type': 'request', 'command': command, 'arguments': arguments or {}}
+        data = json.dumps(message).encode()
+        if self.trace is not None:self.trace.append({'direction':'sent','message':message})
         self.commands[self.seq] = command
         self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode()+data)
         self.process.stdin.flush()
@@ -140,11 +146,52 @@ class DAP:
             self.log.close()
 
 
+def cleanup_debug_directory(temporary, *, windows=os.name=='nt'):
+    # Windows can briefly retain a debugger/PDB directory handle after process
+    # exit. Retry sharing/access violations only; persistent locks still fail.
+    for attempt in range(40):
+        try:
+            temporary.cleanup()
+            return
+        except PermissionError as error:
+            if not windows or getattr(error,'winerror',None) not in (5,32) or attempt==39:
+                raise
+            time.sleep(0.05)
+
+
+class DebuggerCleanupTests(unittest.TestCase):
+    def test_transient_windows_directory_lock_is_retried(self):
+        from unittest.mock import Mock,patch
+        error=PermissionError('sharing violation');error.winerror=32
+        temporary=Mock();temporary.cleanup.side_effect=[error,None]
+        with patch('tests.test_debugger.time.sleep'):
+            cleanup_debug_directory(temporary,windows=True)
+        self.assertEqual(temporary.cleanup.call_count,2)
+
+    def test_persistent_windows_lock_remains_an_error(self):
+        from unittest.mock import Mock,patch
+        error=PermissionError('sharing violation');error.winerror=32
+        temporary=Mock();temporary.cleanup.side_effect=error
+        with patch('tests.test_debugger.time.sleep'),self.assertRaises(PermissionError):
+            cleanup_debug_directory(temporary,windows=True)
+        self.assertGreater(temporary.cleanup.call_count,1)
+        self.assertLessEqual(temporary.cleanup.call_count,50)
+
+    def test_unrelated_or_nonwindows_permission_errors_are_not_retried(self):
+        from unittest.mock import Mock,patch
+        for windows,code in [(False,32),(True,13)]:
+            error=PermissionError('permission denied');error.winerror=code
+            temporary=Mock();temporary.cleanup.side_effect=error
+            with patch('tests.test_debugger.time.sleep'),self.assertRaises(PermissionError):
+                cleanup_debug_directory(temporary,windows=windows)
+            temporary.cleanup.assert_called_once()
+
+
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
     def test_migrated_native_debug_command_keeps_breakpoints_and_step_into(self):
         temporary=tempfile.TemporaryDirectory(prefix='thor-migrated-dap-')
-        self.addCleanup(temporary.cleanup)
+        self.addCleanup(cleanup_debug_directory,temporary)
         root=Path(temporary.name).resolve()
         original=root/'original'/'sample'
         original.mkdir(parents=True)
@@ -815,7 +862,12 @@ main::proc(){
             self.assertTrue(any(v['name']==name for v in variables),variables)
             self.assertFalse(any(v['name'].startswith('__thor_') for v in variables),variables)
             value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
-            self.assertIn('i8' if name=='index' else 'f64',value['type'])
+            if os.name=='nt':
+                # Native Odin PDBs expose the ABI type names, as verified with
+                # the same plain-Odin/CodeLLDB control (no Thor source maps).
+                self.assertIn(value['type'], {'i8','signed char'} if name=='index' else {'f64','double'})
+            else:
+                self.assertIn('i8' if name=='index' else 'f64',value['type'])
             rendered=value['result']
             if name=='index':
                 # LLDB's native i8 formatter displays character escapes.
@@ -1116,6 +1168,19 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_step_over_inside_shared_basic_keeps_library_scope_and_arguments(self):
+        directory,_=self.build('package main\nimport "thor:basic"\nmain::proc(){basic.print("shared breakpoint")}\n')
+        basic=ROOT/'runtime/basic/basic.thor'
+        line=next(i for i,text in enumerate(basic.read_text().splitlines(),1) if 'writer := os.to_stream(os.stdout)' in text)
+        client=self.launch(directory,basic,[line])
+        thread,frame=self.frame(client)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(basic),line+1),frame)
+        arguments=client.request('evaluate',{'frameId':frame['id'],'expression':'args.len','context':'watch'})
+        self.assertEqual(arguments['result'],'1',arguments)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_or_else_fallback_list_keeps_breakpoints_and_user_step_into(self):
         text='''package main
 get::proc()->(int,int,bool){return 0,0,false}
@@ -1286,7 +1351,7 @@ main::proc(){
 
     def build(self, text, files=None, *, vet=False):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
-        self.addCleanup(temporary.cleanup)
+        self.addCleanup(cleanup_debug_directory,temporary)
         directory = Path(temporary.name).resolve()
         source = directory/'main.thor'
         source.write_text(text)
@@ -1440,6 +1505,13 @@ main :: proc() {
         self.assertIn('render',frame['name'])
         value=client.request('evaluate',{'frameId':frame['id'],'expression':'n','context':'watch'})
         self.assertEqual(value['result'],'7')
+        scopes=client.request('scopes',{'frameId':frame['id']})
+        visible=[]
+        for scope in scopes['scopes']:
+            variables=client.request('variables',{'variablesReference':scope['variablesReference']})
+            visible.extend(variable['value'] for variable in variables['variables'] if variable['name']=='n')
+        self.assertTrue(visible,scopes)
+        self.assertTrue(all(value=='7' for value in visible),visible)
         client.request('next',{'threadId':thread})
         thread,frame=self.frame(client)
         self.assertEqual(frame['line'],4,frame)
@@ -1530,6 +1602,24 @@ main::proc(){
         self.assertEqual(value['result'],'10')
         client.request('continue',{'threadId':thread})
         client.event('terminated')
+
+    def test_owned_fn_argument_fallback_preserves_shadowing_locals(self):
+        text='''package main
+render::fn(n:int)->string{
+    {
+        n:=42
+        text:=f"value {n}"
+        return text
+    }
+}
+main::proc(){result:=render(7);defer delete(result);if result!="value 42"{panic("shadowed argument")}}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6])
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'n','context':'watch'})
+        self.assertEqual(value['result'],'42',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
 
     def test_unicode_inline_breakpoint_uses_utf16_editor_columns(self):
         text='''package main

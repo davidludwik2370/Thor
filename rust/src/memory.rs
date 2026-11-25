@@ -29,6 +29,20 @@ impl Default for Memory {
     }
 }
 impl Memory {
+    pub fn bundled_linker_runtime(&mut self, root: &Path, odin: &Path, flags: &[String]) {
+        if !self.address || !cfg!(target_os = "macos") { return; }
+        if !root.join("odin/odin").canonicalize().is_ok_and(|path| path == odin) { return; }
+        if flags.iter().any(|f| f.starts_with("-linker:")) { return; }
+        let previous = flags.iter().rev().find_map(|f| f.strip_prefix("-extra-linker-flags:")).unwrap_or("");
+        if previous.split_whitespace().any(|s| s.trim_start_matches(['\'', '"']).starts_with("-resource-dir") || s.trim_start_matches(['\'', '"']).starts_with("--resource-dir")) { return; }
+        let resource = root.join("odin/clang-resource");
+        if !resource.join("lib/darwin/libclang_rt.asan_osx_dynamic.dylib").is_file() { return; }
+        // Odin's linker argument splitter recognizes double-quoted paths.
+        // Existing user flag text and explicit linker choices are preserved.
+        let quoted = format!("\"{}\"", resource.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\""));
+        self.extra.push(format!("-extra-linker-flags:{previous} -resource-dir={quoted}"));
+    }
+
     pub fn select(
         command: &str,
         flags: &[String],
@@ -305,6 +319,9 @@ fn find_llvm() -> Option<String> {
     let mut candidates = vec![];
     if let Ok(path) = env::var("THOR_LLVM_SYMBOLIZER") {
         candidates.push(PathBuf::from(path));
+    }
+    if let Ok(root) = crate::cli::root() {
+        candidates.push(root.join("odin/libexec/llvm-symbolizer"));
     }
     if let Some(paths) = env::var_os("PATH") {
         candidates.extend(env::split_paths(&paths).map(|p| p.join("llvm-symbolizer")));

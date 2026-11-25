@@ -96,7 +96,7 @@ thor_rename_token :: proc(document: ^Document, position: common.Position) -> (Th
 
 thor_rename_open_document :: proc(fullpath: string) -> ^Document {
 	for _, &document in document_storage.documents {
-		if document.client_owned && document.fullpath == fullpath {return &document}
+		if document.client_owned && compiler_path_equal(document.fullpath,fullpath) {return &document}
 	}
 	return nil
 }
@@ -130,15 +130,13 @@ thor_rename_load :: proc(fullpath: string) -> ^Document {
 }
 
 thor_rename_in_directory :: proc(file, directory: string) -> bool {
-	separator := "/"
-	when ODIN_OS == .Windows {separator = "\\"}
-	return(
-		file == directory ||
-		strings.has_prefix(
-			file,
-			strings.concatenate({strings.trim_suffix(directory, separator), separator}, context.temp_allocator),
-		) \
-	)
+	if directory=="" {return false}
+	separators:="/"
+	when ODIN_OS==.Windows {separators="/\\"}
+	directory:=strings.trim_right(directory,separators)
+	if compiler_path_equal(file,directory) {return true}
+	if len(file)<=len(directory) || !compiler_path_equal(file[:len(directory)],directory) {return false}
+	return file[len(directory)]=='/' || ODIN_OS==.Windows && file[len(directory)]=='\\'
 }
 
 thor_rename_editable :: proc(document, current: ^Document) -> bool {
@@ -487,7 +485,11 @@ thor_rename_files :: proc(target: Thor_Rename_Target, current: ^Document) -> []s
 				   os.is_file(manifest) {os.walker_skip_dir(&walker)}
 				continue
 			}
-			if thor_source_file(info.fullpath) {files[strings.clone(info.fullpath, context.temp_allocator)] = true}
+			if thor_source_file(info.fullpath) {
+				file:=info.fullpath
+				when ODIN_OS==.Windows {file,_=filepath.replace_separators(file,'/',context.temp_allocator)}
+				files[strings.clone(file, context.temp_allocator)] = true
+			}
 		}
 	}
 	result := make([dynamic]string, context.temp_allocator)

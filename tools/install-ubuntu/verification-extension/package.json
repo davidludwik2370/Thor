@@ -1,0 +1,8 @@
+{
+  "name": "thor-install-verification",
+  "publisher": "thor-tests",
+  "version": "1.0.0",
+  "engines": {"vscode": "^1.96.0"},
+  "main": "./empty.js",
+  "license": "0BSD"
+}

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from tests import test_thor as base
+from tests.native_paths import EXE_SUFFIX
 
 UNCHECKED=['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']
 IMPORTS='import "thor:basic"\n'
@@ -24,7 +25,7 @@ class StringConversionTests(unittest.TestCase):
             for flags in [[],UNCHECKED,['-debug','-sanitize:address']]:
                 with self.subTest(flags=flags):
                     result=subprocess.run([os.environ.get('THOR_ODIN','odin'),'test',str(base.ROOT/'runtime/format'),
-                        '-collection:thor='+str(base.ROOT/'runtime'),'-out:'+str(Path(directory)/'string-tests'),
+                        '-collection:thor='+str(base.ROOT/'runtime'),'-out:'+str(Path(directory)/('string-tests'+EXE_SUFFIX)),
                         '-thread-count:1','-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',*flags],
                         capture_output=True,text=True,timeout=60)
                     self.assertEqual(result.returncode,0,result.stdout+result.stderr)

@@ -23,13 +23,18 @@ UsingStatement :: struct {
 	pkg_name: string,
 }
 
+Generic_Call_Key :: struct {
+	procedure: ^ast.Proc_Lit,
+	call: ^ast.Call_Expr,
+}
+
 AstContext :: struct {
 	locals:  [dynamic]LocalGroup, //locals all the way to the document position
 	globals: map[string]GlobalExpr,
 	labels:  map[string]^ast.Ident,
 
 	recursion_map:             map[rawptr]struct{},
-	generic_recursion_map:     map[rawptr]struct{},
+	generic_recursion_map:     map[Generic_Call_Key]struct{},
 	usings:                    [dynamic]UsingStatement,
 	file:                      ast.File,
 	allocator:                 mem.Allocator,
@@ -57,6 +62,12 @@ AstContext :: struct {
 	resolve_specific_overload: bool,
 	call_expr_recursion_cache: map[rawptr]SymbolResult,
 	show_layout:               bool,
+	show_hover_size:           bool,
+	layout_cache:              map[Layout_Cache_Key]Layout_Cache_Result,
+	layout_budget:             int,
+    layout_target:             int, // 0 = active profile; other values select ABI comparison facts.
+    layout_active:             bool, // Empty lazy maps may equal nil; activation is explicit.
+    layout_bindings:           ^Layout_Bindings,
 }
 
 SymbolResult :: struct {
@@ -78,7 +89,7 @@ make_ast_context :: proc(
 		labels                    = make(map[string]^ast.Ident, 0, allocator),
 		usings                    = make([dynamic]UsingStatement, allocator),
 		recursion_map             = make(map[rawptr]struct{}, 0, allocator),
-		generic_recursion_map     = make(map[rawptr]struct{}, 0, allocator),
+		generic_recursion_map     = make(map[Generic_Call_Key]struct{}, 0, allocator),
 		call_expr_recursion_cache = make(map[rawptr]SymbolResult, 0, allocator),
 		file                      = file,
 		imports                   = imports,
@@ -671,6 +682,7 @@ is_symbol_same_typed :: proc(ast_context: ^AstContext, a, b: Symbol, flags: ast.
 		)
 	case SymbolMatrixValue:
 		b_value := b.value.(SymbolMatrixValue)
+        if a_value.row_major != b_value.row_major {return false}
 		if !are_same_size(ast_context, a_value.x, b_value.x) {
 			return false
 		}
@@ -2081,7 +2093,19 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 				return true
 			}
 		}
-		return internal_resolve_type_expression(ast_context, v.type, out)
+        if !internal_resolve_type_expression(ast_context,v.type,out) {return false}
+        if array, ok := out.value.(SymbolFixedArrayValue); ok && array.len!=nil {
+            if inferred, ok := array.len.derived.(^ast.Unary_Expr); ok && inferred.op.kind==.Question {
+                if count, known := inferred_array_literal_count(ast_context,v); known {
+                    context.allocator=ast_context.allocator
+                    length := ast.new(ast.Basic_Lit,array.len.pos,array.len.end)
+                    length.tok={kind=.Integer,text=fmt.aprintf("%d",count),pos=array.len.pos}
+                    array.len=length
+                    out.value=array
+                }
+            }
+        }
+        return true
 	case ^ast.Unary_Expr:
 		ok := internal_resolve_type_expression(ast_context, v.expr, out)
 		if v.op.kind == .And {
@@ -2130,7 +2154,11 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 		out^, ok = resolve_slice_expression(ast_context, v, v.expr)
 		return ok
 	case ^ast.Tag_Expr:
-		return internal_resolve_type_expression(ast_context, v.expr, out)
+        ok := internal_resolve_type_expression(ast_context,v.expr,out)
+        if ok && (v.name=="row_major" || v.name=="column_major") {
+            if value, is_matrix := out.value.(SymbolMatrixValue); is_matrix {value.row_major=v.name=="row_major";out.value=value}
+        }
+        return ok
 	case ^ast.Helper_Type:
 		return internal_resolve_type_expression(ast_context, v.type, out)
 	case ^ast.Ellipsis:
@@ -3100,7 +3128,7 @@ resolve_local_identifier :: proc(
 	)
 
 	// Initializers supply a type/value, not the new binding's mutability.
-	symbol.flags -= {.Parameter, .CompileTime, .ReadOnlyBinding, .Immutable}
+	symbol.flags -= {.Parameter, .CompileTime, .ReadOnlyBinding, .Immutable, .Scoped}
 	// Value bindings must not inherit their element type's generic-parameter
 	// flag. Actual $T parameters restore it below; type aliases retain it.
 	if .Mutable in local.flags || .Variable in local.flags {
@@ -3121,6 +3149,7 @@ resolve_local_identifier :: proc(
 		symbol.flags |= {.PolyType}
 	}
 	if .Immutable in local.flags { symbol.flags |= {.Immutable} }
+	if .Scoped in local.flags {symbol.flags |= {.Scoped}}
 	if .CompileTime in local.flags { symbol.flags |= {.CompileTime} }
 	if .ReadOnlyBinding in local.flags { symbol.flags |= {.ReadOnlyBinding} }
 	if .Mutable not_in local.flags && local.type_expr == nil && is_type_alias_call(ast_context, local.value_expr) {
@@ -3846,6 +3875,7 @@ resolve_symbol_return :: proc(ast_context: ^AstContext, symbol: Symbol, ok := tr
 		}
 	case SymbolUnionValue:
 		if v.poly != nil {
+            if ast_context.call!=nil {v.instantiation=ast_context.call}
 			types := make([dynamic]^ast.Expr, ast_context.allocator)
 
 			for type in v.types {
@@ -3861,6 +3891,7 @@ resolve_symbol_return :: proc(ast_context: ^AstContext, symbol: Symbol, ok := tr
 	case SymbolStructValue:
 		b := symbol_struct_value_builder_make(symbol, v, ast_context.allocator)
 		if v.poly != nil {
+            if ast_context.call!=nil {b.instantiation=ast_context.call}
 			clear(&b.types)
 			for type in v.types {
 				append(&b.types, clone_expr(type, ast_context.allocator, nil))
@@ -4506,6 +4537,7 @@ resolve_binary_expression :: proc(ast_context: ^AstContext, binary: ^ast.Binary_
 			expr = matrix_value_a.expr,
 			x    = matrix_value_a.x,
 			y    = matrix_value_b.y,
+            row_major = matrix_value_a.row_major,
 		}
 		return symbol_a, true
 	} else if is_matrix_a && is_vector_b && binary.op.kind == .Mul {
@@ -5004,7 +5036,10 @@ make_symbol_union_from_ast :: proc(
 
 	docs, comments := get_field_docs_and_comments(ast_context.file, v.variants, ast_context.allocator)
 
+    origin,_ := v.derived.(^ast.Union_Type)
 	symbol.value = SymbolUnionValue {
+        origin=origin,
+        instantiation=ast_context.call if v.poly_params!=nil else nil,
 		types         = types[:],
 		poly          = v.poly_params,
 		docs          = docs[:],
@@ -5144,6 +5179,8 @@ make_symbol_struct_from_ast :: proc(
 	}
 
 	b := symbol_struct_value_builder_make(symbol, ast_context.allocator)
+	b.origin=v
+	b.instantiation=ast_context.call if v.poly_params!=nil else nil
 	write_struct_type(ast_context, &b, v, attributes, -1)
 	symbol = to_symbol(b)
 	return symbol

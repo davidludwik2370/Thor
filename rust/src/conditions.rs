@@ -78,12 +78,13 @@ impl Resolver<'_> {
     pub(crate) fn native_boolean(&self, reference: Ref) -> Option<bool> {
         let source = &self.sources[reference.file];
         let name = source.text(reference.node);
-        if !matches!(name, "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT")
+        if !matches!(name, "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT" | "ODIN_NO_CRT")
             || self.symbol(reference).is_some()
         {
             return None;
         }
         match name {
+            "ODIN_NO_CRT" => Some(self.flags.iter().any(|flag| flag == "-no-crt")),
             "ODIN_DEBUG" => Some(self.flags.iter().any(|flag| flag == "-debug")),
             "ODIN_VALGRIND_SUPPORT" => {
                 let target = self

@@ -229,7 +229,8 @@ fn unused_imports(resolver: &mut Resolver<'_>, file: usize, names: &HashSet<Node
     let source = &resolver.sources[file];
     let mut imports = vec![];
     for (i, node) in source.nodes.iter().enumerate() {
-        if node.kind != "Import" {
+        if node.kind != "Import" || resolver.attributes(Ref{file,node:NodeId(i)})
+            .iter().any(|(name,_)|name=="require") {
             continue;
         }
         let Ok(path) = crate::lower::unquote(&node.op) else {
@@ -452,12 +453,16 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
     let mut certain_names = HashSet::new();
     let mut import_fixes = vec![];
     let mut comprehension_loops = HashSet::new();
+    let test_imports=project.frontend.test && project.options.flags.iter().any(|flag|flag=="-all-packages");
     for (file, source) in project.sources.iter().enumerate() {
         if source.excluded || !source.path.starts_with(root) {
             continue;
         }
         let names = names(source);
-        if include_unused && source.thor {
+        // With native all-package test discovery, an import is itself a test
+        // root even when no declaration is referenced. Removing it can erase
+        // an entire imported suite (or leave the backend with no tests).
+        if include_unused && source.thor && !test_imports {
             import_fixes.extend(unused_imports(&mut resolver, file, &names));
         }
         let writes = write_only(&resolver, file);

@@ -6,10 +6,14 @@ import "core:strconv"
 import "core:strings"
 
 import "src:common"
+import "base:intrinsics"
 
 Type_Layout :: struct {
 	size:  i64,
 	align: i64,
+    // Conservative triggers for cached ABI verification, not display labels.
+	size_dependent: bool,
+	align_dependent: bool,
 }
 
 Field_Layout :: struct {
@@ -18,81 +22,117 @@ Field_Layout :: struct {
 	layout: Type_Layout,
 }
 
-LAYOUT_MAX_DEPTH :: 32
+LAYOUT_MAX_DEPTH :: 96
 LAYOUT_MAX_SIMD_ALIGN :: 16
+LAYOUT_COMPARISON_TARGETS :: 7
+
+Layout_ABI :: struct {pointer_size, int_size, max_align, scalar_align, simd_align: i64}
+
+// All distinct layout fact sets in the supported Odin target table. The two
+// i386 variants distinguish Windows scalar alignment from System V alignment.
+@(private)
+target_abi :: proc(ctx: ^AstContext) -> Layout_ABI {
+    switch ctx.layout_target {
+    case 1: return {8,8,16,16,16}   // ARM64
+    case 2: return {8,8,16,16,512}  // AMD64/RISC-V64
+    case 3: return {4,4,16,4,512}   // i386 System V
+    case 4: return {4,4,16,16,512}  // i386 Windows
+    case 5: return {4,4,8,8,8}      // ARM32
+    case 6: return {4,4,8,8,512}    // wasm32
+    case 7: return {4,8,8,8,512}    // wasm64p32
+    }
+    arch := common.config.profile.arch
+    if arch=="" {
+        #partial switch ODIN_ARCH {
+        case .arm64: arch="arm64"
+        case .arm32: arch="arm32"
+        case .i386: arch="i386"
+        case .wasm32: arch="wasm32"
+        case .wasm64p32: arch="wasm64p32"
+        }
+    }
+    switch arch {
+    case "i386":
+        windows := common.config.profile.os=="windows" || common.config.profile.os=="" && ODIN_OS==.Windows
+        return {4,4,16,16 if windows else 4,512}
+    case "arm32", "riscv32": return {4,4,8,8,8}
+    case "wasm32": return {4,4,8,8,512}
+    case "wasm64p32": return {4,8,8,8,512}
+    case "arm64": return {8,8,16,16,16}
+    }
+    return {8,8,16,16,512}
+}
+
+@(private = "file")
+type_layout :: proc(size, align: i64, size_dependent, align_dependent: bool) -> Type_Layout {
+    return {size=size, align=align, size_dependent=size_dependent, align_dependent=align_dependent}
+}
 
 @(private = "file")
 align_forward :: proc(x, align: i64) -> i64 {
-	if align <= 1 {
-		return x
-	}
-	return (x + align - 1) / align * align
+	if x<0 || align<=0 || align & (align-1) != 0 {return -1}
+    padding := (align - x%align)%align
+    if x>max(i64)-padding {return -1}
+    return x+padding
 }
 
 @(private = "file")
-target_pointer_size :: proc() -> i64 {
-	switch common.config.profile.arch {
-	case "i386", "arm32", "wasm32", "wasm64p32", "riscv32":
-		return 4
-	}
-	return 8
+target_pointer_size :: proc(ast_context: ^AstContext) -> i64 {
+    return target_abi(ast_context).pointer_size
 }
 
 @(private = "file")
-target_int_size :: proc() -> i64 {
-	switch common.config.profile.arch {
-	case "i386", "arm32", "wasm32", "riscv32":
-		return 4
-	}
-	return 8
+target_int_size :: proc(ast_context: ^AstContext) -> i64 {
+    return target_abi(ast_context).int_size
 }
 
 @(private = "file")
-target_max_align :: proc() -> i64 {
-	return 2 * target_int_size()
+target_max_align :: proc(ast_context: ^AstContext) -> i64 {
+    return target_abi(ast_context).scalar_align
 }
 
 @(private = "file")
-allocator_layout :: proc() -> Type_Layout {
-	ptr := target_pointer_size()
-	return {2 * ptr, ptr}
+allocator_layout :: proc(ast_context: ^AstContext) -> Type_Layout {
+	ptr := target_pointer_size(ast_context)
+	return type_layout(2 * ptr, ptr, true, true)
 }
 
 @(private = "file")
-basic_type_layout :: proc(name: string) -> (Type_Layout, bool) {
-	ptr := target_pointer_size()
-	word := target_int_size()
+basic_type_layout :: proc(ast_context: ^AstContext, name: string) -> (Type_Layout, bool) {
+	ptr := target_pointer_size(ast_context)
+	word := target_int_size(ast_context)
 	switch name {
 	case "bool", "b8", "i8", "u8", "byte":
-		return {1, 1}, true
+		return type_layout(1, 1, false, false), true
 	case "b16", "i16", "u16", "i16le", "i16be", "u16le", "u16be", "f16", "f16le", "f16be":
-		return {2, 2}, true
+		return type_layout(2, 2, false, false), true
 	case "b32", "i32", "u32", "i32le", "i32be", "u32le", "u32be", "f32", "f32le", "f32be", "rune":
-		return {4, 4}, true
-	case "b64", "i64", "u64", "i64le", "i64be", "u64le", "u64be", "f64", "f64le", "f64be", "typeid":
-		return {8, 8}, true
+		return type_layout(4, 4, false, false), true
+	case "b64", "i64", "u64", "i64le", "i64be", "u64le", "u64be", "f64", "f64le", "f64be":
+		return type_layout(8, min(8, target_max_align(ast_context)), false, true), true
+	case "typeid": return type_layout(8, 8, false, false), true
 	case "i128", "u128", "i128le", "i128be", "u128le", "u128be":
-		return {16, min(16, target_max_align())}, true
+		return type_layout(16, min(16, target_max_align(ast_context)), false, true), true
 	case "int", "uint":
-		return {word, word}, true
+		return type_layout(word, word, true, true), true
 	case "uintptr", "rawptr", "cstring", "cstring16":
-		return {ptr, ptr}, true
+		return type_layout(ptr, ptr, true, true), true
 	case "string", "string16":
-		return {align_forward(ptr + word, max(ptr, word)), max(ptr, word)}, true
+		return type_layout(2 * word, word, true, true), true
 	case "any":
-		return {align_forward(ptr, 8) + 8, max(ptr, 8)}, true
+		return type_layout(16, 8, false, false), true
 	case "complex32":
-		return {4, 2}, true
+		return type_layout(4, 2, false, false), true
 	case "complex64":
-		return {8, 4}, true
+		return type_layout(8, 4, false, false), true
 	case "complex128":
-		return {16, 8}, true
+		return type_layout(16, min(8, target_max_align(ast_context)), false, true), true
 	case "quaternion64":
-		return {8, 2}, true
+		return type_layout(8, 2, false, false), true
 	case "quaternion128":
-		return {16, 4}, true
+		return type_layout(16, 4, false, false), true
 	case "quaternion256":
-		return {32, 8}, true
+		return type_layout(32, min(8, target_max_align(ast_context)), false, true), true
 	}
 	return {}, false
 }
@@ -132,6 +172,7 @@ eval_const_int :: proc(
 		x := eval_const_int(ast_context, v.expr, depth + 1, locals) or_return
 		#partial switch v.op.kind {
 		case .Sub:
+			if x==min(i64) {return 0,false}
 			return -x, true
 		case .Add:
 			return x, true
@@ -143,19 +184,28 @@ eval_const_int :: proc(
 		y := eval_const_int(ast_context, v.right, depth + 1, locals) or_return
 		#partial switch v.op.kind {
 		case .Add:
-			return x + y, true
+            value,overflow:=intrinsics.overflow_add(x,y)
+            return value,!overflow
 		case .Sub:
-			return x - y, true
+            value,overflow:=intrinsics.overflow_sub(x,y)
+            return value,!overflow
 		case .Mul:
-			return x * y, true
+            value,overflow:=intrinsics.overflow_mul(x,y)
+            return value,!overflow
 		case .Quo:
-			return y == 0 ? 0 : x / y, y != 0
+            if y==0 || x==min(i64) && y== -1 {return 0,false}
+			return x/y,true
 		case .Mod:
-			return y == 0 ? 0 : x % y, y != 0
+            if y==0 || x==min(i64) && y== -1 {return 0,false}
+			return x%y,true
 		case .Shl:
-			return x << u64(y), y >= 0
+            if y<0 || y>=64 {return 0,false}
+            value:=i128(x)<<u64(y)
+            return i64(value),value>=i128(min(i64)) && value<=i128(max(i64))
 		case .Shr:
-			return x >> u64(y), y >= 0
+            if y<0 {return 0,false}
+            if y>=64 {return -1 if x<0 else 0,true}
+			return x>>u64(y),true
 		case .And:
 			return x & y, true
 		case .Or:
@@ -171,6 +221,7 @@ eval_const_int :: proc(
 				return value, true
 			}
 		}
+        if bound,found:=layout_bound_expression(ast_context,v); found {return eval_const_int(ast_context,bound,depth+1,locals)}
 		symbol := resolve_type_identifier(ast_context, v^) or_return
 		return eval_const_symbol(ast_context, symbol, expr, depth)
 	case ^ast.Selector_Expr:
@@ -241,10 +292,52 @@ array_count :: proc(ast_context: ^AstContext, len_expr: ^ast.Expr, depth: int) -
 	}
 	symbol := resolve_type_expression(ast_context, len_expr) or_return
 	if e, is_enum := symbol.value.(SymbolEnumValue); is_enum {
+		if len(e.names)==0 {return 0,true}
 		lo, hi := enum_value_range(ast_context, e, depth + 1) or_return
-		return hi - lo + 1, true
+        if hi<lo || u64(hi)-u64(lo)>=u64(max(i64)) {return 0,false}
+		return hi-lo+1,true
 	}
 	return 0, false
+}
+
+// Infer only target-independent literal indices. Keep unresolved or
+// target-dependent indexed literals unknown rather than freezing an ABI's count.
+inferred_array_literal_count :: proc(ctx: ^AstContext, literal: ^ast.Comp_Lit) -> (count:i64,ok:bool) {
+    // This helper also runs during completion/type inference, outside hover.
+    if !ctx.layout_active {
+        ctx.layout_active=true
+        ctx.layout_cache=make(map[Layout_Cache_Key]Layout_Cache_Result,ctx.allocator)
+        ctx.layout_budget=HOVER_LAYOUT_BUDGET
+    }
+    keyed, positional := false,false
+    for elem, i in literal.elems {
+        field, indexed := elem.derived.(^ast.Field_Value)
+        if !indexed {
+            positional=true
+            count=i64(i)+1
+            continue
+        }
+        keyed=true
+        if field.field==nil || layout_expr_dependent(ctx,field.field,0) {return 0,false}
+        end: i64
+        if range, ok := field.field.derived.(^ast.Binary_Expr); ok &&
+            (range.op.kind==.Range_Half || range.op.kind==.Range_Full || range.op.kind==.Ellipsis) {
+            lo := eval_const_int(ctx,range.left) or_return
+            hi := eval_const_int(ctx,range.right) or_return
+            if lo<0 || hi<lo {return 0,false}
+            end=hi
+            if range.op.kind!=.Range_Half {
+                if end==max(i64) {return 0,false}
+                end+=1
+            }
+        } else {
+            index := eval_const_int(ctx,field.field) or_return
+            if index<0 || index==max(i64) {return 0,false}
+            end=index+1
+        }
+        count=max(count,end)
+    }
+    return count, !(keyed && positional)
 }
 
 @(private = "file")
@@ -254,31 +347,38 @@ bit_set_layout :: proc(ast_context: ^AstContext, v: SymbolBitSetValue, depth: in
 	}
 
 	lo, hi: i64
+    dependent := false
 	if range, is_range := v.expr.derived.(^ast.Binary_Expr);
 	   is_range && (range.op.kind == .Range_Half || range.op.kind == .Range_Full || range.op.kind == .Ellipsis) {
+        dependent=layout_expr_dependent(ast_context,v.expr,depth+1)
 		lo = eval_const_int(ast_context, range.left, depth + 1) or_return
 		hi = eval_const_int(ast_context, range.right, depth + 1) or_return
 		if range.op.kind == .Range_Half {
+            if hi==lo {return type_layout(1,1,dependent,dependent),true}
+            if hi==min(i64) {return {},false}
 			hi -= 1
 		}
 	} else {
 		symbol := resolve_type_expression(ast_context, v.expr) or_return
 		e := symbol.value.(SymbolEnumValue) or_return
+        if len(e.names)==0 {return type_layout(1,1,false,false),true}
+        for value in e.values {dependent=dependent || layout_expr_dependent(ast_context,value,depth+1)}
 		lo, hi = enum_value_range(ast_context, e, depth + 1) or_return
 	}
 
-	bits := hi - lo + 1
+    if hi<lo || u64(hi)-u64(lo)>=128 {return {},false}
+	bits := i64(u64(hi)-u64(lo))+1
 	switch {
 	case bits <= 8:
-		return {1, 1}, true
+		return type_layout(1, 1, dependent, dependent), true
 	case bits <= 16:
-		return {2, 2}, true
+		return type_layout(2, 2, dependent, dependent), true
 	case bits <= 32:
-		return {4, 4}, true
+		return type_layout(4, 4, dependent, dependent), true
 	case bits <= 64:
-		return {8, 8}, true
+		return type_layout(8, 8, dependent, dependent), true
 	case bits <= 128:
-		return {16, 16}, true
+		return type_layout(16, 16, dependent, dependent), true
 	}
 	return {}, false
 }
@@ -303,9 +403,24 @@ is_pointer_like_symbol :: proc(symbol: Symbol) -> bool {
 }
 
 @(private = "file")
-union_layout :: proc(ast_context: ^AstContext, v: SymbolUnionValue, depth: int) -> (result: Type_Layout, ok: bool) {
+union_layout :: proc(ctx: ^AstContext, v: SymbolUnionValue, depth: int) -> (Type_Layout, bool) {
+    if !ctx.layout_active {return union_layout_uncached(ctx,v,depth)}
+    key := Layout_Cache_Key{types=cast(rawptr)v.origin if v.origin!=nil else raw_data(v.types),args=v.instantiation,count=len(v.types),align=v.align,flags=u32(v.kind),is_union=true,target=ctx.layout_target}
+    if found, ok := ctx.layout_cache[key]; ok {return found.layout, found.ok && !found.busy}
+    ctx.layout_cache[key]={busy=true}
+    layout, ok := union_layout_uncached(ctx,v,depth)
+    ctx.layout_cache[key]={layout=layout,ok=ok}
+    return layout,ok
+}
+
+@(private = "file")
+union_layout_uncached :: proc(ast_context: ^AstContext, v: SymbolUnionValue, depth: int) -> (result: Type_Layout, ok: bool) {
+    scope:=Layout_Bindings{origin=v.origin,poly=v.poly,parent=ast_context.layout_bindings}
+    if v.instantiation!=nil {scope.args=v.instantiation.args}
+    if scope.poly!=nil && len(scope.args)>0 {ast_context.layout_bindings=&scope}
+    defer ast_context.layout_bindings=scope.parent
 	if len(v.types) == 0 {
-		return {0, 1}, true
+		return type_layout(0, 1, false, false), true
 	}
 
 	custom_align: i64 = 0
@@ -314,8 +429,10 @@ union_layout :: proc(ast_context: ^AstContext, v: SymbolUnionValue, depth: int) 
 	}
 
 	max_size, max_align: i64 = 0, 1
+    dependent := layout_expr_dependent(ast_context,v.align,depth+1)
 	for t in v.types {
 		l := type_expr_layout(ast_context, t, depth + 1) or_return
+        dependent = dependent || l.size_dependent || l.align_dependent
 		max_size = max(max_size, l.size)
 		max_align = max(max_align, l.align)
 	}
@@ -325,7 +442,7 @@ union_layout :: proc(ast_context: ^AstContext, v: SymbolUnionValue, depth: int) 
 	if len(v.types) == 1 {
 		if symbol, resolved := resolve_type_expression(ast_context, v.types[0]);
 		   resolved && is_pointer_like_symbol(symbol) {
-			return {align_forward(max_size, align), align}, true
+			return type_layout(align_forward(max_size, align), align, dependent, dependent), true
 		}
 	}
 
@@ -337,13 +454,27 @@ union_layout :: proc(ast_context: ^AstContext, v: SymbolUnionValue, depth: int) 
 		tag_size = 2
 	}
 	tag_size = max(tag_size, align)
-	tag_size = min(tag_size, target_max_align(), 8)
+	tag_size = min(tag_size, target_abi(ast_context).max_align, 8)
 
-	size := align_forward(max_size, tag_size) + tag_size
-	return {align_forward(size, align), align}, true
+    size:=align_forward(max_size,tag_size)
+    if size<0 || size>max(i64)-tag_size {return {},false}
+    size+=tag_size
+	return type_layout(align_forward(size, align), align, dependent, dependent), true
 }
 
-struct_layout :: proc(
+struct_layout :: proc(ctx: ^AstContext, v: SymbolStructValue, depth := 0, fields: ^[dynamic]Field_Layout = nil) -> (Type_Layout, bool) {
+    if !ctx.layout_active || fields != nil {return struct_layout_uncached(ctx, v, depth, fields)}
+    key := Layout_Cache_Key{types=cast(rawptr)v.origin if v.origin!=nil else raw_data(v.types),
+        args=cast(rawptr)v.instantiation if v.origin!=nil else raw_data(v.args),count=len(v.types),
+        align=v.align,min_align=v.min_field_align,max_align=v.max_field_align,tags=v.tags,target=ctx.layout_target}
+    if found, ok := ctx.layout_cache[key]; ok {return found.layout, found.ok && !found.busy}
+    ctx.layout_cache[key] = {busy=true}
+    layout, ok := struct_layout_uncached(ctx, v, depth, fields)
+    ctx.layout_cache[key] = {layout=layout,ok=ok}
+    return layout, ok
+}
+
+struct_layout_uncached :: proc(
 	ast_context: ^AstContext,
 	v: SymbolStructValue,
 	depth := 0,
@@ -355,6 +486,9 @@ struct_layout :: proc(
 	if depth > LAYOUT_MAX_DEPTH {
 		return {}, false
 	}
+    scope:=Layout_Bindings{origin=v.origin,poly=v.poly,args=v.args,parent=ast_context.layout_bindings}
+    if scope.poly!=nil && len(scope.args)>0 {ast_context.layout_bindings=&scope}
+    defer ast_context.layout_bindings=scope.parent
 
 	is_packed := .Is_Packed in v.tags
 	is_raw_union := .Is_Raw_Union in v.tags
@@ -368,13 +502,20 @@ struct_layout :: proc(
 	}
 
 	offset, size, align: i64 = 0, 0, 1
+    size_dependent, align_dependent := false, false
+    for attribute in ([]^ast.Expr{v.align,v.min_field_align,v.max_field_align}) {
+        if layout_expr_dependent(ast_context, attribute, depth+1) {size_dependent,align_dependent=true,true}
+    }
 	for name, i in v.names {
 		if i < len(v.from_usings) && v.from_usings[i] != -1 {
 			continue
 		}
 
 		field := type_expr_layout(ast_context, v.types[i], depth + 1) or_return
+        if field.size<0 || field.align<=0 {return {},false}
 		field_align := field.align
+        size_dependent = size_dependent || field.size_dependent || (!is_packed && field.align_dependent)
+        align_dependent = align_dependent || (!is_packed && field.align_dependent)
 		if is_packed {
 			field_align = 1
 		} else {
@@ -391,6 +532,7 @@ struct_layout :: proc(
 			size = max(size, field.size)
 		} else {
 			offset = align_forward(offset, field_align)
+            if offset<0 || offset>max(i64)-field.size {return {},false}
 			field_offset = offset
 			offset += field.size
 			size = offset
@@ -402,10 +544,20 @@ struct_layout :: proc(
 		}
 	}
 
+    // Field-alignment directives also affect an empty record's alignment.
+    if !is_packed {
+        if min_field_align>0 {
+            align=max(align,min_field_align)
+        }
+        if max_field_align>0 {
+            align=min(align,max_field_align)
+        }
+    }
+
 	if v.align != nil {
 		align = eval_const_int(ast_context, v.align, depth + 1) or_return
 	}
-	return {align_forward(size, align), align}, true
+	return type_layout(align_forward(size, align), align, size_dependent, align_dependent), true
 }
 
 @(private = "file")
@@ -431,6 +583,7 @@ soa_element_fields :: proc(
 	case SymbolFixedArrayValue:
 		n := array_count(ast_context, v.len, depth + 1) or_return
 		l := type_expr_layout(ast_context, v.expr, depth + 1) or_return
+        if n < 0 || n > HOVER_LAYOUT_BUDGET {return nil, false}
 		for _ in 0 ..< n {
 			append(&layouts, l)
 		}
@@ -443,23 +596,28 @@ type_expr_layout :: proc(ast_context: ^AstContext, expr: ^ast.Expr, depth := 0) 
 	if expr == nil || depth > LAYOUT_MAX_DEPTH {
 		return {}, false
 	}
+    if ident,ok:=expr.derived.(^ast.Ident); ok {
+        if bound,found:=layout_bound_expression(ast_context,ident); found {return type_expr_layout(ast_context,bound,depth+1)}
+    }
 	symbol := resolve_type_expression(ast_context, expr) or_return
 	return symbol_layout(ast_context, symbol, depth + 1)
 }
 
 symbol_layout :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> (result: Type_Layout, ok: bool) {
-	if depth > LAYOUT_MAX_DEPTH {
-		return {}, false
-	}
+	if depth > LAYOUT_MAX_DEPTH {return {}, false}
+    if ast_context.layout_active {
+        if ast_context.layout_budget <= 0 {return {}, false}
+        ast_context.layout_budget -= 1
+    }
 
-	ptr := target_pointer_size()
-	word := target_int_size()
+	ptr := target_pointer_size(ast_context)
+	word := target_int_size(ast_context)
 
 	if symbol.pointers > 0 {
 		if .SoaPointer in symbol.flags {
-			return {align_forward(ptr + word, max(ptr, word)), max(ptr, word)}, true
+			return type_layout(2 * word, word, true, true), true
 		}
-		return {ptr, ptr}, true
+		return type_layout(ptr, ptr, true, true), true
 	}
 
 	switch v in symbol.value {
@@ -467,7 +625,7 @@ symbol_layout :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> (
 		if v.ident == nil {
 			return {}, false
 		}
-		return basic_type_layout(v.ident.name)
+		return basic_type_layout(ast_context,v.ident.name)
 	case SymbolStructValue:
 		return struct_layout(ast_context, v, depth + 1)
 	case SymbolUnionValue:
@@ -476,7 +634,7 @@ symbol_layout :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> (
 		if v.base_type != nil {
 			return type_expr_layout(ast_context, v.base_type, depth + 1)
 		}
-		return {word, word}, true
+		return type_layout(word, word, true, true), true
 	case SymbolBitSetValue:
 		return bit_set_layout(ast_context, v, depth + 1)
 	case SymbolBitFieldValue:
@@ -486,52 +644,79 @@ symbol_layout :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> (
 		if .Soa in symbol.flags {
 			fields := soa_element_fields(ast_context, v.expr, depth + 1) or_return
 			size, align: i64 = 0, 1
+            dependent := layout_expr_dependent(ast_context,v.len,depth+1)
+            align_dependent:=false
 			for f in fields {
-				size = align_forward(size, f.align) + f.size * n
+                chunk := layout_product(f.size,n) or_return
+                size = align_forward(size,f.align)
+                if size<0 || size>max(i64)-chunk {return {},false}
+                dependent = dependent || f.size_dependent || f.align_dependent
+                align_dependent=align_dependent || f.align_dependent
+				size += chunk
 				align = max(align, f.align)
 			}
-			return {align_forward(size, align), align}, true
+			return type_layout(align_forward(size, align), align, dependent, align_dependent), true
 		}
 		elem := type_expr_layout(ast_context, v.expr, depth + 1) or_return
 		if .Simd in symbol.flags {
-			size := elem.size * n
-			return {size, min(size, LAYOUT_MAX_SIMD_ALIGN)}, true
+            if n<=0 || n & (n-1) != 0 {return {},false}
+			size := layout_product(elem.size,n) or_return
+            align: i64 = 1
+            for align < size && align < target_abi(ast_context).simd_align {align *= 2}
+            dependent := elem.size_dependent || layout_expr_dependent(ast_context,v.len,depth+1)
+			return type_layout(size, align, dependent, size>8 || dependent), true
 		}
-		return {elem.size * n, elem.align}, true
+        if n<0 || elem.size<0 || elem.align<=0 {return {},false}
+        size: i64
+        if n>0 {
+            size = layout_product(align_forward(elem.size,elem.align),n-1) or_return
+            if size>max(i64)-elem.size {return {},false}
+            size += elem.size
+        }
+		return type_layout(size, elem.align, n>0 && (elem.size_dependent || n>1 && elem.align_dependent) || layout_expr_dependent(ast_context,v.len,depth+1), elem.align_dependent), true
 	case SymbolDynamicArrayValue:
 		if .Soa in symbol.flags {
 			fields := soa_element_fields(ast_context, v.expr, depth + 1) or_return
-			return {i64(len(fields)) * ptr + 2 * word + allocator_layout().size, max(ptr, word)}, true
+			return type_layout(i64(len(fields)) * ptr + 2 * word + allocator_layout(ast_context).size, max(ptr, word), true, true), true
 		}
 		if v.cap != nil {
 			n := eval_const_int(ast_context, v.cap, depth + 1) or_return
 			elem := type_expr_layout(ast_context, v.expr, depth + 1) or_return
 			align := max(elem.align, word)
-			return {align_forward(align_forward(elem.size * n, word) + word, align), align}, true
+            size := layout_product(elem.size,n) or_return
+            size = align_forward(size,word)
+            if size<0 || size>max(i64)-word {return {},false}
+			return type_layout(align_forward(size + word, align), align, true, true), true
 		}
-		return {ptr + 2 * word + allocator_layout().size, max(ptr, word)}, true
+		return type_layout(3 * word + 2 * ptr, max(ptr, word), true, true), true
 	case SymbolSliceValue:
 		if .Soa in symbol.flags {
 			fields := soa_element_fields(ast_context, v.expr, depth + 1) or_return
-			return {i64(len(fields)) * ptr + word, max(ptr, word)}, true
+			return type_layout(i64(len(fields)) * ptr + word, max(ptr, word), true, true), true
 		}
-		return {align_forward(ptr + word, max(ptr, word)), max(ptr, word)}, true
+		return type_layout(2 * word, word, true, true), true
 	case SymbolMultiPointerValue:
-		return {ptr, ptr}, true
+		return type_layout(ptr, ptr, true, true), true
 	case SymbolMapValue:
-		return {2 * ptr + allocator_layout().size, ptr}, true
+		return type_layout(4 * ptr, ptr, true, true), true
 	case SymbolMatrixValue:
 		rows := eval_const_int(ast_context, v.x, depth + 1) or_return
 		cols := eval_const_int(ast_context, v.y, depth + 1) or_return
 		elem := type_expr_layout(ast_context, v.expr, depth + 1) or_return
-		return {rows * cols * elem.size, elem.align}, true
+        major_count := cols if v.row_major else rows
+        stride := layout_product(major_count,elem.size) or_return
+        size := layout_product(layout_product(rows,cols) or_return,elem.size) or_return
+        align := clamp(stride & -stride,elem.align,min(LAYOUT_MAX_SIMD_ALIGN,target_abi(ast_context).simd_align)) if stride>0 else elem.align
+        size_dependent := elem.size_dependent || layout_expr_dependent(ast_context,v.x,depth+1) || layout_expr_dependent(ast_context,v.y,depth+1)
+        align_dependent:=elem.align_dependent || stride>0 && stride%16==0 || size_dependent
+		return type_layout(size,align,size_dependent,align_dependent),true
 	case SymbolProcedureValue:
-		return {ptr, ptr}, true
+		return type_layout(ptr, ptr, true, true), true
+    case SymbolUntypedValue: return untyped_storage_layout(ast_context,v.type)
 	case SymbolPackageValue,
 	     SymbolGenericValue,
 	     SymbolProcedureGroupValue,
 	     SymbolAggregateValue,
-	     SymbolUntypedValue,
 	     SymbolPolyTypeValue,
 		 SymbolLabelValue:
 		return {}, false
@@ -709,4 +894,17 @@ align_layout_comments :: proc(text: string, allocator := context.temp_allocator)
 		}
 	}
 	return strings.to_string(sb)
+}
+
+untyped_storage_layout :: proc(ast_context: ^AstContext, kind: SymbolUntypedValueType) -> (Type_Layout,bool) {
+    switch kind {
+    case .Integer: return basic_type_layout(ast_context,"int")
+    case .Float: return basic_type_layout(ast_context,"f64")
+    case .Complex: return basic_type_layout(ast_context,"complex128")
+    case .Quaternion: return basic_type_layout(ast_context,"quaternion256")
+    case .String: return basic_type_layout(ast_context,"string")
+    case .Rune: return basic_type_layout(ast_context,"rune")
+    case .Bool: return basic_type_layout(ast_context,"bool")
+    }
+    return {},false
 }

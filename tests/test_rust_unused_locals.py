@@ -1,5 +1,6 @@
 """Native warning recovery preserves declaration work and explicit vet policy."""
 import json
+from pathlib import Path
 import unittest
 from tests import test_rust_compiler as native
 
@@ -96,7 +97,7 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
                             'import "library"\n')
         errors=self.warnings(source,files={'library/work.odin':
             'package library\ncalls:int\nnext::proc()->int{calls+=1;return calls}\nwork::proc(){if true {unused:=next()}}\n'},count=1)
-        self.assertTrue(errors[0]['pos']['file'].endswith('/library/work.odin'))
+        self.assertEqual(Path(errors[0]['pos']['file']).parts[-2:],('library','work.odin'))
 
     def test_requested_procedure_vetting_stays_strict(self):
         self.compare(self.program('local::proc($T:typeid){};_=1'),command='check',

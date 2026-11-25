@@ -98,7 +98,7 @@ leaf::proc()->int{return state}
 helper::proc(value:$T)->int{when T==int{return value}else{return leaf()}}
 work::fn(value:$T)->int{return helper(value)}
 ''')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         result=self.invoke('rust',command='check',flags=['-json-errors'])
         self.assertEqual(result.returncode,1,result.stderr)
         errors=json.loads(result.stderr)['errors']

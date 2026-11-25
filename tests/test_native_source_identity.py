@@ -1,4 +1,5 @@
 """Identical Odin/Thor programs must retain native type and source semantics."""
+from tests.native_paths import EXE_SUFFIX
 from tests.test_rust_compiler import compiler_variants
 import json
 import subprocess
@@ -23,7 +24,7 @@ class NativeSourceIdentityTests(unittest.TestCase):
 
     def test_frontend_tag_storage_and_type_parsing_with_checks_disabled(self):
         with tempfile.TemporaryDirectory(prefix='thor-unchecked-frontend-') as temporary:
-            root=Path(temporary).resolve();binary=root/'frontend'
+            root=Path(temporary).resolve();binary=root/('frontend'+EXE_SUFFIX)
             result=subprocess.run(['odin','build',str(base.ROOT/'frontend'),*base.UNCHECKED,
                 '-out:'+str(binary)],capture_output=True,text=True,timeout=60)
             self.assertEqual(result.returncode,0,result.stderr)
@@ -71,12 +72,12 @@ main::proc(){Integer:=7;or_panic:=Integer;_=or_panic}
         with tempfile.TemporaryDirectory(prefix='thor-native-identity-') as temporary:
             root=Path(temporary).resolve();app=root/project_name;app.mkdir()
             for name,content in (files or {}).items():
-                path=app/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)
-            text=text.replace('ABSOLUTE_PAYLOAD',str(app/'payload.txt')).replace('TEST_PROJECT_NAME',app.name)
-            native=app/'main.odin';native.write_text(text)
-            source=app/'main.thor';source.write_text(text)
+                path=app/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content,newline='')
+            text=text.replace('ABSOLUTE_PAYLOAD',(app/'payload.txt').as_posix()).replace('TEST_PROJECT_NAME',app.name)
+            native=app/'main.odin';native.write_text(text,newline='')
+            source=app/'main.thor';source.write_text(text,newline='')
             flags=[f.replace(':PLACEHOLDER','='+str(app/'custom')) for f in flags]
-            executable=root/'native'
+            executable=root/('native'+EXE_SUFFIX)
             result=subprocess.run(['odin','build',str(app if directory else native),*([] if directory else ['-file']),
                 '-thread-count:1',*flags,'-out:'+str(executable)],capture_output=True,text=True,timeout=45)
             self.assertEqual(result.returncode,0,result.stderr)
@@ -90,8 +91,10 @@ main::proc(){Integer:=7;or_panic:=Integer;_=or_panic}
                     from thorlang.sourceidentity import hash_bytes
                     def normalize(value):
                         for path in [source,native]:
-                            value=value.replace(str(path),'<source>').replace(path.name,'<source>')
-                            value=value.replace('Fx'+format(hash_bytes(str(path).encode()),'x'),'<file-hash>')
+                            for spelling in dict.fromkeys([str(path),path.as_posix()]):
+                                value=value.replace(spelling,'<source>')
+                                value=value.replace('Fx'+format(hash_bytes(spelling.encode()),'x'),'<file-hash>')
+                            value=value.replace(path.name,'<source>')
                             if 'p:=proc()' in text:
                                 offset=len(text[:text.index('p:=proc()')+3].encode())
                                 name=f'main::main$anon-main:{path.name}:{offset}'

@@ -185,6 +185,15 @@ find_import_usage :: proc(document: ^Document, allocator := context.temp_allocat
 	unused := make([dynamic]Package, allocator)
 	unused_selections := make([dynamic]^ast.Ident, allocator)
 	for imp in document.imports {
+		required := false
+		for attribute in imp.import_decl.attributes {
+			for element in attribute.elems {
+				if name, _, ok := unwrap_attr_elem(element); ok && name.name == "require" {
+					required = true
+				}
+			}
+		}
+		if required {continue}
 		// Zero-length imports are internal adapters (e.g. for set[T]), with no
 		// source declaration to dim or remove. Blank imports are intentional.
 		used := used_names[imp.base]

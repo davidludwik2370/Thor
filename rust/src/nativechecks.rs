@@ -150,7 +150,7 @@ fn advanced_source(source: &Source) -> bool {
                 .flatten()
                 .any(|f| f["kind"] != "PureFunction")
             || source.nodes.iter().enumerate().any(|(i, n)| {
-                n.kind == "Attribute"
+                n.kind == "CaseComparison" || n.kind == "Attribute"
                     && (!crate::unused_attributes::elements(source, NodeId(i)).is_empty()
                         || !crate::vet_attributes::elements(source, NodeId(i)).is_empty())
             }))
@@ -745,9 +745,7 @@ pub(super) fn validate(project: &Project) -> Result<(i32, Vec<Value>)> {
         options.flags.push("-build-mode:test".into());
     }
     if options.command == "build" {
-        let output = scratch
-            .0
-            .join(format!("artifact{}", env::consts::EXE_SUFFIX));
+        let output = crate::native_compat::artifact_path(&scratch.0,"artifact",&options.flags);
         if options
             .flags
             .iter()

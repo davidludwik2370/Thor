@@ -591,8 +591,18 @@ impl<'a, 'r> Purity<'a, 'r> {
                         let symbol=&symbol;
                         let owner=&self.r.sources[symbol.reference.file];
                         let local=symbol.reference.file==proc.file && self.r.sources[proc.file].node(proc.node).span.contains(owner.node(symbol.reference.node).span);
-                        if !local && (owner.node(symbol.reference.node).mutable || symbol.immutable) {
-                            let message = format!("Pure code cannot read or write runtime storage '{}' outside the function.",symbol.name);
+                        let persistent=local && !symbol.immutable && owner.node(symbol.reference.node).mutable && {
+                            let attributes=self.r.attributes(symbol.reference);
+                            attributes.iter().any(|(name,_)|matches!(name.as_str(),"static"|"thread_local")) &&
+                            (!attributes.iter().any(|(name,_)|name=="rodata") || std::iter::once(node.node).chain(source.ancestors(node.node)).take_while(|n|source.node(*n).kind!="Block").any(|n|{
+                                let item=source.node(n);
+                                item.kind=="Unary" && item.op=="&" || item.kind=="Slice"
+                                    || item.kind=="Assignment" && source.group(n,"lhs").iter().any(|lhs|source.node(*lhs).span.contains(source.node(node.node).span))
+                                    || item.kind=="Range" && source.group(n,"names").iter().any(|name|source.node(*name).kind=="Unary" && source.node(*name).op=="&")
+                            }))
+                        };
+                        if persistent || !local && (owner.node(symbol.reference.node).mutable || symbol.immutable) {
+                            let message = if persistent {format!("Pure code cannot read or write persistent static storage '{}'; it survives function calls. Use proc for stateful code.",symbol.name)} else {format!("Pure code cannot read or write runtime storage '{}' outside the function.",symbol.name)};
                             let ordinary_body = !source.shared_native
                                 && !self.r.sources[proc.file].shared_native
                                 && function_owner(self.r.sources, node).is_none()
@@ -917,10 +927,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                         odin.is_some_and(|odin| owner.path.starts_with(odin.join("core/fmt")));
                     let basic = owner.path.parent()
                         == Some(
-                            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                                .parent()
-                                .unwrap()
-                                .join("runtime/basic")
+                            self.r.runtime_root().join("basic")
                                 .as_path(),
                         );
                     if native_fmt && IO.contains(&name)

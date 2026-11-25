@@ -18,6 +18,7 @@ fn atom(typ: &Type) -> bool {
 
 impl Lower<'_, '_> {
     pub(super) fn readonly_data(&mut self, id: NodeId) -> Option<&'static str> {
+        if self.has_scoped && !crate::scoped::names(self.source,id).is_empty() {return None;}
         let node = self.source.node(id);
         if !self.source.thor || !node.immutable || !self.source.group(id, "attributes").is_empty() {
             return None;

@@ -1,5 +1,6 @@
 """Normal independent compiler commands use native compile-time execution."""
 import json
+import os
 import unittest
 from tests import test_rust_compiler as native
 

@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import unittest
 
+from tests.native_paths import thor_launcher
 from thorlang.sourcemap import MappingBuilder, SourceMap, position
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,7 +56,7 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
-    compiler = ROOT / 'thor'
+    compiler = thor_launcher()
 
     def test_native_keyword_diagnostics_cover_the_complete_word(self):
         for keyword,body in [('using','value:=1;using value'),('break','break'),
@@ -622,16 +623,16 @@ main::proc(){
         for name, text in (files or {}).items():
             path = entry.parent / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text)
+            path.write_text(text, newline='')
         overlay_flags = []
         if overlays:
             replacements = {}
             for i, (name, text) in enumerate(overlays.items()):
                 replacement = root / f"buffer-{i}"
-                replacement.write_text(text)
+                replacement.write_text(text, newline='')
                 replacements[str(entry.parent / name)] = str(replacement)
             overlay = root / "overlay.json"
-            overlay.write_text(json.dumps({"Replace": replacements}))
+            overlay.write_text(json.dumps({"Replace": replacements}), newline='')
             overlay_flags = ["--overlay", str(overlay)]
         result = subprocess.run([str(self.compiler), command, str(entry.parent), "--output-dir", str(root / "out"),
                                  "--diagnostic-format=json", *overlay_flags, *flags], capture_output=True, text=True, timeout=40)
@@ -735,7 +736,7 @@ main::proc(){
                     self.assertIn(str(entry), result.stderr)
                     self.assertNotIn('^', result.stderr)
                 else:
-                    self.assertIn(str(next(output.rglob('main.odin'))), result.stderr)
+                    self.assertIn(next(output.rglob('main.odin')).as_posix(), result.stderr.replace('\\','/'))
 
     def test_missing_import_has_a_source_range(self):
         self.at('package main\nimport "nonexistent"\nmain :: proc(){}\n', 'import', message='imported package does not exist')
@@ -766,7 +767,7 @@ main::proc(){
                 _, _, errors, _ = self.invoke('package main\nimport "lib"\nmain :: proc(){lib.f()}\n',
                     files={f'lib/lib.{extension}': 'package lib\nf :: proc(){ a := 1; _ = a; _ = missing }\n'})
                 error = next(e for e in errors if 'missing' in e['msgs'][0])
-                self.assertTrue(error['pos']['file'].endswith(f'/lib/lib.{extension}'), error)
+                self.assertEqual(Path(error['pos']['file']).parts[-2:],('lib',f'lib.{extension}'), error)
                 self.assertEqual(error['pos']['line'], 2)
 
     def test_unsaved_overlay_lowered_and_reported_at_original_path(self):
@@ -811,7 +812,7 @@ main::proc(){
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         entry = Path(temporary.name) / 'main.thor'
-        entry.write_text('package main\nimport "core:fmt"\nimport "core:os"\nmain :: proc(){ fmt.eprintln("not JSON: compiler text"); os.exit(7) }\n')
+        entry.write_text('package main\nimport "core:fmt"\nimport "core:os"\nmain :: proc(){ fmt.eprintln("not JSON: compiler text"); os.exit(7) }\n', newline='')
         result = subprocess.run([str(self.compiler), 'run', str(entry), '--output-dir', str(entry.parent / 'out')], capture_output=True, text=True)
         self.assertEqual(result.returncode, 7)
         self.assertEqual(result.stderr, 'not JSON: compiler text\n')

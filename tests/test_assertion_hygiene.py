@@ -1,4 +1,5 @@
 """Required toolchain work must survive Python -O and Odin -disable-assert."""
+from tests.native_paths import EXE_SUFFIX
 import ast
 import json
 from pathlib import Path
@@ -8,6 +9,7 @@ import sys
 import tempfile
 import unittest
 
+from tests.native_paths import thor_launcher
 from thorlang.compiler import Source
 from thorlang.driver import frontend_binary
 
@@ -148,7 +150,7 @@ class AssertionHygieneTests(unittest.TestCase):
                         fixture += '\nmain::proc(){confirm_run()}\n'
                     source = root/'main.thor'
                     source.write_text(fixture)
-                    result = subprocess.run([str(ROOT/'thor'), 'run', str(source), '-o:speed', '-disable-assert',
+                    result = subprocess.run([str(thor_launcher()), 'run', str(source), '-o:speed', '-disable-assert',
                                              '--output-dir', str(root/'generated')], cwd=root,
                                             capture_output=True, text=True, timeout=40)
                     self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
@@ -157,7 +159,7 @@ class AssertionHygieneTests(unittest.TestCase):
 
     def test_frontend_ast_and_errors_match_with_native_assertions_disabled(self):
         with tempfile.TemporaryDirectory(prefix='thor-frontend-noassert-') as directory:
-            binary = Path(directory)/'frontend'
+            binary = Path(directory)/('frontend'+EXE_SUFFIX)
             result = subprocess.run([self.odin, 'build', str(ROOT/'frontend'), '-o:speed',
                                      '-disable-assert', '-no-bounds-check', '-no-type-assert', f'-out:{binary}'],
                                     capture_output=True, text=True, timeout=90)

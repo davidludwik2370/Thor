@@ -1,6 +1,7 @@
 """Constant concatenation follows native types, including unresolved generics."""
 import unittest
 import subprocess
+from tests.native_paths import EXE_SUFFIX
 from tests import test_rust_compiler as native
 
 
@@ -40,7 +41,7 @@ class RustConcatenationParityTests(unittest.TestCase):
             self.assertIn('Expected a constant value',reference.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'[1, 2]\n')
-        ordinary=self.root/'ordinary.odin';executable=self.root/'ordinary'
+        ordinary=self.root/'ordinary.odin';executable=self.root/('ordinary'+EXE_SUFFIX)
         ordinary.write_text('package main\nimport "core:fmt"\nimport "base:intrinsics"\n'
             'combine::proc($a:$T,$b:T)->[2]int{return intrinsics.concatenate(a,b)}\n'
             'main::proc(){fmt.println(combine([1]int{1},[1]int{2}))}\n')

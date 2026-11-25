@@ -24,6 +24,7 @@ Info :: struct {
     variadic: bool,
     by_ptr: bool,
     diverging: bool,
+    partial: bool `json:"partial,omitempty"`,
     optional_ok: bool,
     optional_allocator_error: bool,
     bounds_check: int,
@@ -36,6 +37,7 @@ Output :: struct {
     private: bool,
     private_file: bool,
     target_specific: bool,
+    test_mode: bool,
     excluded: bool,
     nodes: [dynamic]Info,
     edits: [dynamic]parser.Edit,
@@ -43,6 +45,7 @@ Output :: struct {
     comments: [dynamic]Span,
     diagnostics: []Parse_Error,
     immutables: [dynamic][2]int,
+    scoped: [dynamic][3]int,
     mut_parameters: [dynamic][3]int,
     ro_parameters: [dynamic][3]int,
     auto_parameters: [dynamic][3]int,
@@ -137,7 +140,8 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "Binary"; info.op = tokenizer.to_string(n.op.kind)
         info.roles["left"] = span(n.left); info.roles["right"] = span(n.right)
     case ^ast.Unary_Expr:
-        info.kind = "Unary"; info.op = n.op.text; info.roles["expr"] = span(n.expr)
+        info.kind = "CaseComparison" if parser.thor_case_comparison(n.op.kind) else "Unary"
+        info.op = n.op.text; info.roles["expr"] = span(n.expr)
     case ^ast.Paren_Expr: info.kind = "Paren"; info.roles["expr"] = span(n.expr)
     case ^ast.Selector_Expr:
         info.kind = "Selector"; info.op = n.op.text
@@ -304,6 +308,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.op = "unroll"
     case ^ast.Switch_Stmt:
         info.kind = "Switch"
+        info.partial = n.partial
         info.roles["label"] = span(n.label)
         if n.label!=nil {info.start=n.label.pos.offset}
         info.roles["expr"] = span(n.cond)
@@ -459,9 +464,9 @@ main :: proc() {
         return
     }
     file.end.offset = len(data)
-    out := Output{odin_root=odin_root, private=tags.private!=.Public, private_file=tags.private==.File,
+    out := Output{odin_root=odin_root, private=tags.private!=.Public, private_file=tags.private==.File,test_mode=test_mode,
                   target_specific=filename_excluded(os.args[1],{os=.Unknown,arch=.Unknown}),
-                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,mut_parameters=p.mut_parameters,ro_parameters=p.ro_parameters,auto_parameters=p.auto_parameters,features=p.features[:],declaration_separators=p.declaration_separators,optional_semicolons=p.optional_semicolons}
+                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,scoped=p.scoped,mut_parameters=p.mut_parameters,ro_parameters=p.ro_parameters,auto_parameters=p.auto_parameters,features=p.features[:],declaration_separators=p.declaration_separators,optional_semicolons=p.optional_semicolons}
     for tag in file.tags {
         append(&out.file_tags, tag.text)
         text := strings.trim_space(tag.text)

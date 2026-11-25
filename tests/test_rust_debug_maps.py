@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import unittest
 from tests import test_rust_compiler as native
+from tests.native_paths import EXE_SUFFIX
 
 
 class RustDebugMapTests(unittest.TestCase):
@@ -14,7 +15,7 @@ class RustDebugMapTests(unittest.TestCase):
 
     def build(self, source, command='build'):
         self.source.write_text(source)
-        binary = self.root/'program'
+        binary = self.root/('program'+EXE_SUFFIX)
         flags=['-o:none','-out:'+str(binary)] if command=='build' else []
         result = subprocess.run([str(native.RUST), command, str(self.source), '-debug', *flags,
             '--track-allocations=off', '--no-sanitize', '--output-dir', str(self.root/'generated')],

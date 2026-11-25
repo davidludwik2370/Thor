@@ -46,7 +46,7 @@ work::fn(n:int)->int {return n+1}
 
     def test_profile_keeps_json_error_stream_and_original_location(self):
         text = self.program('missing_name()')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         result, report = self.profile(flags=['-json-errors'])
         self.assertEqual(result.returncode, 1, result.stderr)
         packet = json.loads(result.stderr)
@@ -59,7 +59,7 @@ work::fn(n:int)->int {return n+1}
         text = self.program('''values:=#run work();defer delete(values)
 if values[0][0]!=2 {panic("cached contents")}''',
                             'work::proc()->[][2]int{values:=make([][2]int,1);values[0]={2,3};return values}\n')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         cold, report = self.profile('transpile', ['--cache-report'])
         self.assertEqual(cold.returncode, 0, cold.stderr)
         self.assertGreater(report['counters']['evaluation.helper_preparations'], 0)

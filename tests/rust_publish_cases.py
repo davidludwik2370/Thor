@@ -104,6 +104,9 @@ def verify_policy(BINARY):
       result=subprocess.run([str(BINARY),'publisher',str(request)],cwd=output,capture_output=True,text=True)
       if result.returncode:raise RuntimeError(result.stderr)
       packet=json.loads(result.stdout)
+      if 'ok' in packet:
+       for field in ['resources','directories']:
+        packet['ok'][field]=[Path(name).as_posix() for name in packet['ok'].get(field,[])]
       if 'error' in expected:
        if not fail or 'error' not in packet:raise RuntimeError((expected,packet))
       elif packet.get('ok')!=expected:raise RuntimeError((expected,packet))
@@ -182,10 +185,19 @@ def verify_dependencies(BINARY):
      shim='#!'+sys.executable+'\nimport json,os,sys\nfrom pathlib import Path\n'+f'config=json.loads(Path({str(settings)!r}).read_text())\n'+f'with open({str(log)!r},"a") as f:f.write(json.dumps([Path(sys.argv[0]).name,*sys.argv[1:]])+"\\n")\n'+\
       'name=Path(sys.argv[0]).name\nif name=="readelf":print(config["readelf"].get(sys.argv[-1],""))\nelif name=="ldd":print(config["ldd"])\n'
      for name in ['readelf','ldd','patchelf']:
-      path=tools/name;path.write_text(shim);path.chmod(0o755)
+      if os.name=='nt':
+       from tests.native_paths import native_test_compiler
+       path=native_test_compiler(tools,'linux_tools',tool=name,settings=str(settings),log=str(log))
+       target=tools/(name+'.exe');path.rename(target);path.with_suffix('.json').rename(target.with_suffix('.json'))
+      else:
+       path=tools/name;path.write_text(shim);path.chmod(0o755)
      executable=project/'program';executable.write_bytes(b'original exe')
      library=project/'libexample.so.1.2';library.write_bytes(b'original library')
-     settings.write_text(json.dumps({'readelf':{str(executable):'(NEEDED) Shared library: [libexample.so.1]\n(NEEDED) Shared library: [libc.so.6]\n',str(library):'(NEEDED) Shared library: [libm.so.6]\n'},'ldd':f'libexample.so.1 => {library} (0x1)\n'}))
+     # ldd reports POSIX absolute paths. A root-relative path on the current
+     # Windows drive lets the native test tools model that format without a VM.
+     ldd_library=library.as_posix()
+     if os.name=='nt':ldd_library=ldd_library[2:]
+     settings.write_text(json.dumps({'readelf':{str(executable):'(NEEDED) Shared library: [libexample.so.1]\n(NEEDED) Shared library: [libc.so.6]\n',str(library):'(NEEDED) Shared library: [libm.so.6]\n'},'ldd':f'libexample.so.1 => {ldd_library} (0x1)\n'}))
      environment={**os.environ,'PATH':str(tools)+os.pathsep+os.environ['PATH']};outputs=[];commands=[]
      for engine in compiler_engines():
       dest=root/('linux-'+engine);(dest/'bin').mkdir(parents=True);binary=dest/'bin/program';shutil.copy2(executable,binary);log.write_text('')
@@ -194,7 +206,11 @@ def verify_dependencies(BINARY):
       else:
        request=root/'request.json';request.write_text(json.dumps(dict(system='linux',executable=str(executable),binary=str(binary),destination=str(dest/'lib'),project=str(project),declared=[],hints=[])))
        actual=invoke('bundle',request,environment)
-      outputs.append(actual);commands.append(log.read_text().replace(str(dest),'OUTPUT'))
+      outputs.append(actual)
+      if 'error' in actual:raise RuntimeError(actual['error'])
+      rows=[[arg.replace(str(dest),'OUTPUT').replace(str(root),'ROOT').replace('\\','/')
+             for arg in json.loads(line)] for line in log.read_text().splitlines()]
+      commands.append(''.join(json.dumps(row)+'\n' for row in rows))
       if (dest/'lib/libexample.so.1.2').read_bytes()!=library.read_bytes():raise RuntimeError('linux copy')
      if len(outputs)==2 and (outputs[0]!=outputs[1] or commands[0]!=commands[1]):raise RuntimeError((outputs,commands))
      if outputs[-1]!={'ok':['libexample.so.1.2']}:raise RuntimeError(outputs)

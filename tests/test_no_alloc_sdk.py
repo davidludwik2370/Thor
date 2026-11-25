@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import unittest
 import sys
+import platform
 from tests import test_rust_compiler as base
 
 SINK='''sink::proc(data:rawptr,mode:io.Stream_Mode,bytes:[]byte,offset:i64,whence:io.Seek_From)->(i64,io.Error){return i64(len(bytes)),nil}
@@ -28,9 +29,37 @@ class NoAllocSDKTests(unittest.TestCase):
         for case in cases:
             with self.subTest(case=case['name']):
                 if case.get('platforms') and sys.platform not in case['platforms']:continue
+                if case.get('architectures') and platform.machine().lower() not in case['architectures']:continue
+                expectation=case.get('platform_expect',{}).get(sys.platform,case['expect'])
                 imports='\n'.join('import '+json.dumps('core:'+p) for p in case['imports'])
                 self.check(case['body'],case.get('declarations',''),imports,
-                           fail='no_alloc:' if case['expect']=='reject' else None,flags=case.get('flags',()))
+                           fail='no_alloc:' if expectation=='reject' else None,flags=case.get('flags',()))
+
+    def test_crt_condition_selects_only_the_matching_native_implementation(self):
+        for flags,inverted in [([],False),(['-no-crt'],True)]:
+            safe_when='ODIN_NO_CRT' if inverted else '!ODIN_NO_CRT'
+            decl='when '+safe_when+'{selected::proc(){}}else{selected::proc(){_=make([]int,1)}}'
+            self.source.write_text('package main\n'+decl+'\n@(no_alloc) main::proc(){selected()}\n')
+            required=['-no-thread-local','-default-to-nil-allocator','-build-mode:llvm-ir']
+            good=self.invoke('rust','build',flags=[*flags,*required])
+            self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+            bad=self.invoke('rust','build',flags=[*([] if flags else ['-no-crt']),*required])
+            self.assertNotEqual(bad.returncode,0,bad.stderr)
+            self.assertIn('no_alloc:',bad.stderr)
+        self.check('data:[8]byte;out:=raw_data(data[:]);_=runtime.memset(out[2:],1,3)',
+            imports='import "base:runtime"')
+
+    def test_conditional_multipointer_storage_keeps_native_element_types(self):
+        declaration='''fill::proc(values:[]$T, element:T, direct:bool){
+ temp:[8]T
+ out:=raw_data(values) if direct else raw_data(temp[:])
+ out[0]=element
+ out[1:][0]=element
+}
+'''
+        self.check('values:[4]byte;fill(values[:],byte(3),true)',declaration)
+        self.check('values:[4]f64;fill(values[:],f64(3),false)',declaration)
+        self.check('values:[4]Integer;fill(values[:],Integer(3),true)',declaration,fail='no_alloc:')
 
     def test_callback_factories_aliases_forwarding_and_nested_records(self):
         for declaration in [

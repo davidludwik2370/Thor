@@ -3,6 +3,7 @@ from tests.test_rust_compiler import compiler_engines
 import unittest
 from tests import test_struct_arithmetic as arithmetic
 from tests import test_rust_compiler as native
+import os
 
 
 class StructBitwisePowerTests(unittest.TestCase):
@@ -12,6 +13,16 @@ class StructBitwisePowerTests(unittest.TestCase):
     compare=native.RustCompilerTests.compare
     program=native.RustCompilerTests.program
     run_both=arithmetic.StructArithmeticTests.run_both
+
+    def test_contextual_windows_flag_arguments_retain_native_enum_inference(self):
+        self.source.write_text('''package main
+import win "core:sys/windows"
+main::proc(){win.RedrawWindow(nil,nil,nil,.RDW_INVALIDATE | .RDW_UPDATENOW)}
+''')
+        result=self.invoke('rust','check' if os.name=='nt' else 'transpile',flags=[] if os.name=='nt' else ['-target:windows_amd64'])
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        emitted='\n'.join(p.read_text() for p in (self.root/'rust').rglob('*.odin') if p.is_file())
+        self.assertNotIn('struct_generic_or',emitted)
 
     def test_bitwise_shifts_complement_and_literals(self):
         self.run_both('''
@@ -24,6 +35,19 @@ if (a!=Bits{10,5}) {panic("compound")}
 expected:Bits={3,4}|{4,8}
 if (expected!=Bits{7,12}) {panic("context")}
 ''','Bits::struct{a,b:uint}\n')
+
+    def test_native_bitset_context_defaults_and_struct_literal_defaults(self):
+        self.run_both('''
+if (defaults()!=~bit_set[Kind]{}) {panic("native bit-set default")}
+if (explicit({.one}|{.two})!={.one,.two}) {panic("native bit-set argument")}
+v:Bits=~{1,2}
+if (v!=Bits{~uint(1),~uint(2)}||struct_default()!=v) {panic("struct literal default")}
+''','''Kind::enum{one,two}
+Bits::struct{a,b:uint}
+defaults::proc(v:bit_set[Kind]=~{})->bit_set[Kind]{return v}
+explicit::proc(v:bit_set[Kind])->bit_set[Kind]{return v}
+struct_default::proc(v:Bits=~{1,2})->Bits{return v}
+''')
 
     def test_native_boolean_width_fields_aliases_generics_and_comptime(self):
         for width in ['b8','b16','b32','b64']:

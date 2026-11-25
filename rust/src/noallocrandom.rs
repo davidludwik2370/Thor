@@ -367,8 +367,9 @@ impl Check<'_, '_> {
                                 .any(|node| s.text(*node) == "main")
                                 || self.r.attributes(Ref { node: decl, ..site }).iter().any(
                                     |(name, _)| {
-                                        ["init", "test", "export", "no_alloc"]
+                                        ["init", "export", "no_alloc"]
                                             .contains(&name.as_str())
+                                            || name == "test" && s.info["test_mode"] == true
                                     },
                                 )
                         })

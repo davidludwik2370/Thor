@@ -30,7 +30,11 @@ pub fn project_files(
     if let Some(odin) = odin {
         args.extend(["--odin".into(), odin.into()]);
     }
-    let tasks = json!({"version":"2.0.0","tasks":[{"label":"build-thor-debug","type":"process","command":root.join("thor"),"args":args,"options":{"cwd":"${workspaceFolder}"},"problemMatcher":[]}]});
+    let launcher=if cfg!(windows) {
+        [root.join("thor.exe"),root.join("bin/thor.exe"),root.join("rust/target/release/thor-rust.exe")]
+            .into_iter().find(|path|path.is_file()).unwrap_or_else(||root.join("thor.exe"))
+    }else{root.join("thor")};
+    let tasks = json!({"version":"2.0.0","tasks":[{"label":"build-thor-debug","type":"process","command":launcher,"args":args,"options":{"cwd":"${workspaceFolder}"},"problemMatcher":[]}]});
     let launch = json!({"version":"0.2.0","configurations":[{"name":"Debug Thor (LLDB)","type":"thor-lldb","request":"launch","program":format!("${{workspaceFolder}}/.vscode/bin/{binary}"),"manifest":format!("{generated}/thor-manifest.json"),"cwd":"${workspaceFolder}","args":[],"preLaunchTask":"build-thor-debug"}]});
     let encode = |value: &Value| {
         let mut s = serde_json::to_string_pretty(value).expect("JSON values are serializable");

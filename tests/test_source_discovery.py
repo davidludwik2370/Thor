@@ -52,7 +52,8 @@ class SourceDiscoveryTests(unittest.TestCase):
         odin=shutil.which(os.environ.get('THOR_ODIN','odin'))
         if not odin:self.skipTest('Odin is required')
         self.write('hilo_test.odin','package main\nimport "core:fmt"\nmain::proc(){fmt.println("native")}\n')
-        result=subprocess.run([odin,'run','.', '-out:'+str(self.root/'native-program')],
+        from tests.native_paths import EXE_SUFFIX
+        result=subprocess.run([odin,'run','.', '-out:'+str(self.root/('native-program'+EXE_SUFFIX))],
                               cwd=self.app,text=True,capture_output=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout.strip(),'native')

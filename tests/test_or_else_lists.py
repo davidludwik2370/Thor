@@ -1,4 +1,5 @@
 """Typed lazy fallback lists and their per-position discard contract."""
+from tests.native_paths import EXE_SUFFIX
 import json
 from pathlib import Path
 import subprocess
@@ -281,7 +282,7 @@ choose::fn(values:[]int)->([]int,[]int){return get() or_else (values,values)}
 
     def test_native_frontend_parses_lists_with_checks_disabled(self):
         with tempfile.TemporaryDirectory(prefix='thor-fallback-frontend-') as temporary:
-            root=Path(temporary);binary=root/'frontend'
+            root=Path(temporary);binary=root/('frontend'+EXE_SUFFIX)
             result=subprocess.run(['odin','build',str(base.ROOT/'frontend'),*UNCHECKED,
                 '-out:'+str(binary)],capture_output=True,text=True,timeout=60)
             self.assertEqual(result.returncode,0,result.stderr)

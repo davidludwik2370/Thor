@@ -38,7 +38,8 @@ RequestInfo :: struct {
 // A configured compiler may be a native executable, launcher or symlink in a
 // different directory. Query its root only when the adjacent runtime is absent.
 resolve_thor_runtime :: proc(compiler: string) -> string {
-	runtime_path := path.join({filepath.dir(compiler), "runtime"}, context.temp_allocator)
+	directory,_:=filepath.replace_separators(filepath.dir(compiler),'/',context.temp_allocator)
+	runtime_path := path.join({directory, "runtime"}, context.temp_allocator)
 	if os.is_dir(runtime_path) { return runtime_path }
 	r, w, pipe_err := os.pipe()
 	if pipe_err != nil { return "" }
@@ -64,6 +65,7 @@ resolve_thor_runtime :: proc(compiler: string) -> string {
 	}
 	root := strings.trim_space(string(buffer[:count]))
 	if count == len(buffer) || !filepath.is_abs(root) { return "" }
+	root,_=filepath.replace_separators(root,'/',context.temp_allocator)
 	runtime_path = path.join({root, "runtime"}, context.temp_allocator)
 	return runtime_path if os.is_dir(runtime_path) else ""
 }
@@ -440,6 +442,7 @@ read_ols_initialize_options :: proc(config: ^common.Config, ols_config: OlsConfi
 	config.enable_completions = ols_config.enable_completions.(bool) or_else config.enable_completions
 	config.enable_format = ols_config.enable_format.(bool) or_else config.enable_format
 	config.enable_hover = ols_config.enable_hover.(bool) or_else config.enable_hover
+	config.enable_hover_size = ols_config.enable_hover_size.(bool) or_else config.enable_hover_size
 	config.enable_hover_layout = ols_config.enable_hover_layout.(bool) or_else config.enable_hover_layout
 	config.enable_semantic_tokens = ols_config.enable_semantic_tokens.(bool) or_else config.enable_semantic_tokens
 	config.enable_unused_imports_reporting =
@@ -765,6 +768,7 @@ request_initialize :: proc(
 	}
 
 	config.enable_hover = true
+	config.enable_hover_size = true
 	config.enable_hover_layout = false
 	config.enable_format = false
 
@@ -779,6 +783,7 @@ request_initialize :: proc(
 	config.enable_completions = true
 	config.enable_format = false
 	config.enable_hover = true
+	config.enable_hover_size = true
 	config.enable_hover_layout = false
 	config.enable_semantic_tokens = false
 	config.enable_unused_imports_reporting = true
@@ -795,8 +800,16 @@ request_initialize :: proc(
 	config.odin_command = ""
 	config.thor_command = ""
 	if executable, err := os.get_executable_path(context.temp_allocator); err == nil {
-		launcher := path.join({filepath.dir(filepath.dir(filepath.dir(executable))), "thor"}, context.temp_allocator)
-		if os.is_file(launcher) { config.thor_command = strings.clone(launcher, context.allocator) }
+		root,_:=filepath.replace_separators(filepath.dir(filepath.dir(filepath.dir(executable))),'/',context.temp_allocator)
+		when ODIN_OS==.Windows {
+			for relative in ([]string{"thor.exe","thor-rust.exe","rust/target/release/thor-rust.exe","bin/thor.exe"}) {
+				launcher:=path.join({root,relative},context.temp_allocator)
+				if os.is_file(launcher) {config.thor_command=strings.clone(launcher,context.allocator);break}
+			}
+		} else {
+			launcher:=path.join({root,"thor"},context.temp_allocator)
+			if os.is_file(launcher) {config.thor_command=strings.clone(launcher,context.allocator)}
+		}
 	}
 	config.checker_args = ""
 	config.enable_fake_method = false

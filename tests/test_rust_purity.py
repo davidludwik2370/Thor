@@ -72,7 +72,7 @@ work::fn(data:[]int)->int{change(data);return 0}
 leaf::proc(n:int){fmt.print(n);fmt.println(n)}
 work::fn(n:int)->int{leaf(n);return n}
 ''')
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         result=self.invoke('rust',command='check',flags=['-json-errors'])
         self.assertEqual(result.returncode,1,result.stderr)
         errors=json.loads(result.stderr)['errors']

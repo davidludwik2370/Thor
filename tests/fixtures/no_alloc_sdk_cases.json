@@ -1240,7 +1240,10 @@
       "os"
     ],
     "body": "_=os.get_processor_core_count()",
-    "expect": "accept"
+    "expect": "accept",
+    "platform_expect": {
+      "win32": "reject"
+    }
   },
   {
     "name": "allocating.hex.encode",
@@ -1285,7 +1288,11 @@
     "imports": [],
     "declarations": "import \"base:intrinsics\"",
     "body": "_=intrinsics.read_cycle_counter_frequency()",
-    "expect": "accept"
+    "expect": "accept",
+    "architectures": [
+      "arm64",
+      "aarch64"
+    ]
   },
   {
     "name": "intrinsic.prefetch",

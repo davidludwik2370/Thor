@@ -28,7 +28,7 @@ macro_rules! kinds {
 }
 kinds! {
     MatrixType, MatrixIndex, ArrayType, Assignment, Attribute, AutoCast, Binary, BitFieldType, BitSetType, Block, Call,
-    Case, Cast, CompileSwitch, CompileSwitchExpr, Comprehension, ComprehensionBody,
+    Case, CaseComparison, Cast, CompileSwitch, CompileSwitchExpr, Comprehension, ComprehensionBody,
     Compound, Declaration, Defer, Deref, Directive, DistinctType, DynamicArrayType,
     Ellipsis, EnumType, ExpressionStatement, FallbackList, Field, FieldValue, Fields, File, For,
     ForeignBlock, ForeignImport, HelperType, Ident, If, Implicit, ImplicitSelector, Import,

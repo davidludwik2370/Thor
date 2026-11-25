@@ -176,7 +176,7 @@ main::proc(){}
         errors, updated = self.reports(text,'--apply')
         self.assertEqual([error['code'] for error in errors], ['thor/unused-procedure'])
         self.assertIn("'unused'",errors[0]['msgs'][0])
-        self.assertTrue(errors[0]['pos']['file'].endswith('/library/main.thor'))
+        self.assertTrue(errors[0]['pos']['file'].replace('\\','/').endswith('/library/main.thor'))
         self.assertEqual(updated,text.encode())
 
     def test_unused_procedure_pure_suggestions_share_one_validation_batch(self):

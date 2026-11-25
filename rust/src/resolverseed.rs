@@ -21,6 +21,7 @@ pub(crate) struct ResolverSeed {
     evaluated: BTreeMap<Ref, serde_json::Value>,
     logical_constants: BTreeMap<Ref, serde_json::Value>,
     logical_activation: Option<bool>,
+    runtime_root: Option<std::path::PathBuf>,
     set_activation: Option<bool>,
     bound_types: BTreeMap<(Ref, String), Type>,
     bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
@@ -63,6 +64,7 @@ impl<'a> Resolver<'a> {
             evaluated: self.evaluated,
             logical_constants: self.logical_constants,
             logical_activation: self.logical_activation.get().copied(),
+            runtime_root: self.runtime_root.get().cloned(),
             set_activation: self.set_activation.get().copied(),
             bound_types: self.bound_types,
             bound_constants: self.bound_constants,
@@ -76,7 +78,8 @@ impl ResolverSeed {
         self.flags == flags && self.sources.len() == sources.len()
             && self.sources.iter().zip(sources).all(|(old, current)|
                 old.shares_syntax(current) && old.shared_native == current.shared_native
-                    && old.collection_roots == current.collection_roots)
+                    && old.collection_roots == current.collection_roots
+                    && old.support_collection == current.support_collection)
     }
     /// Transfer the completed state to the next serial phase, without cloning
     /// query tables or retaining a reference into Project's movable source list.
@@ -98,6 +101,7 @@ impl ResolverSeed {
             immutable_markers: self.markers, flags: self.flags, evaluated: self.evaluated,
             logical_constants: self.logical_constants,
             logical_activation: self.logical_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
+            runtime_root: self.runtime_root.clone().map(std::cell::OnceCell::from).unwrap_or_default(),
             set_activation: self.set_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
             bound_types: self.bound_types, bound_constants: self.bound_constants,
             using_symbols: self.using_symbols, contexts_ready: self.contexts_ready,
@@ -132,6 +136,7 @@ impl ResolverSeed {
                 .logical_activation
                 .map(std::cell::OnceCell::from)
                 .unwrap_or_default(),
+            runtime_root: self.runtime_root.clone().map(std::cell::OnceCell::from).unwrap_or_default(),
             set_activation: self.set_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
             bound_types: self.bound_types.clone(),
             bound_constants: self.bound_constants.clone(),
@@ -168,6 +173,9 @@ mod tests {
             || seed.matches(&changed, &[]) || seed.matches(&[], &[]) {
             panic!("resolver snapshot ignored its inputs");
         }
+        let mut renamed_support = sources.clone();
+        renamed_support[0].support_collection = "another_support".into();
+        if seed.matches(&renamed_support, &[]) { panic!("resolver snapshot ignored support identity"); }
         let mut resumed = seed.resume(&sources);
         if resumed.type_of(site) != expected || !resumed.contexts_ready
             || resumed.types.get(&site).is_none() || !resumed.can_freeze() {

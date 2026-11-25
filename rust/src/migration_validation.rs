@@ -97,7 +97,7 @@ impl Case {
             }
         }
         if self.action == "build" {
-            let artifact = output.join("artifact");
+            let artifact = crate::native_compat::artifact_path(output,"artifact",&flags);
             if flags
                 .iter()
                 .any(|flag| matches!(flag.as_str(), "-build-mode:llvm" | "-build-mode:llvm-ir"))

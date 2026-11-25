@@ -39,6 +39,16 @@ impl Check<'_, '_> {
             return Ok(false);
         };
         let allowed = match path.as_str() {
+            "base/runtime/procs.odin" => ["RtlMoveMemory", "RtlFillMemory"].contains(&name),
+            "core/sys/windows/kernel32.odin" => [
+                "ReadFile", "WriteFile", "FlushFileBuffers", "GetLastError", "SetLastError", "GetConsoleMode", "GetFileType",
+                "GetCurrentProcess", "GetCurrentProcessId", "GetCurrentThread", "GetCurrentThreadId",
+                "QueryPerformanceCounter", "QueryPerformanceFrequency", "GetTickCount64",
+                "GetSystemTimeAsFileTime", "GetSystemTimePreciseAsFileTime", "Sleep", "SwitchToThread",
+                "InitializeSRWLock", "AcquireSRWLockExclusive", "AcquireSRWLockShared",
+                "ReleaseSRWLockExclusive", "ReleaseSRWLockShared", "TryAcquireSRWLockExclusive",
+                "TryAcquireSRWLockShared", "WaitOnAddress", "WakeByAddressSingle", "WakeByAddressAll",
+            ].contains(&name),
             "core/sys/linux/sys.odin" => [
                 "read","write","pread","pwrite","readv","writev","close","lseek","fsync","fdatasync",
                 "clock_gettime",

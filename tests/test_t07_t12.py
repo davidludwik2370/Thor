@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 from tests import test_thor as base
+from tests.native_paths import EXE_SUFFIX
 
 ROOT, THOR = base.ROOT, base.THOR
 
@@ -28,7 +29,7 @@ class BatchTests(unittest.TestCase):
 
     def test_owned_lexer_retains_native_tokens_and_unicode_positions(self):
         result=subprocess.run(['odin','test',str(ROOT/'frontend'/'tokenizer'),
-                               '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',f'-out:{ROOT/".thor-cache"/"tokenizer-tests"}'],capture_output=True,text=True,timeout=45)
+                               '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',f'-out:{ROOT/".thor-cache"/("tokenizer-tests"+EXE_SUFFIX)}'],capture_output=True,text=True,timeout=45)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_format_collection_and_owned_output(self):

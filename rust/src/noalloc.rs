@@ -598,7 +598,7 @@ impl<'a, 'r> Check<'a, 'r> {
         // storage even when their anonymous native enum type is unavailable.
         // Do not invent an enum identity or use this to select native branches.
         if typ.is_unknown() && ["ODIN_OS","ODIN_ARCH","ODIN_ENDIAN","ODIN_BUILD_MODE","ODIN_SUBTARGET",
-            "ODIN_OPTIMIZATION_MODE","ODIN_DEBUG","ODIN_TEST","ODIN_OS_STRING","ODIN_ARCH_STRING",
+            "ODIN_OPTIMIZATION_MODE","ODIN_DEBUG","ODIN_NO_CRT","ODIN_TEST","ODIN_OS_STRING","ODIN_ARCH_STRING",
             "ODIN_ROOT","ODIN_VENDOR","ODIN_VERSION","ODIN_BUILD_PROJECT_NAME"].iter().any(|name|self.r.native_builtin_alias(at,name)){
             return Type::scalar("__native_compiler_constant");
         }
@@ -748,6 +748,9 @@ impl<'a, 'r> Check<'a, 'r> {
         let s = &self.r.sources[at.file];
         let n = s.node(at.node).clone();
         let kind = n.kind.as_str();
+        if kind=="Declaration" && !crate::scoped::names(s,at.node).is_empty() {
+            return Err(self.error(w,at,"implicit scoped cleanup calls an allocator or destructor"));
+        }
         if matches!(
             kind,
             "Procedure" | "ProcedureType" | "Attribute" | "Import" | "Directive" | "PolyType"

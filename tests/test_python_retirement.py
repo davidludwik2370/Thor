@@ -24,7 +24,7 @@ class PythonRetirementTests(unittest.TestCase):
             (root/'thorlang').mkdir();(root/'docs').mkdir()
             source=root/'thorlang/reference.py';source.write_text('value = 1\n')
             launcher=root/'thor-python';launcher.write_text('# historical\n')
-            recorded={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest()
+            recorded={p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in (source,launcher)}
             (root/'docs/python-reference-frozen.json').write_text(json.dumps({'sha256':recorded}))
             self.assertEqual(differences(root),[])

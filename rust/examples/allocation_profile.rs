@@ -115,6 +115,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         vet: None,
         vet_apply: false,
         vet_ask: false,
+        unverified: Default::default(),
     })?;
     let loaded_time = started.elapsed().as_secs_f64();
     let loaded = snapshot();

@@ -26,8 +26,14 @@ tar = "=0.4.43"
 zip = { version = "=2.4.2", default-features = false, features = ["deflate-flate2", "flate2"] }
 filetime = "=0.2.29"
 
+[build-dependencies]
+sha2 = { version = "=0.11.0", default-features = false }
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+file-id = "=0.2.3"
 
 [profile.release]
 lto = "thin"

@@ -111,7 +111,7 @@ Value::struct{pointer:^int}
 safe::fn(value:int)->int{return value}
 bad::fn(value:'''+typ+''')->int{return 0}
 ''')
-                self.source.write_text(source)
+                self.source.write_text(source,newline='')
                 result=self.invoke('rust',command='check',flags=['-json-errors'])
                 self.assertEqual(result.returncode,1,result.stderr)
                 errors=json.loads(result.stderr)['errors']

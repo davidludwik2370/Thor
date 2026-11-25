@@ -1,7 +1,7 @@
 //! Fatal reporting is outside the ordinary-execution allocation contract.
 //! Arguments to conditional checks still execute on their successful path.
 use super::*;
-use std::{collections::BTreeMap, path::PathBuf, sync::OnceLock};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -71,20 +71,6 @@ fn identity(r: &Resolver<'_>, callee: Ref) -> Option<(&'static str, String, Kind
     }
     None
 }
-fn expected(relative: &str) -> Option<&'static str> {
-    static DATA: OnceLock<BTreeMap<String, String>> = OnceLock::new();
-    DATA.get_or_init(|| {
-        serde_json::from_str::<serde_json::Value>(include_str!("../data/noalloc-io-sdk.json"))
-            .expect("reviewed SDK effect profile")["sdk"]
-            .as_object()
-            .expect("SDK profile entries")
-            .iter()
-            .map(|(key, value)| (key.clone(), value.as_str().expect("source hash").into()))
-            .collect()
-    })
-    .get(relative)
-    .map(String::as_str)
-}
 impl Check<'_, '_> {
     fn failure_source(&mut self, w: &Work, site: Ref, relative: &str) -> Result<()> {
         let Some(root) = self.r.sources[site.file].info["odin_root"].as_str() else {
@@ -111,7 +97,7 @@ impl Check<'_, '_> {
                 )
             })?
         };
-        if expected(relative) != Some(crate::digest::sha256(&bytes).as_str()) {
+        if !super::io::sdk_source_matches(std::path::Path::new(root), relative, &bytes) {
             return Err(self.error(w,site,&format!("fatal-reporting SDK profile does not match {}; the changed implementation requires review",path.display())));
         }
         self.failure.verified.insert(path);

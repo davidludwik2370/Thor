@@ -1,5 +1,32 @@
 # Thor
 
+Thor extends Odin with pure functions, compile-time execution, immutable views,
+comprehensions and other features while generating native Odin programs.
+
+## Install
+
+After cloning, run the native installer from the repository root:
+
+```sh
+./thor-install --vscode --profile Thor --path
+```
+
+Use `./thor-install` for the toolchain only, or `--vscode` without `--profile`
+to keep your normal editor profile/theme. Existing editor preferences and
+project configurations are preserved. Windows uses `thor-install.cmd`.
+Editor setup includes Thor tools, the standard Odin Language Server (OLS) extension and CodeLLDB. The
+extension makes installed Thor commands available in new VS Code terminals;
+reload the window after updates and relaunch terminals with a stale environment.
+The [installation guide](docs/installing.md) covers prerequisites, optional Thor
+colors and development builds. **Until GitHub releases are published, supply a
+locally built native bundle with `--bundle FILE`; cloning alone does not provide
+a compiled release.**
+
+Thor-owned code uses [0BSD](LICENSE). Incorporated code retains its original
+licenses; see [NOTICE](NOTICE).
+
+## Compiler and development
+
 `thor` runs the prebuilt Rust compiler. `thor-rust` selects the same implementation,
 and `thor-python` retains a frozen historical reference. Compiler fixes and features
 are maintained in Rust only. See [Python retirement and validation](docs/python-retirement.md)
@@ -23,6 +50,10 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
+Switch cases accept comparison prefixes (`<`, `<=`, `>`, `>=`, `!=`) in
+statements, expressions and `#switch`; see the
+[comparison switch demo](examples/switch_comparisons/demo.thor).
+
 The [attributes, directives, and file-tag reference](docs/attributes-and-directives.md)
 documents every recognized name in Thor and the pinned Odin compiler, including
 placement, arguments, restrictions, and obsolete or reserved forms.
@@ -43,6 +74,8 @@ integration. See [the introductory demo](examples/big_numbers/demo.thor),
 [the language reference](docs/arbitrary-precision.md).
 
 Odin compatibility is checked against real projects as well as focused tests.
+The [native Windows follow-up](docs/windows-validation-followup-2026-11-23.md) records
+Windows compiler/editor coverage, remaining native debugger limits and manual review steps.
 The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)
 records the original failures and their regression cases; the compiler preserves
 native range/type operands, enum indices, SOA iteration and storage rules while
@@ -67,7 +100,7 @@ and its [executable example](examples/struct_arithmetic/demo.thor).
 
 The [parameter-contract demo](examples/parameter_contracts/demo.thor) covers
 non-overridable `:>` caller metadata parameters, explicit `#ro` slice readers,
-`#runtime` evaluation barriers, declaration-local `@(vet_ignore="...")`, aliases,
+`#runtime` evaluation barriers, declaration-local `@(vet_ignore={.unused})`, aliases,
 callbacks, and compile-time capture. Their contracts are included in the
 [attribute/directive reference](docs/attributes-and-directives.md).
 
@@ -188,6 +221,10 @@ The arena uses Odin's native caller-scope deferred cleanup, including early
 returns. Keep its allocations within that scope; explicit allocator choices and
 `context.temp_allocator` retain their usual behavior. See the
 [scoped arena contract](runtime/basic/README.md#scoped-arena-allocations).
+
+Use `nums~ := make([]int, 5)` for a single local with automatic shallow
+cleanup. Both `:=` and `:>` are supported. See [scoped owners](docs/scoped-owners.md)
+and the [runnable example](examples/scoped_owners/main.thor).
 
 `basic.hash(value)` returns a runtime `u64` value hash without allocating.
 Select `.XXH64` or `.FNV64a` with `algorithm=`, or use the default `.XXH3_64`.
@@ -426,8 +463,10 @@ using their actual text. Errors are not cached.
 
 `--cache-report` prints `thor_cache` evaluation counters and `thor_prepared_hits`
 for results reused before helper construction; one early hit can cover nested
-calculations too. `--no-cache` bypasses both result and parser caches.
-`--clear-cache` clears their entries before compiling. The former
+calculations too. `--no-cache` bypasses result, parser and memory-vet caches.
+`--clear-cache` clears their entries before compiling. Memory vet can reuse
+unchanged checks after validating dependency contents, flags and resources;
+see [memory-check reuse](docs/lifetime-vet.md#reusing-unchanged-checks). The former
 `--no-transpile-cache` option was removed with the whole-project cache.
 
 Thor's own options use long names, such as `--output-dir`, `--odin`,
@@ -614,6 +653,8 @@ thor vet . --ask                   # Preview corrections and ask once [y/N]
 thor build . --vet                 # Require Thor convention checks to pass
 thor vet . --vet=unused            # Select checks (comma-separated)
 thor vet . -warnings-as-errors     # Require corrections for a successful check
+thor vet . --unverified            # Show individual incomplete-analysis notices
+thor build . --vet --unverified=error # Also fail on unverified findings
 ```
 
 The `immutable` check suggests `:>` for initialized bindings whose conversion
@@ -715,6 +756,8 @@ intentional blank lines and the file's newline style.
 Explicit blank imports (`import _ "package"`) remain intentional, including
 imports needed for initialization. Imports used only in inactive debug/platform
 branches are retained so applying corrections does not break other configurations.
+In test mode with `-all-packages`, imports are test-discovery roots and are also
+retained, even if their namespace is otherwise unused.
 Unused bindings take priority over immutable suggestions. A declaration with an
 unused name receives no immutable suggestion or conversion, including when a
 group contains both used and unused names. After those names are used or removed,
@@ -733,7 +776,12 @@ The parser identifies optional terminators, including inside f-string expression
 remove the flagged token while preserving comments and line endings.
 `-ignore-warnings` hides warnings from standalone `vet` and editor checks.
 `thor build --vet` treats its convention findings as errors, so this flag does
-not suppress them. Native vet flags and `#+vet` tags work on Odin-compatible `.thor` source.
+not suppress them. Incomplete memory analyses and unfinished correction proofs
+are summarized as nonfatal counts by default. `--unverified` shows details as
+information; `--unverified=error` shows them as errors and fails the command,
+including with `-ignore-warnings`. JSON retains all details. See
+[unverified reporting](docs/lifetime-vet.md#reporting-incomplete-analyses).
+Native vet flags and `#+vet` tags work on Odin-compatible `.thor` source.
 Source-sensitive checks inspect a separate source-preserving view before normal
 Thor compilation, retaining native diagnostics, package scopes and opt-outs.
 That view also supports `fn`, immutable declarations, parameter contracts,
@@ -1797,3 +1845,8 @@ depends on the declarations in scope and is also excluded. Implicit deferred
 procedure callbacks are also rejected; make eligible calls explicit in the body.
 TLS infers call result types but does not execute procedures for hover values or
 its own branch selection; live compiler checks perform the actual evaluation.
+
+Lifetime and cleanup analysis is available through `thor vet`; see
+[Lifetime and leak checks](docs/lifetime-vet.md) for definite findings, unverified
+boundaries, and `vet_ignore` acknowledgements. These checks add no ordinary-build
+analysis passes or application runtime instrumentation.

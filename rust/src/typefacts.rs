@@ -32,10 +32,21 @@ impl Resolver<'_> {
     /// Preserve the native distinction erased by the compact Pointer shape.
     /// A pointer to an array auto-dereferences; a multipointer to arrays does not.
     fn multipointer(&mut self, at:Ref, depth:usize)->Option<bool> {
+        self.multipointer_bounded(at, depth, &mut 128)
+    }
+    fn multipointer_bounded(&mut self, at:Ref, depth:usize, budget:&mut usize)->Option<bool> {
+        *budget = budget.checked_sub(1)?;
         if depth>32{return None;}
         let s=&self.sources[at.file];let n=s.node(at.node);
         let role=|name|s.role(at.node,name).map(|node|Ref{node,..at});
         if n.kind=="Call" && role("callee").is_some_and(|callee|self.native_builtin_alias(callee,"raw_data")){return Some(true);}
+        if matches!(n.kind.as_str(), "Ternary" | "WhenExpr" | "OrElse") {
+            let left = role("x")?;
+            let right = role("y")?;
+            let a = self.multipointer_bounded(left, depth + 1, budget);
+            let b = self.multipointer_bounded(right, depth + 1, budget);
+            return if a == b { a } else { None };
+        }
         let next=match n.kind.as_str(){
             "PointerType"=>return Some(false),"MultiPointerType"=>return Some(true),
             "Unary" if n.op=="&"=>return Some(false),
@@ -50,7 +61,7 @@ impl Resolver<'_> {
             }),
             _=>None,
         }?;
-        self.multipointer(next,depth+1)
+        self.multipointer_bounded(next,depth+1,budget)
     }
     pub(super) fn slice_type(&mut self, operand:Ref, typ:Type)->Type {
         let mut base=&typ;while let Type::Nominal(_,inner)=base{base=inner;}
@@ -297,8 +308,11 @@ impl Resolver<'_> {
             return typ.clone();
         }
         let stable = self.active.is_empty() && self.planning.is_empty();
+        let epoch = self.incomplete_plans.get();
         let typ = self.specialize(r, bindings, &mut HashSet::new());
-        if stable && !self.has_demanded_packages() {
+        // Retain the existing top-level partial-shape cache, and also reuse
+        // fully resolved nested answers that did not hit a recursion guard.
+        if (stable || typ.resolved() && epoch == self.incomplete_plans.get()) && !self.has_demanded_packages() {
             if let Some(memo) = &mut self.metadata { memo.specialized.entry(r).or_default().insert(bindings.clone(), typ.clone()); }
         }
         typ
@@ -379,6 +393,7 @@ impl Resolver<'_> {
         }
         if let Some(typ)=self.logical_constant_type(r){return typ;}
         if !seen.insert(r) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return Type::Unknown;
         }
         if let Some(typ) = self.logical_type(r) { return typ; }
@@ -775,6 +790,7 @@ impl Resolver<'_> {
         seen: &mut HashSet<Ref>,
     ) -> Type {
         if !seen.insert(r) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return Type::Unknown;
         }
         let s = &self.sources[r.file];
@@ -898,10 +914,7 @@ impl Resolver<'_> {
         if s.node(owner.node).kind == "UnionType" {
             return Type::Union(owner, arguments);
         }
-        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("runtime/sets/sets.odin");
+        let expected = self.runtime_root().join("sets/sets.odin");
         let genuine = matches!((crate::project::canonicalize(&s.path),crate::project::canonicalize(expected)),(Ok(actual),Ok(expected)) if actual==expected);
         let named_set = s.node(owner.node).parent.is_some_and(|declaration| {
             s.group(declaration, "names")
@@ -1359,6 +1372,7 @@ impl Resolver<'_> {
     }
     fn candidate_inner(&mut self, callee: Ref, seen: &mut HashSet<Ref>) -> Vec<Ref> {
         if !seen.insert(callee) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return vec![];
         }
         let s = &self.sources[callee.file];

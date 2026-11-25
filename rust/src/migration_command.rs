@@ -36,6 +36,20 @@ fn words(text: &str) -> Result<Vec<String>> {
             continue;
         }
         if ch == '\\' {
+            // An absolute Windows drive path is literal on either host. Do not
+            // turn C:\work or -out:C:\work into C:work during command-only
+            // translation. POSIX escaping remains available for other words.
+            let drive_path=word.as_bytes().windows(2).enumerate().any(|(i,pair)|
+                pair[0].is_ascii_alphabetic() && pair[1]==b':'
+                    && (i==0 || matches!(word.as_bytes()[i-1],b':'|b'='))
+                    && (i+2==word.len() || matches!(word.as_bytes()[i+2],b'\\'|b'/')));
+            let unc_start=cfg!(windows) && word.is_empty() && chars.peek()==Some(&'\\');
+            if drive_path || cfg!(windows) && word.starts_with("\\\\") || unc_start {
+                word.push(ch);
+                if unc_start {word.push(chars.next().unwrap());}
+                started=true;
+                continue;
+            }
             let next = chars
                 .next()
                 .ok_or_else(|| Error::usage("unfinished escape in --command"))?;
@@ -110,7 +124,7 @@ pub(super) fn parse(text: &str) -> Result<Invocation> {
     }
     let executable = tokens.remove(0);
     let name = executable.rsplit(['/', '\\']).next().unwrap_or_default();
-    if !matches!(name, "odin" | "odin.exe") {
+    if name != "odin" && !name.eq_ignore_ascii_case("odin.exe") {
         return Err(Error::usage(
             "--command must start with odin or a path to the Odin executable",
         ));

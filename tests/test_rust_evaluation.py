@@ -7,6 +7,7 @@ import unittest
 
 from thorlang.driver import Project, frontend_binary
 from thorlang.evaluation import Evaluator
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -22,7 +23,7 @@ class RustEvaluationTests(unittest.TestCase):
         if result.returncode:
             raise RuntimeError(result.stdout+result.stderr)
         cls.frontend = frontend_binary('odin')[0]
-        cls.binary = native.ROOT/'rust/target/release/examples/evaluation_protocol'
+        cls.binary = rust_binary('evaluation_protocol', example=True)
 
     def evaluate(self, prefix, expression, *, body='', body_end='', files=None, flags=None,
                  error=None, compare=True, timeout=None, emit=False,

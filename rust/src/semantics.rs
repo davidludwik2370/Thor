@@ -31,7 +31,7 @@ mod typefacts;
 mod builtintypes;
 #[path = "intrinsictypes.rs"]
 mod intrinsictypes;
-pub(crate) use intrinsictypes::allocation_free_intrinsic;
+pub(crate) use intrinsictypes::{allocation_free_intrinsic,atomic_intrinsic};
 pub use calls::CallPlan;
 pub(crate) use calls::ClosedCalls;
 pub use contexts::{ContextHint, ParameterWitness};
@@ -264,6 +264,7 @@ pub struct Resolver<'a> {
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
     pub logical_constants: BTreeMap<Ref,serde_json::Value>,
     logical_activation: std::cell::OnceCell<bool>,
+    runtime_root: std::cell::OnceCell<std::path::PathBuf>,
     pub(crate) set_activation: std::cell::OnceCell<bool>,
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
@@ -280,6 +281,10 @@ pub struct Resolver<'a> {
 #[derive(Default)]
 struct Metadata {
     calls: ClosedCalls,
+    // Exact-input answers for this source graph only. Unlike ClosedCalls these
+    // may contain unresolved overloads and never survive namespace extension.
+    local_calls: HashMap<Ref, HashMap<(Substitutions, bool), Vec<CallPlan>>>,
+    local_call_count: usize,
     specialized: HashMap<Ref, HashMap<Substitutions, Type>>,
     fields: HashMap<TypeId, RecordFields>,
     members: HashMap<TypeId, HashMap<String, Type>>,
@@ -352,6 +357,16 @@ impl<'a> Resolver<'a> {
     pub(crate) fn set_evaluations(&mut self, values: BTreeMap<Ref, serde_json::Value>) {
         if self.evaluated != values { self.evaluated = values; self.invalidate_queries(); }
     }
+    /// Compiler-owned support collection remains distinct from user overrides.
+    /// Cache the installation path per analysis; relocation never uses a build
+    /// machine's source path and hot identity checks do no filesystem discovery.
+    pub(crate) fn runtime_root(&self) -> &std::path::Path {
+        self.runtime_root.get_or_init(|| {
+            self.sources.iter().find_map(|source|
+                source.collection_roots.get(&source.support_collection)).cloned()
+                .unwrap_or_else(|| crate::cli::root().expect("compiler installation root").join("runtime"))
+        })
+    }
     pub fn new(sources: &'a [Source]) -> Self {
         Self::with_flags(sources, &[])
     }
@@ -414,6 +429,7 @@ impl<'a> Resolver<'a> {
             evaluated: BTreeMap::new(),
             logical_constants: BTreeMap::new(),
             logical_activation: std::cell::OnceCell::new(),
+            runtime_root: std::cell::OnceCell::new(),
             set_activation: std::cell::OnceCell::new(),
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),
@@ -991,9 +1007,7 @@ impl<'a> Resolver<'a> {
                 return None;
             }
             let owner = &self.sources[symbol.reference.file];
-            let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()?
-                .join("runtime/big/big.odin");
+            let expected = self.runtime_root().join("big/big.odin");
             if owner.path != expected {
                 return None;
             }
@@ -1447,6 +1461,7 @@ impl<'a> Resolver<'a> {
                 }
                 Type::Unknown
             }
+            "CaseComparison" => Type::scalar("bool"),
             "HelperType"=>{let mut typ=child("expr").map(|v|self.type_of(v)).unwrap_or(Type::Unknown);if let Type::Matrix{row_major,..}=&mut typ{if ["row_major","column_major"].contains(&n.op.as_str()){*row_major=n.op=="row_major";}}typ},
             "Paren" | "AutoCast" | "Unary" | "Run" | "Runtime" => {
                 let typ = child("expr")
@@ -2180,6 +2195,8 @@ mod index_tests {
             memo.calls.entry(site).or_default().insert(Substitutions::new(), vec![CallPlan {
                 procedure:site, signature:site, arguments:vec![], bindings:Substitutions::new(),
             }]);
+            memo.local_calls.entry(site).or_default().insert((Substitutions::new(),false),vec![]);
+            memo.local_call_count=1;
             match operation {
                 0 => resolver.remember_evaluation(site, json!(1)),
                 1 => resolver.remember_logical_constant(site, json!(2)),
@@ -2188,7 +2205,36 @@ mod index_tests {
             }
             let memo = resolver.metadata.as_ref().unwrap();
             if !memo.fields.is_empty() || !memo.members.is_empty() || !memo.paths.is_empty()
-                || !memo.specialized.is_empty() || !memo.calls.is_empty() { panic!("stale metadata after operation {operation}"); }
+                || !memo.specialized.is_empty() || !memo.calls.is_empty()
+                || !memo.local_calls.is_empty() || memo.local_call_count!=0 { panic!("stale metadata after operation {operation}"); }
+        }
+    }
+    #[test]
+    fn graph_local_call_answers_do_not_escape_discovery_or_recursion_guards() {
+        let raw="missing()";
+        let source=Source::from_frontend("/example.thor".into(),raw.into(),json!({
+            "nodes":[{"kind":"File","start":0,"end":9,"parent":-1},
+                {"kind":"Call","start":0,"end":9,"parent":0,"roles":{"callee":[0,7]}},
+                {"kind":"Ident","start":0,"end":7,"parent":1,"name":"missing"}],
+            "features":[],"edits":[],"selections":[]
+        }),true).unwrap();
+        let sources=vec![source];let call=Ref{file:0,node:NodeId(1)};
+        let mut resolver=Resolver::new(&sources);
+        resolver.planning.insert((call,vec![]));
+        let curtailed=resolver.call_plans(call,&Substitutions::new());
+        if !curtailed.is_empty() || resolver.metadata.as_ref().unwrap().local_call_count!=0 {
+            panic!("recursive cutoff entered the memo");
+        }
+        resolver.planning.clear();
+        let answer=resolver.call_plans(call,&Substitutions::new());
+        let closed=resolver.take_closed_calls();
+        if !answer.is_empty() || !closed.is_empty() || resolver.metadata.as_ref().unwrap().local_call_count!=1 {
+            panic!("graph-local answer was lost or exported as closed");
+        }
+        resolver.track_import_demands(true);
+        let tracked=resolver.call_plans(call,&Substitutions::new());
+        if !tracked.is_empty() || resolver.metadata.as_ref().unwrap().local_call_count!=2 {
+            panic!("untracked answer suppressed a demand-tracking query");
         }
     }
     #[test]

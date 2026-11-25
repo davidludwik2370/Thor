@@ -1,6 +1,7 @@
 """Native constant counts, string identity and lazy repetition helpers."""
 import unittest
 import subprocess
+from tests.native_paths import EXE_SUFFIX
 from tests import test_rust_compiler as native
 
 
@@ -42,7 +43,7 @@ class RustRepetitionParityTests(unittest.TestCase):
             self.assertIn('not a type',reference.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'2\n')
-        ordinary=self.root/'ordinary.odin';executable=self.root/'ordinary'
+        ordinary=self.root/'ordinary.odin';executable=self.root/('ordinary'+EXE_SUFFIX)
         ordinary.write_text('package main\nimport "core:fmt"\nBox::struct($text:string){data:[len(text+text)]u8}\nmain::proc(){fmt.println(size_of(Box("x")))}\n')
         built=subprocess.run(['odin','build',str(ordinary),'-file','-out:'+str(executable)],capture_output=True,text=True,timeout=60)
         self.assertEqual(built.returncode,0,built.stderr)

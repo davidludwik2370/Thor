@@ -8,6 +8,7 @@ import unittest
 
 from thorlang.driver import Project, frontend_binary
 from thorlang.evaluation import Evaluator
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -65,7 +66,7 @@ class RustExtractionTests(unittest.TestCase):
                         'queries': [[location(node), code] for node, code in queries.items()],
                         'calls': targets, 'external': [[location(node), list(value)] for node, value in external.items()],
                         'helper_imports': helper_imports}
-            result = subprocess.run([str(native.ROOT/'rust/target/release/examples/extraction_protocol'), str(entry)],
+            result = subprocess.run([str(rust_binary('extraction_protocol', example=True)), str(entry)],
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
             def canonical(packet):

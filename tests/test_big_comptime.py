@@ -219,9 +219,9 @@ class BigCacheTests(base.unittest.TestCase):
         warm=again(root)
         self.assertGreaterEqual(report(warm)['hits'],2)
         self.assertEqual(warm.stderr,'')
-        (root/'input/main.thor').write_text(source.replace('a+=1','extra:=22;_=extra;a+=1'))
+        (root/'input/main.thor').write_text(source.replace('a+=1','extra:=22;_=extra;a+=1'), newline='')
         self.assertGreaterEqual(report(again(root))['hits'],2)
-        (root/'input/main.thor').write_text(source.replace('567890)','567891)'))
+        (root/'input/main.thor').write_text(source.replace('567890)','567891)'), newline='')
         changed=again(root)
         self.assertGreaterEqual(report(changed)['writes'],1)
         packets=[json.loads(p.read_text())['value'] for p in (root/'input/.thor-cache/eval-v1').glob('*.json')]

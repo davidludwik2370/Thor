@@ -3,10 +3,43 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-function findToolchain(workspace, {env = process.env, home = os.homedir(), exists = fs.existsSync} = {}) {
-    const candidates = [env.THOR_ROOT, workspace, path.join(home, 'Thor')];
-    return candidates.filter(Boolean).map(root => path.resolve(root))
-        .find(root => exists(path.join(root, 'thor')) && exists(path.join(root, 'tls')));
+function installationRecord({env = process.env, home = os.homedir(), platform = process.platform,
+    read = file => fs.readFileSync(file, 'utf8')} = {}) {
+    const file = platform === 'win32'
+        ? path.join(env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Thor', 'installation.json')
+        : platform === 'darwin' ? path.join(home, 'Library', 'Application Support', 'Thor', 'installation.json')
+        : path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'thor', 'installation.json');
+    try {
+        const record = JSON.parse(read(file));
+        return record.schema === 1 && record.managed_by === 'thor-install' && typeof record.root === 'string'
+            && path.isAbsolute(record.root) ? record : undefined;
+    } catch { return undefined; }
 }
 
-module.exports = {findToolchain};
+function findRegisteredToolchain(options = {}) {
+    const record = installationRecord(options), exists = options.exists || fs.existsSync;
+    return record && findCompiler(record.root, options) && exists(path.join(record.root, 'tls')) ? record.root : undefined;
+}
+
+function findToolchain(workspace, options = {}) {
+    const {env = process.env, home = os.homedir(), exists = fs.existsSync} = options;
+    const candidates = [env.THOR_ROOT, workspace, findRegisteredToolchain(options), path.join(home, 'Thor')];
+    return candidates.filter(Boolean).map(root => path.resolve(root))
+        .find(root => ['thor', 'thor.exe', path.join('rust', 'target', 'release', 'thor-rust.exe'), path.join('bin', 'thor.exe')]
+            .some(name => exists(path.join(root, name))) && exists(path.join(root, 'tls')));
+}
+
+function findCompiler(root, {platform = process.platform, exists = fs.existsSync} = {}) {
+    const names = platform === 'win32'
+        ? ['thor.exe', path.join('bin', 'thor.exe'), path.join('rust', 'target', 'release', 'thor-rust.exe')]
+        : ['thor'];
+    return names.map(name => path.join(root, name)).find(exists);
+}
+
+function findBundledOdin(root, {platform = process.platform, exists = fs.existsSync} = {}) {
+    if (!root) return undefined;
+    const directory = path.join(root, 'odin');
+    return exists(path.join(directory, platform === 'win32' ? 'odin.exe' : 'odin')) ? directory : undefined;
+}
+
+module.exports = {findToolchain, findCompiler, findBundledOdin, findRegisteredToolchain, installationRecord};

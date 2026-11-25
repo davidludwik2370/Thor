@@ -2,6 +2,7 @@
 import json
 import subprocess
 from pathlib import Path
+from tests.native_paths import thor_launcher
 from tests import test_thor as base
 
 
@@ -306,7 +307,7 @@ expect(a,"123");expect(b,"13/22");delete(b);expect(c,"13/22");delete(a);delete(c
 
     def test_commented_language_demo_in_debug_mode_has_no_leaks(self):
         root=Path(__file__).resolve().parents[1]
-        result=subprocess.run([str(root/'thor'),'run',str(root/'examples/big_numbers'),'-debug'],
+        result=subprocess.run([str(thor_launcher()),'run',str(root/'examples/big_numbers'),'-debug'],
                               text=True,capture_output=True,timeout=60)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertEqual(result.stderr,'')

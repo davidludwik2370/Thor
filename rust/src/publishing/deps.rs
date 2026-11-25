@@ -414,8 +414,9 @@ pub fn linux(
     let inspector = ["readelf", "llvm-readelf"]
         .iter()
         .find_map(|name| {
+            let name=format!("{name}{}",std::env::consts::EXE_SUFFIX);
             std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-                .map(|path| path.join(name))
+                .map(|path| path.join(&name))
                 .find(|path| is_executable(path))
         })
         .ok_or_else(|| {

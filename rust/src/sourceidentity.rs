@@ -11,10 +11,16 @@ impl Lower<'_, '_> {
             .unwrap_or("normal")
     }
     pub(super) fn source_string(&self, value: &str, prefix: &str) -> String {
+        // Odin source locations use forward slashes on Windows too. Normalize
+        // before filename selection and hashing, without changing procedure
+        // names or literal backslashes on POSIX hosts.
+        let path = (cfg!(windows) && matches!(prefix, "F" | "D"))
+            .then(|| value.replace('\\', "/"));
+        let value = path.as_deref().unwrap_or(value);
         match self.source_mode() {
             "none" => String::new(),
             "filename" if prefix != "P" => value
-                .rsplit(std::path::MAIN_SEPARATOR)
+                .rsplit('/')
                 .next()
                 .unwrap_or("")
                 .into(),

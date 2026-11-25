@@ -1,4 +1,5 @@
 """Run the playground table tests using Odin directly, including memory checks."""
+from tests.native_paths import EXE_SUFFIX
 from pathlib import Path
 import os
 import shutil
@@ -21,7 +22,7 @@ class OdinTableTests(unittest.TestCase):
             shutil.copyfile(ROOT / 'odin-playground' / 'Library.odin', directory / 'Library.odin')
             shutil.copyfile(ROOT / 'tests' / 'odin' / 'table_test.odin', directory / 'table_test.odin')
             result = subprocess.run([odin, 'test', str(directory),
-                f'-out:{directory / "table-tests"}', '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'],
+                f'-out:{directory / ("table-tests"+EXE_SUFFIX)}', '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'],
                 text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

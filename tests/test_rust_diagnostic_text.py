@@ -59,7 +59,7 @@ class RustDiagnosticTextTests(unittest.TestCase):
     def test_compile_time_optional_failure_marks_the_complete_original_expression(self):
         import json
         text='package main\nget::fn()->(int,bool){return 0,false}\nchoose::fn()->int{return get() or_panic}\nVALUE::#run choose()\nmain::proc(){_=VALUE}\n'
-        self.source.write_text(text)
+        self.source.write_text(text,newline='')
         for flags in [[], ['-error-pos-style:unix']]:
             with self.subTest(flags=flags):
                 result=self.invoke('rust',command='check',flags=['-json-errors',*flags])

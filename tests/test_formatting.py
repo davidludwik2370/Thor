@@ -43,13 +43,18 @@ class FormattingTests(unittest.TestCase):
             ('true:t','true'),('255:#x','0xff'),('255:X','FF'),('10:b','1010'),
             ('12:z','10'),('8:o','10'),('65:c','A'),("'é':q","'é'"),
             ('65:U','U+41'),('"é😀z":.2s','é😀'),('"é😀z":8.2s','      é😀'),
-            ('"é😀z":.2q','"é\\U0001f600"'),('"ab":x','6162'),('"ab": X','61 62'),
+            ('"ab":x','6162'),('"ab": X','61 62'),
             ('"ab":T','string'),('1.0:h','0h3ff0000000000000'),('1.0:+h','0h3ff0000000000000'),
             ('[]u8{65,66}:x','4142'),('[]u8{65,66}: X','41 42'),
             ('1024:M','1.00KiB'),('1024:#m','1.00 kib'),
             ('Color.Red:v','Red'),('Color.Red:d','0'),('[1,2]:v','[1, 2]'),
             ('R{2}:v','R{x = 2}'),
         ],'Color::enum{Red,Blue}\nR::struct{x:int}\n')
+        self.invoke(self.program('''value:="é😀z"
+actual:=f"{value:.2q}";defer delete(actual)
+expected:=fmt.aprintf("%q","é😀");defer delete(expected)
+if actual!=expected {panic("native Unicode quoting")}
+''','import "core:fmt"\n'))
 
     def test_exact_integer_bases_decimal_percent_and_type(self):
         self.fields([
@@ -110,9 +115,9 @@ EXPLICIT::#run render()
         self.assertGreaterEqual(CacheTests.report(self,first)['writes'],1)
         warm=CacheTests.again(self,root)
         self.assertGreaterEqual(CacheTests.report(self,warm)['hits'],1)
-        (root/'input/main.thor').write_text(source.replace('assert(TEXT','extra:=22;_=extra;assert(TEXT'))
+        (root/'input/main.thor').write_text(source.replace('assert(TEXT','extra:=22;_=extra;assert(TEXT'), newline='')
         self.assertGreaterEqual(CacheTests.report(self,CacheTests.again(self,root))['hits'],1)
-        (root/'input/main.thor').write_text(source.replace('.4f','.6g').replace('"0.3333"','"0.333333"'))
+        (root/'input/main.thor').write_text(source.replace('.4f','.6g').replace('"0.3333"','"0.333333"'), newline='')
         changed=CacheTests.again(self,root)
         self.assertGreaterEqual(CacheTests.report(self,changed)['writes'],1)
 

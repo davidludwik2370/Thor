@@ -130,8 +130,16 @@ impl Cache {
             };
         }
         if let Some((inputs, facts)) = &self.completed {
-            if inputs.matches(resolver, flags, editor) {
+            // An independently loaded native namespace adds no checked roots.
+            // Completed discovery had no unresolved imports, so it cannot
+            // change an old namespace's effects. The prefix guard also rejects
+            // new members in an old package, flags, contexts and evaluations.
+            let extension = resolver.sources.len() > inputs.sources.len()
+                && inputs.extends(resolver, flags, editor)
+                && resolver.sources[inputs.sources.len()..].iter().all(|s| s.shared_native);
+            if inputs.matches(resolver, flags, editor) || extension {
                 crate::profile::count("permissions.reuses", 1);
+                if extension { crate::profile::count("permissions.native_extension_reuses", 1); }
                 return facts.clone();
             }
         }
@@ -282,6 +290,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn completed_facts_survive_only_independent_native_namespace_extensions() {
+        let old = vec![source()];
+        let site = Ref { file:0, node:crate::ast::NodeId(0) };
+        let mut facts = Facts::default();
+        facts.readonly.insert(site);
+        let make = |path:&str| Source::from_frontend(path.into(),"x".into(),serde_json::json!({
+            "nodes":[{"kind":"File","start":0,"end":1,"parent":-1}],
+            "features":[],"edits":[],"selections":[]
+        }),false).unwrap();
+        let mut extra = make("/additional/library.odin");
+        extra.shared_native = true;
+        for change in 0..6 {
+            let mut next = vec![old[0].clone(),extra.clone()];
+            let flags = if change == 3 {vec!["-debug".into()]}else{vec![]};
+            if change == 1 {next[1].shared_native=false;}
+            if change == 2 {next[1]=make("/additional.odin");next[1].shared_native=true;}
+            if change == 4 {next[0]=source();}
+            if change == 5 {next[0].collection_roots.insert("core".into(),"/changed".into());}
+            let mut cache=Cache {completed:Some((Inputs::new(&Resolver::new(&old),&[],false),facts.clone())),retry:None};
+            let mut resolver=Resolver::new(&next);
+            let actual=cache.analyze(&mut resolver,&flags,false,None);
+            if actual.readonly.contains(&site) != (change==0) {
+                panic!("native extension guard ignored change {change}");
+            }
+        }
+    }
     #[test]
     fn missing_dependency_prevents_publication_of_partial_facts() {
         let directory = std::env::temp_dir().join(format!(

@@ -32,7 +32,11 @@ impl Privileges<'_, '_> {
         }
         // Every visited body's complete reachable closure was examined.
         // Cache negatives together so cycles cannot hide a later source.
-        if !self.r.has_demanded_packages() {
+        // A non-discovery pass examines the complete fixed source snapshot,
+        // even if unresolved imports remain queued. These caches belong only
+        // to this analyzer; loading a package creates a new one. Discovery can
+        // stop partway through a body, so its incomplete negatives stay uncached.
+        if !self.discovering || !self.r.has_demanded_packages() {
             for current in visited { self.view_sources.insert(current, false); }
         }
         false
@@ -80,7 +84,7 @@ impl Privileges<'_, '_> {
             if self.discovering && self.r.has_demanded_packages() { break; }
         }
         let body = (local, callees);
-        if !self.r.has_demanded_packages() {
+        if !self.discovering || !self.r.has_demanded_packages() {
             self.view_bodies.insert(current, body.clone());
         }
         body

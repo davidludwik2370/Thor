@@ -43,14 +43,20 @@ fn shell_words(text: &str) -> Option<Vec<ShellWord>> {
             });
             continue;
         }
-        let mut value = vec![];
+        let mut value: Vec<u8> = vec![];
         let mut quote = None;
         while cursor < raw.len() {
             let byte = raw[cursor];
             if quote.is_none() && (byte.is_ascii_whitespace() || b";&|()<>".contains(&byte)) {
                 break;
             }
-            if byte == b'\\' && quote != Some(b'\'') {
+            let drive_path=value.windows(2).enumerate().any(|(i,pair)|
+                pair[0].is_ascii_alphabetic() && pair[1]==b':'
+                    && (i==0 || matches!(value[i-1],b':'|b'='))
+                    && (i+2==value.len() || matches!(value[i+2],b'\\'|b'/')));
+            let unc_path=cfg!(windows) && (value.starts_with(b"\\\\")
+                || value.is_empty() && raw.get(cursor+1)==Some(&b'\\'));
+            if byte == b'\\' && quote != Some(b'\'') && !drive_path && !unc_path {
                 cursor += 1;
                 if cursor == raw.len() {
                     return None;
@@ -81,9 +87,8 @@ fn shell_words(text: &str) -> Option<Vec<ShellWord>> {
 fn native_command(command: &str, settings: &Settings) -> bool {
     command == "odin"
         || command == settings.odin
-        || Path::new(command)
-            .file_name()
-            .is_some_and(|name| name == "odin" || name == "odin.exe")
+        || command.rsplit(['/', '\\']).next()
+            .is_some_and(|name| name == "odin" || name.eq_ignore_ascii_case("odin.exe"))
 }
 
 fn shell_task(

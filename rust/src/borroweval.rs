@@ -131,10 +131,7 @@ impl Evaluator<'_, '_, '_> {
             return false;
         }
         let source = &self.resolver.sources[symbol.reference.file];
-        let basic = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("runtime/basic");
+        let basic = self.resolver.runtime_root().join("basic");
         if source.path.parent() == Some(basic.as_path())
             && ["print", "input", "read", "write"].contains(&symbol.name.as_str())
         {

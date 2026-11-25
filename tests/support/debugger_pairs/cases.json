@@ -1,0 +1,11 @@
+{
+  "allocated": "test_allocated_fn_body_has_original_name_and_runtime_breakpoint",
+  "using": "test_automatic_using_header_preserves_breakpoints_steps_and_arguments",
+  "basic": "test_breakpoint_in_shared_basic_uses_its_installed_source_map",
+  "deferred": "test_deferred_branch_location_steps_into_original_user_call",
+  "fallback": "test_or_else_fallback_list_keeps_breakpoints_and_user_step_into",
+  "pmap": "test_parallel_map_generic_callback_keeps_source_breakpoints_and_result_fields",
+  "static": "test_static_readonly_slice_literals_keep_source_breakpoints_and_values",
+  "switch": "test_step_into_user_call_inside_switch_and_inspect_helper_locals",
+  "unicode": "test_unicode_inline_breakpoint_uses_utf16_editor_columns"
+}

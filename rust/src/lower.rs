@@ -75,6 +75,8 @@ mod sourceidentity;
 mod branchlocations;
 #[path = "resultlower.rs"]
 mod resultlower;
+#[path = "scopedlower.rs"]
+mod scopedlower;
 
 #[path = "nativeview.rs"]
 mod nativeview;
@@ -95,6 +97,7 @@ struct Capture {
 pub struct Lower<'a, 'r> {
     pub source: &'a Source,
     pub file: usize,
+    has_scoped: bool,
     pub resolver: &'r mut Resolver<'a>,
     edits: Vec<(Span, Code)>,
     selected: HashMap<String, String>,
@@ -115,6 +118,11 @@ pub struct Lower<'a, 'r> {
     branch_captures: Vec<(NodeId, String)>,
     branch_procedures: HashSet<NodeId>,
     querying: usize,
+    scoped_arguments: HashMap<NodeId, Vec<String>>,
+    scoped_argument_busy: HashSet<NodeId>,
+    scoped_declaration_busy: HashSet<NodeId>,
+    scoped_capture_suspended: bool,
+    scoped_frames: Vec<String>,
     struct_math_busy: HashSet<NodeId>,
     padding_layouts: Option<recordpadding::Layouts>,
     logical: bignumbers::State,
@@ -129,6 +137,8 @@ pub struct Lower<'a, 'r> {
     pub type_sites: HashMap<String, (Ref, String)>,
     pub pure_error_sites: HashMap<String, Ref>,
     pub expression_error_sites: HashMap<String, Ref>,
+    pub immutable_error_sites:HashMap<String,Ref>,
+    storage_roots:HashMap<NodeId,Ref>,
     blocked: HashMap<NodeId, String>,
     storage_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
     storage_block_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
@@ -165,6 +175,21 @@ pub struct Lower<'a, 'r> {
     evaluation_witnesses: BTreeMap<NodeId, String>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
+    /// Vet queries the exact storage/temporary decisions without preparing or
+    /// running lowering again. Ordinary compilation never calls this method.
+    pub(crate) fn lifetime_metadata(file: usize, resolver: &'r mut Resolver<'a>) -> (HashSet<NodeId>, HashMap<NodeId, HashSet<NodeId>>) {
+        let mut this = Self::unprepared(file, resolver, None);
+        let declarations = this.source.nodes.iter().enumerate().filter_map(|(i,n)|
+            (n.kind == "Declaration" && n.immutable).then_some(NodeId(i))).collect::<Vec<_>>();
+        let mut static_values = HashSet::new();
+        for declaration in declarations {
+            if this.readonly_data(declaration).is_some() {
+                static_values.extend(this.source.group(declaration, "values"));
+            }
+        }
+        this.discover_fstrings();
+        (static_values, this.fstring_plans)
+    }
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
         Self::new_with_view(file, resolver, None)
     }
@@ -177,6 +202,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         Self {
             source,
             file,
+            has_scoped: source.info["scoped"].as_array().is_some_and(|rows|!rows.is_empty()),
             resolver,
             edits: vec![],
             selected: HashMap::new(),
@@ -199,6 +225,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             branch_captures: vec![],
             branch_procedures: HashSet::new(),
             querying: 0,
+            scoped_arguments: HashMap::new(),
+            scoped_argument_busy: HashSet::new(),
+            scoped_declaration_busy: HashSet::new(),
+            scoped_capture_suspended: false,
+            scoped_frames: vec![],
             logical: bignumbers::State::default(),
             temporary_serial: 0,
             temporary_discarding: HashSet::new(),
@@ -211,6 +242,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
             expression_error_sites: HashMap::new(),
+            immutable_error_sites:HashMap::new(),
+            storage_roots:HashMap::new(),
             blocked: HashMap::new(),
             storage_guards: BTreeMap::new(),
             storage_block_guards: BTreeMap::new(),
@@ -526,6 +559,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.errors.len()
         );
         self.errors.insert(token.clone(), message.into());
+        if let Some(seed)=self.storage_roots.get(&id){self.immutable_error_sites.insert(token.clone(),*seed);}
         token
     }
     pub fn finish(&mut self) -> Result<(Emitted, HashMap<String, String>)> {
@@ -944,19 +978,44 @@ impl<'a, 'r> Lower<'a, 'r> {
         Ok(Code::concat(parts))
     }
     pub fn render(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
-        if self
-            .evaluation
-            .as_ref()
-            .is_some_and(|view| !view.retains(self.source, id))
-        {
-            return Ok(self.g("", id));
+        if self.evaluation.as_ref().is_some_and(|view| !view.retains(self.source, id)) {
+            return Ok(self.g("",id));
+        }
+        if self.has_scoped && !self.scoped_capture_suspended && self.querying==0 && !self.scoped_arguments.is_empty() {
+            if let Some(allocators)=self.scoped_arguments.get(&id).cloned().filter(|_|!self.scoped_argument_busy.contains(&id)) {
+                self.scoped_argument_busy.insert(id);
+                let rendered=self.render(id,expected,constant);
+                self.scoped_argument_busy.remove(&id);
+                let mut code=rendered?;
+                let module=self.module("scoped");
+                for allocator in allocators {code=Code::concat([self.g(format!("{module}.capture_allocator({allocator}, "),id),code,self.g(")",id)]);}
+                return Ok(code);
+            }
         }
         let old = self.checked_mode;
+        // A user procedure is not a closure. Only compiler expression helpers
+        // receive the initializer's allocator slots as explicit parameters.
+        let scoped_parent_frames=if self.source.node(id).kind=="Procedure" && !self.scoped_frames.is_empty() {Some(std::mem::take(&mut self.scoped_frames))} else {None};
         if self.source.node(id).kind == "Procedure" {
             self.checked_mode =
                 self.source.node(id).data["pure"] == true || self.emitting_variants.contains(&id);
         }
+        let scoped_outer=self.has_scoped && self.source.node(id).kind=="Declaration" && self.querying==0 && !crate::scoped::names(self.source,id).is_empty() && self.scoped_declaration_busy.insert(id);
+        let (scoped_captures,scoped_replacements) = if scoped_outer {self.scoped_captures(id)?} else {(vec![],vec![])};
+        let frame_start=self.scoped_frames.len();
+        if scoped_outer {
+            for name in crate::scoped::names(self.source,id) {
+                let allocator=format!("{}scope_allocator_{}",self.prefix,name.0);
+                if self.scoped_arguments.values().any(|args|args.contains(&allocator)) {self.scoped_frames.push(allocator);}
+            }
+        }
         let result = self.render_inner(id, expected, constant);
+        if scoped_outer {self.scoped_declaration_busy.remove(&id);}
+        self.scoped_frames.truncate(frame_start);
+        if let Some(frames)=scoped_parent_frames {self.scoped_frames=frames;}
+        for (arg,previous) in scoped_replacements.into_iter().rev() {
+            if let Some(previous)=previous {self.scoped_arguments.insert(arg,previous);} else {self.scoped_arguments.remove(&arg);}
+        }
         self.checked_mode = old;
         let mut code = result?.annotated(self.source.node(id).kind.as_str());
         let node = self.source.node(id);
@@ -980,6 +1039,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         if self.querying==0&&self.source.node(id).kind=="Declaration" {
             code=Code::concat([code,self.immutable_declaration(id)]);
+            if scoped_outer {code=self.scoped_declaration(id,code,scoped_captures)?;}
         }
         if self.querying == 0 {
             if let Some(guards) = self.storage_guards.get(&id).cloned() {
@@ -1261,6 +1321,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         if matches!(kind.as_str(), "SwitchExpr" | "CompileSwitchExpr") {
             return self.switch_expression(id, vec![expected], constant);
+        }
+        if kind == "Switch" {
+            if let Some(code) = self.comparison_switch_statement(id)? {return Ok(code);}
         }
         if kind == "CompileSwitch" {
             return self.compile_switch(id);
@@ -1646,6 +1709,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
             "Field" => {
+                // Emitted operator defaults must be native constants. Set this
+                // at the field boundary: an isolated compile-time request may
+                // render the same expression as executable helper code.
+                let default_constant=constant||self.source.role(id,"default").is_some_and(|v|Self::struct_tree_operator(self.source.node(self.unparen(v))));
                 if let (Some(annotation), Some(value)) = (
                     self.source.role(id, "type"),
                     self.source.role(id, "default"),
@@ -1660,9 +1727,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 element_only: false,
                                 plain_array: self.source.node(annotation).kind == "ArrayType",
                             }),
-                            constant,
+                            default_constant,
                         ),
                     );
+                } else if let Some(value)=self.source.role(id,"default") {
+                    overrides.insert(value,(None,default_constant));
                 }
             }
             "Procedure" => {
@@ -2513,7 +2582,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             let argument = if let Some(reference) = reference {
                 reference.at_use(&self.source.path, self.source.node(*child).span)
             } else {
-                let value = self.render(*child, None, false)?;
+                let suspended=self.scoped_capture_suspended;
+                self.scoped_capture_suspended=true;
+                let value = self.render(*child, None, false);
+                self.scoped_capture_suspended=suspended;
+                let value=value?;
                 if byref {
                     Code::concat([self.g("&(", id), value, self.g(")", id)])
                 } else {
@@ -2537,6 +2610,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             let module = self.module("temporaries");
             params.push(format!("{pointer}: ^{module}.Scope"));
             args.push(self.g(pointer, id));
+        }
+        for (index,pointer) in self.scoped_frames.iter().enumerate() {
+            params.push(format!("{pointer}: ${}ScopeAllocator_{index}",self.prefix));
+            args.push(self.g(pointer,id));
         }
         let branch_capture = self.capture_branch_location(id, &mut params, &mut args);
         let returns = if let Some(result) = result {

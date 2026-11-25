@@ -11,7 +11,12 @@ from unittest.mock import patch
 
 from thorlang import project_template
 
+from tests.native_paths import thor_launcher
 ROOT=Path(__file__).resolve().parents[1]
+
+def new_launcher():
+    return [str(thor_launcher()),'new'] if os.name=='nt' else [str(ROOT/'mkthor')]
+
 
 
 class ProjectTemplateTests(unittest.TestCase):
@@ -21,14 +26,14 @@ class ProjectTemplateTests(unittest.TestCase):
             source=root/'main.thor';output=root/'generated'
             source.write_text('package main\nmain::proc(){value:=1;assert(value==1)}\n')
             args=[str(source),'-debug','-o:none','--output-dir',str(output)]
-            result=subprocess.run([str(ROOT/'thor'),'build',*args],cwd=root,capture_output=True,text=True,timeout=40)
+            result=subprocess.run([str(thor_launcher()),'build',*args],cwd=root,capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             manifest=json.loads((output/'thor-manifest.json').read_text())
             self.assertEqual({Path(path).name for path in manifest['debug_roots']},{'runtime','base','core','vendor'})
             executable=Path(manifest['debug_program']['path'])
             self.assertEqual(manifest['debug_program']['sha256'],hashlib.sha256(executable.read_bytes()).hexdigest())
             source.write_text('package main\nmain::proc(){value:=2;assert(value==2)}\n')
-            result=subprocess.run([str(ROOT/'thor'),'check',*[arg for arg in args if arg!='-o:none']],capture_output=True,text=True,timeout=40)
+            result=subprocess.run([str(thor_launcher()),'check',*[arg for arg in args if arg!='-o:none']],capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertNotIn('debug_program',json.loads((output/'thor-manifest.json').read_text()))
             self.assertTrue(executable.exists())
@@ -36,7 +41,7 @@ class ProjectTemplateTests(unittest.TestCase):
     def test_project_has_only_named_source_and_run_debug_configuration(self):
         with tempfile.TemporaryDirectory(prefix='mkthor-test-') as temporary:
             parent=Path(temporary)/'parent with spaces'
-            result=subprocess.run([str(ROOT/'mkthor'),'example','--parent',str(parent),'--no-open'],
+            result=subprocess.run([*new_launcher(),'example','--parent',str(parent),'--no-open'],
                 capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             project=parent/'example'
@@ -51,18 +56,20 @@ class ProjectTemplateTests(unittest.TestCase):
             self.assertEqual(config['preLaunchTask'],task['label'])
             self.assertIn('-debug',task['args'])
             self.assertIn('-o:none',task['args'])
-            self.assertEqual(Path(task['command']),ROOT/'thor')
+            launchers=[ROOT/'thor.exe',ROOT/'bin/thor.exe',thor_launcher()] if os.name=='nt' else [thor_launcher()]
+            expected=next(path for path in launchers if path.is_file())
+            self.assertEqual(Path(task['command']),expected)
             self.assertEqual([t['label'] for t in tasks],['build-thor-debug'])
-            again=subprocess.run([str(ROOT/'mkthor'),'example','--parent',str(parent),'--no-open'],capture_output=True,text=True)
+            again=subprocess.run([*new_launcher(),'example','--parent',str(parent),'--no-open'],capture_output=True,text=True)
             self.assertNotEqual(again.returncode,0)
             self.assertIn('already exists',again.stderr)
             self.assertEqual((project/'example.thor').read_bytes(),source)
-            check=subprocess.run([str(ROOT/'thor'),'run',str(project)],cwd=project,capture_output=True,text=True,timeout=40)
+            check=subprocess.run([str(thor_launcher()),'run',str(project)],cwd=project,capture_output=True,text=True,timeout=40)
             self.assertEqual(check.returncode,0,check.stdout+check.stderr)
 
     def test_platform_suffix_preserves_requested_filename_and_reports_native_filtering(self):
         with tempfile.TemporaryDirectory(prefix='mkthor-suffix-') as temporary:
-            result=subprocess.run([str(ROOT/'mkthor'),'example_linux','--parent',temporary,'--no-open'],capture_output=True,text=True)
+            result=subprocess.run([*new_launcher(),'example_linux','--parent',temporary,'--no-open'],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             project=Path(temporary)/'example_linux'
             self.assertTrue((project/'example_linux.thor').is_file())
@@ -72,11 +79,11 @@ class ProjectTemplateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='mkthor-test-') as temporary:
             parent=Path(temporary)
             for name in ['../escape','.hidden','/absolute','two words','a/b']:
-                result=subprocess.run([str(ROOT/'mkthor'),name,'--parent',temporary,'--no-open'],capture_output=True,text=True)
+                result=subprocess.run([*new_launcher(),name,'--parent',temporary,'--no-open'],capture_output=True,text=True)
                 self.assertNotEqual(result.returncode,0)
             self.assertEqual(list(parent.iterdir()),[])
             (parent/'existing').symlink_to(parent/'missing')
-            result=subprocess.run([str(ROOT/'mkthor'),'existing','--parent',temporary,'--no-open'],capture_output=True,text=True)
+            result=subprocess.run([*new_launcher(),'existing','--parent',temporary,'--no-open'],capture_output=True,text=True)
             self.assertNotEqual(result.returncode,0)
             self.assertTrue((parent/'existing').is_symlink())
 
@@ -98,7 +105,7 @@ class ProjectTemplateTests(unittest.TestCase):
             content='// 😀 custom\r\npackage main\r\nmain::proc(){}\r\n'.encode()
             template.write_bytes(content)
             odin=str(root/'tools with spaces/odin')
-            result=subprocess.run([str(ROOT/'thor'),'new','custom','--parent',str(root/'parent with spaces'),
+            result=subprocess.run([str(thor_launcher()),'new','custom','--parent',str(root/'parent with spaces'),
                 '--template',str(template),'--gitignore','--odin',odin],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             project=root/'parent with spaces/custom'
@@ -116,7 +123,7 @@ class ProjectTemplateTests(unittest.TestCase):
             for flags in [['--template',str(root/'missing')],['--template',str(invalid)],
                           ['--unknown'],['--open','--no-open']]:
                 with self.subTest(flags=flags):
-                    result=subprocess.run([str(ROOT/'thor'),'new','fresh',*flags],cwd=root,capture_output=True,text=True)
+                    result=subprocess.run([str(thor_launcher()),'new','fresh',*flags],cwd=root,capture_output=True,text=True)
                     self.assertNotEqual(result.returncode,0)
                     self.assertFalse((root/'fresh').exists())
 
@@ -127,7 +134,7 @@ class ProjectTemplateTests(unittest.TestCase):
             compiler.parent.mkdir()
             compiler.write_text('#!/bin/sh\nexit 99\n')
             compiler.chmod(0o755)
-            result=subprocess.run([str(ROOT/'thor'),'new','example','--odin','custom tools/odin'],
+            result=subprocess.run([str(thor_launcher()),'new','example','--odin','custom tools/odin'],
                                   cwd=root,capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             for task in json.loads((root/'example/.vscode/tasks.json').read_text())['tasks']:
@@ -158,6 +165,6 @@ class ProjectTemplateTests(unittest.TestCase):
 
     def test_new_help_is_available_without_compiling(self):
         for args in [['help','new'],['help']]:
-            result=subprocess.run([str(ROOT/'thor'),*args],capture_output=True,text=True)
+            result=subprocess.run([str(thor_launcher()),*args],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('new',result.stdout)

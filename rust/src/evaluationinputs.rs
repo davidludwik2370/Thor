@@ -120,6 +120,7 @@ pub fn source_resources(source: &Source) -> Option<Vec<(&str, PathBuf)>> {
     Some(resources)
 }
 pub fn signature(path: &Path) -> io::Result<Option<Value>> {
+    #[cfg(not(windows))]
     let metadata = match fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -141,7 +142,11 @@ pub fn signature(path: &Path) -> io::Result<Option<Value>> {
             stamp(metadata.ctime(), metadata.ctime_nsec())?
         ])))
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        windows_signature(path)
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = metadata;
         // Missing native stat fields disable this optional fast path; they
@@ -151,6 +156,22 @@ pub fn signature(path: &Path) -> io::Result<Option<Value>> {
             "native cache stat signature unavailable",
         ))
     }
+}
+/// Use the safe native identity adapter while retaining Rust's no-unsafe-code
+/// invariant. Byte-dependent snapshots always rehash content in `Inputs::valid`;
+/// metadata alone is never used to certify an unchanged file's contents.
+#[cfg(windows)]
+fn windows_signature(path: &Path) -> io::Result<Option<Value>> {
+    use std::os::windows::fs::MetadataExt;
+    let identity = match file_id::get_high_res_file_id(path) {
+        Ok(file_id::FileId::HighRes { volume_serial_number, file_id }) => (volume_serial_number, file_id),
+        Ok(_) => return Err(io::Error::new(io::ErrorKind::Unsupported, "high-resolution file identity unavailable")),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let metadata = fs::metadata(path)?;
+    Ok(Some(json!(["windows-v1", identity.0, identity.1.to_le_bytes(),
+        metadata.file_attributes(), metadata.file_size(), metadata.creation_time(), metadata.last_write_time()])))
 }
 fn directory_names(path: &Path) -> io::Result<Vec<String>> {
     let mut names = fs::read_dir(path)?.map(|entry|
@@ -223,7 +244,40 @@ pub fn resolve(path: &Path) -> io::Result<PathBuf> {
         }
         Ok(result)
     }
-    walk(&absolute(path)?, 0)
+    let path=absolute(path)?;
+    // Win32 normalizes non-verbatim `..` components before following reparse
+    // points. Walking them like POSIX paths can track a different resource than
+    // the one read by the native compiler. Keep the original binding spelling,
+    // but resolve its target with the host's path semantics.
+    #[cfg(windows)]
+    let path=std::path::absolute(path)?;
+    walk(&path, 0)
+}
+
+#[cfg(all(test,windows))]
+mod windows_resolve_tests {
+    use super::*;
+    #[test]
+    fn parent_components_track_the_file_opened_by_win32() {
+        let root=env::temp_dir().join(format!("thor-path-{}-{}",std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join("target/child")).unwrap();
+        struct Cleanup(PathBuf);
+        impl Drop for Cleanup {fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
+        let _cleanup=Cleanup(root.clone());
+        fs::write(root.join("sibling"),b"native").unwrap();
+        fs::write(root.join("target/sibling"),b"different").unwrap();
+        std::os::windows::fs::symlink_dir(root.join("target/child"),root.join("link")).unwrap();
+        let input=root.join("link/../sibling");
+        let actual_bytes=fs::read(&input).unwrap();
+        let target=resolve(&input).unwrap();
+        let expected=fs::canonicalize(&input).unwrap();
+        let actual=fs::canonicalize(&target).unwrap();
+        assert_eq!(actual_bytes,b"native");
+        assert_eq!(actual,expected);
+        let missing=resolve(&root.join("link/../missing/tail")).unwrap();
+        assert_eq!(missing,root.join("missing/tail"));
+    }
 }
 pub struct Inputs {
     pub data: Value,
@@ -472,5 +526,86 @@ impl Inputs {
             Some(true)
         })();
         check == Some(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            static NEXT: AtomicUsize = AtomicUsize::new(0);
+            let path = env::temp_dir().join(format!("thor-inputs-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Scratch { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+    #[test]
+    fn native_inputs_support_files_directories_and_missing_paths() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("héllo.txt");
+        fs::write(&file, "contents").unwrap();
+        let before = signature(&file).unwrap();
+        let digest = file_digest(&file).unwrap();
+        let after = signature(&file).unwrap();
+        assert!(before.is_some());
+        assert_eq!(before, after);
+        assert_eq!(digest, sha256(b"contents"));
+        let mut inputs = Inputs::default();
+        inputs.file(&file, Some(b"contents"), true);
+        inputs.directory(&scratch.0);
+        inputs.file(&scratch.0.join("missing"), None, false);
+        assert!(inputs.valid());
+        fs::write(scratch.0.join("missing"), "new").unwrap();
+        assert!(!inputs.valid());
+    }
+    #[test]
+    fn native_inputs_rehash_same_size_edits_even_if_metadata_is_restored() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("data");
+        fs::write(&file, "before").unwrap();
+        let mut inputs = Inputs::default();
+        inputs.file(&file, None, true);
+        let mtime = filetime::FileTime::from_last_modification_time(&fs::metadata(&file).unwrap());
+        fs::write(&file, "change").unwrap();
+        filetime::set_file_mtime(&file, mtime).unwrap();
+        // Even forged matching metadata cannot bypass the content digest.
+        inputs.data["files"][file.to_string_lossy().as_ref()]["stat"] = json!(signature(&file).unwrap());
+        assert!(!inputs.valid());
+    }
+    #[test]
+    fn native_inputs_identical_rewrite_is_valid_but_replacement_identity_changes() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("data");
+        fs::write(&file, "same").unwrap();
+        let mut content = Inputs::default();
+        let mut metadata = Inputs::default();
+        content.file(&file, None, true);
+        metadata.file(&file, None, false);
+        let replacement = scratch.0.join("replacement");
+        fs::write(&replacement, "same").unwrap();
+        fs::remove_file(&file).unwrap();
+        fs::rename(&replacement, &file).unwrap();
+        assert!(content.valid());
+        assert!(!metadata.valid());
+        fs::remove_file(&file).unwrap();
+        assert!(!content.valid());
+    }
+    #[test]
+    fn native_inputs_overlay_and_package_membership_fail_closed() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("main.thor");
+        fs::write(&file, "package main").unwrap();
+        let mut overlay = Inputs::default();
+        overlay.file(&file, Some(b"different"), true);
+        assert!(!overlay.valid());
+        let mut package = Inputs::default();
+        package.package(&scratch.0, &[file], &["thor".into()]);
+        assert!(package.valid());
+        fs::write(scratch.0.join("new.thor"), "package main").unwrap();
+        assert!(!package.valid());
     }
 }

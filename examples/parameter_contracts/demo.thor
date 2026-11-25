@@ -32,7 +32,7 @@ copy_values :: proc(#ro source, #mut destination: []int) {
 square :: fn(value: int) -> int { return value*value }
 
 // Suppress this declaration's prefer-fn advice; normal uses remain allowed.
-@(vet_ignore="pure")
+@(vet_ignore={.pure})
 keep_as_proc :: proc(value: int) -> int { return value+1 }
 
 LIMIT :: 7
@@ -59,7 +59,7 @@ main :: proc() {
     if read_sum(destination) != 6 { panic("read-only input") }
 
     // Keep an intentionally mutable declaration, including during vet --apply.
-    @(vet_ignore="immutable")
+    @(vet_ignore={.immutable})
     editable := keep_as_proc(runtime_value)
     fmt.println(editable)
 }

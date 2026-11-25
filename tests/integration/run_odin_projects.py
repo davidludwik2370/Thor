@@ -6,6 +6,7 @@ No upstream test verdict or source is rewritten by this runner.
 """
 import argparse
 import ctypes
+import hashlib
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -30,11 +31,30 @@ if str(ROOT) not in sys.path:
 from thorlang.hygiene import tokens as source_tokens
 
 
+def acquire_lock(lock, blocking=False):
+    if os.name == 'nt':
+        import msvcrt
+        while True:
+            lock.seek(0)
+            try:
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                return True
+            except OSError:
+                if not blocking:return False
+                time.sleep(0.1)
+    else:
+        import fcntl
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+            return True
+        except BlockingIOError:
+            return False
+
+
 @contextmanager
 def project_lock(directory):
-    import fcntl
-    with (directory / 'run.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with (directory / 'run.lock').open('a+b') as lock:
+        acquire_lock(lock, blocking=True)
         yield
 
 
@@ -57,7 +77,8 @@ def vet_baselines(tokens, commands, values):
         # These runner settings control test presentation and scheduling. Vet
         # recipes select the same tested package without running its test loop.
         harness_defines = ('-define:ODIN_TEST_FANCY=', '-define:ODIN_TEST_THREADS=',
-                          '-define:ODIN_TEST_JSON_REPORT=', '-define:ODIN_TEST_RANDOM_SEED=')
+                          '-define:ODIN_TEST_JSON_REPORT=', '-define:ODIN_TEST_RANDOM_SEED=',
+                          '-define:ODIN_TEST_LOG_STATE_CHANGES=')
         return sorted(argument for argument in arguments
             if (argument.startswith(('-target:', '-define:', '-collection:'))
                 or argument in ('-file', '-no-entry-point'))
@@ -107,12 +128,49 @@ def fixture_overlay(project, stage, tree, source, directory):
     return overlay
 
 
+def native_arguments(recipe, values, *, platform=None):
+    arguments = [value.format(**values) for value in recipe['args']]
+    if (os.name if platform is None else platform) == 'nt':
+        mode = next((arg.split(':',1)[1] for arg in arguments if arg.startswith('-build-mode:')), 'exe')
+        suffix = {'dll':'.dll','dynamic':'.dll','obj':'.obj','object':'.obj','llvm':'.ll','llvm-ir':'.ll',
+                  'asm':'.s','assembly':'.s','assembler':'.s','static':'.lib'}.get(mode,'.exe')
+        arguments = [arg + suffix if arg.startswith('-out:') and not Path(arg[5:]).suffix else arg for arg in arguments]
+    return arguments
+
+
 def test_result_summary(packet):
     return {
         'total': packet.get('total'), 'success': packet.get('success'),
         'cases': sorted([package, case['name'], case.get('success')]
             for package, cases in packet.get('packages', {}).items() for case in cases),
     }
+
+
+def report_format_changed(project, report, mode):
+    baseline = {result['name']: result for result in report.get('baseline', [])}
+    return any(recipe['args'][0] == 'test'
+        and baseline.get(recipe['name'], {}).get('test_report_format','json') != mode
+        for recipe in project['commands'])
+
+
+def text_test_result_summary(text):
+    """Use Odin's ordinary state log when its optional JSON writer is unavailable.
+
+    A complete terminal state for every finished test is required. Never turn
+    a truncated/crashed runner into a successful comparison by counting lines.
+    """
+    text = ANSI.sub('', text)
+    counts = list(map(int, re.findall(r'Finished\s+(\d+)\s+tests?', text)))
+    terminal = {}
+    for index, name, state in re.findall(r'Test #(\d+) (\S+) changed state to (Successful|Failed)\.', text):
+        if '.' not in name:
+            return None
+        package, case = name.rsplit('.', 1)
+        terminal[int(index)] = [package, case, state == 'Successful']
+    if not counts or sum(counts) != len(terminal):
+        return None
+    cases = sorted(terminal.values())
+    return {'total': len(cases), 'success': all(case[2] for case in cases), 'cases': cases}
 
 
 def execute(arguments, cwd, log, environment, timeout=900):
@@ -122,15 +180,12 @@ def execute(arguments, cwd, log, environment, timeout=900):
 
 @contextmanager
 def execution_slot(environment):
-    import fcntl
     count = max(1, int(environment.get('THOR_INTEGRATION_JOBS', '2')))
-    locks = [(WORK / f'command-{index}.lock').open('a') for index in range(count)]
+    locks = [(WORK / f'command-{index}.lock').open('a+b') for index in range(count)]
     try:
         while True:
             for lock in locks:
-                try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except BlockingIOError:
+                if not acquire_lock(lock):
                     continue
                 yield
                 return
@@ -166,8 +221,15 @@ def physical_footprint_kib(pid):
 
 
 def process_tree(pid):
-    snapshot = subprocess.check_output(['ps', '-axo', 'pid,ppid,rss'], text=True)
-    processes = [tuple(map(int, line.split())) for line in snapshot.splitlines()[1:]]
+    if os.name == 'nt':
+        query = 'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize | ConvertTo-Json -Compress'
+        snapshot = subprocess.check_output(['powershell.exe','-NoProfile','-NonInteractive','-Command',query],text=True)
+        values = json.loads(snapshot)
+        if isinstance(values,dict):values=[values]
+        processes = [(int(p['ProcessId']),int(p['ParentProcessId']),int(p['WorkingSetSize'])//1024) for p in values]
+    else:
+        snapshot = subprocess.check_output(['ps', '-axo', 'pid,ppid,rss'], text=True)
+        processes = [tuple(map(int, line.split())) for line in snapshot.splitlines()[1:]]
     descendants = {pid}
     while True:
         children = {child for child, parent, _ in processes if parent in descendants}
@@ -183,6 +245,9 @@ def process_tree_rss(pid):
 
 
 def terminate_process_tree(pid):
+    if os.name == 'nt':
+        subprocess.run(['taskkill','/PID',str(pid),'/T','/F'],capture_output=True,timeout=20)
+        return
     descendants, _ = process_tree(pid)
     groups = {pid}
     for child in descendants:
@@ -211,7 +276,7 @@ def execute_locked(arguments, cwd, log, environment, timeout=900):
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.with_suffix('.stdout').open('wb') as stdout_file, log.with_suffix('.stderr').open('wb') as stderr_file:
         process = subprocess.Popen(arguments, cwd=cwd, env=environment,
-            stdout=stdout_file, stderr=stderr_file, start_new_session=True)
+            stdout=stdout_file, stderr=stderr_file, start_new_session=os.name!='nt')
         try:
             while True:
                 try:
@@ -222,7 +287,7 @@ def execute_locked(arguments, cwd, log, environment, timeout=900):
                     if maximum_rss and peak_rss > maximum_rss:
                         status = 'memory-limit'
                         descendants, _ = process_tree(process.pid)
-                        snapshot = subprocess.check_output(['ps','-axo','pid,ppid,rss,command'],text=True)
+                        snapshot = subprocess.check_output(['ps','-axo','pid,ppid,rss,command'],text=True) if os.name!='nt' else 'pid parent rss command\n'
                         rows = [line.split(None,3) for line in snapshot.splitlines()[1:]]
                         details = [{'pid':int(pid),'parent':int(parent),'resident_kib':int(resident),
                             'footprint_kib':physical_footprint_kib(int(pid)),'command':command}
@@ -268,7 +333,17 @@ def run_locked(project, args, source, directory):
     report_path = directory / 'report.json'
     report = json.loads(report_path.read_text()) if report_path.exists() else {}
     report.update(repo=project['repo'], commit=project['commit'])
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
+    proof = WORK / 'upstream-source-manifest.json'
+    if os.name == 'nt' and proof.is_file() and not (source/'.git').exists():
+        package = next(item for item in json.loads(proof.read_text()) if item['repo']==project['repo'])
+        for name, expected in package['files'].items():
+            path = (source/name).resolve()
+            if not path.is_relative_to(source.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
+                raise RuntimeError(f'Upstream snapshot hash mismatch: {name}')
+        revision = package['commit']
+        report['source_identity'] = 'sha256-source-snapshot'
+    else:
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
     if revision != project['commit']:
         raise RuntimeError(f'{slug} has revision {revision}, expected {project["commit"]}')
     if project.get('patch'):
@@ -282,7 +357,7 @@ def run_locked(project, args, source, directory):
     environment.setdefault('THOR_FRONTEND_ODIN', str(Path(args.odin).resolve()))
     environment.update({key: value.format(source=str(source), work=str(WORK), root=str(ROOT))
                         for key, value in project.get('environment', {}).items()})
-    native = project.get('odin', args.odin)
+    native = args.odin if os.name=='nt' else project.get('odin', args.odin)
     native = native.format(work=str(WORK), root=str(ROOT))
     native = str(Path(shutil.which(native) or native).resolve())
     environment['PATH'] = str(Path(native).parent) + os.pathsep + environment['PATH']
@@ -299,14 +374,24 @@ def run_locked(project, args, source, directory):
         if stage != 'baseline' and project.get('translate_runtime_commands'):
             proxy = WORK / 'tools' / 'runtime-command-proxy'
             proxy.mkdir(parents=True, exist_ok=True)
-            launcher = proxy / 'odin'
-            target = MANIFEST.with_name('odin_runtime_proxy.py')
-            if not launcher.exists():
-                launcher.symlink_to(target)
-            target.chmod(0o755)
+            if os.name=='nt':
+                launcher = proxy / 'odin.exe'
+                shutil.copy2(ROOT/'rust/target/release/examples/integration_odin_proxy.exe', launcher)
+            else:
+                launcher = proxy / 'odin'
+                target = MANIFEST.with_name('odin_runtime_proxy.py')
+                if not launcher.exists():
+                    launcher.symlink_to(target)
+                target.chmod(0o755)
             command_environment.update(THOR_INTEGRATION_ODIN=native, THOR_INTEGRATION_THOR=str(args.thor))
             command_environment['PATH'] = str(proxy) + os.pathsep + command_environment['PATH']
+        previous_results=report.get(stage,[])
         for index, recipe in enumerate(project['commands']):
+            selection=getattr(args,'commands',None)
+            if selection and not re.search(selection,recipe['name']):
+                previous=[result for result in previous_results if result['name']in(recipe['name'],recipe['name']+'-translation')]
+                results.extend(previous or [{'name':recipe['name'],'status':'not-selected'}])
+                continue
             if recipe.get('skip_repeated_runtime'):
                 previous = next((result for result in report.get(stage, []) if result['name'] == recipe['name']), None)
                 result = {'name':recipe['name'], 'status':'native-runtime-unavailable',
@@ -321,10 +406,13 @@ def run_locked(project, args, source, directory):
             artifact = directory / f'{stage}-{index}-program'
             values = {'source': str(source), 'tree': str(tree), 'artifact': str(artifact),
                       'work': str(WORK), 'root': str(ROOT)}
-            tokens = [value.format(**values) for value in recipe['args']]
+            tokens = native_arguments(recipe, values)
             if tokens[0] == 'test':
-                tokens += [f'-define:ODIN_TEST_JSON_REPORT={directory / f"{stage}-{index}-tests.json"}',
-                           '-define:ODIN_TEST_RANDOM_SEED=582019']
+                if getattr(args,'test_report','json') == 'text':
+                    tokens += ['-define:ODIN_TEST_LOG_STATE_CHANGES=true']
+                else:
+                    tokens += [f'-define:ODIN_TEST_JSON_REPORT={directory / f"{stage}-{index}-tests.json"}']
+                tokens += ['-define:ODIN_TEST_RANDOM_SEED=582019']
             cwd = tree / recipe.get('cwd', '.').format(**values)
             if stage == 'baseline':
                 invocation = [native, *tokens]
@@ -353,6 +441,13 @@ def run_locked(project, args, source, directory):
             if tokens[0] == 'test' and test_report.exists():
                 packet = json.loads(test_report.read_text())
                 result['test_results'] = test_result_summary(packet)
+                result['test_report_format'] = 'json'
+            elif tokens[0] == 'test' and getattr(args,'test_report','json') == 'text':
+                text = ''.join(Path(result[key]).read_text(errors='replace') for key in ('stdout','stderr'))
+                summary = text_test_result_summary(text)
+                if summary is not None:
+                    result['test_results'] = summary
+                result['test_report_format'] = 'text'
             baseline = next((r for r in report.get('baseline', []) if r['name'] == recipe['name']), None)
             if stage != 'baseline' and baseline:
                 result['matches_baseline'] = (
@@ -376,7 +471,7 @@ def run_locked(project, args, source, directory):
         save()
         return
     if args.stage in ('all', 'baseline'):
-        if args.fresh or 'baseline' not in report:
+        if args.fresh or 'baseline' not in report or report_format_changed(project,report,getattr(args,'test_report','json')):
             report['baseline'] = commands('baseline', source)
             save()
     if args.stage == 'baseline':
@@ -393,7 +488,7 @@ def run_locked(project, args, source, directory):
                 continue
             values = {'tree': str(source), 'source': str(source), 'work': str(WORK), 'root': str(ROOT),
                       'artifact': str(directory / f'migration-{index}-program')}
-            tokens = [value.format(**values) for value in recipe['args']]
+            tokens = native_arguments(recipe, values)
             invocation += ['--command', shlex.join([native, *tokens])]
         report['migration'] = execute(invocation, source, directory / 'migration', environment, args.timeout)
         save()
@@ -430,16 +525,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--projects', default='.*')
     parser.add_argument('--stage', choices=['all', 'baseline', 'migrated', 'vetted', 'verify'], default='all')
-    parser.add_argument('--thor', type=Path, default=ROOT / 'rust/target/release/thor-rust')
+    parser.add_argument('--thor', type=Path, default=ROOT / ('rust/target/release/thor-rust.exe' if os.name=='nt' else 'rust/target/release/thor-rust'))
     parser.add_argument('--odin', default=shutil.which('odin'))
+    parser.add_argument('--commands',help='With --stage verify, rerun matching command names and retain other recorded results')
     parser.add_argument('--jobs', type=int, default=1)
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--fresh', action='store_true')
+    parser.add_argument('--test-report', choices=['json','text'], default='json',
+        help='Use native state logs if the selected SDK has no working optional JSON reporter')
     args = parser.parse_args()
+    if args.commands and args.stage!='verify':parser.error('--commands requires --stage verify')
     args.thor = args.thor.resolve()
     projects = [p for p in json.loads(MANIFEST.read_text()) if re.search(args.projects, p['repo'])]
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        list(pool.map(lambda project: run_project(project, args), projects))
+    if args.jobs == 1:
+        # Keep the default runner on the main thread, so Ctrl+C can unwind its
+        # active command/locks instead of waiting for an executor worker.
+        for project in projects:
+            run_project(project, args)
+    else:
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            list(pool.map(lambda project: run_project(project, args), projects))
 
 
 if __name__ == '__main__':

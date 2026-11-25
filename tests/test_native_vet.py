@@ -97,7 +97,10 @@ class NativeVetTests(unittest.TestCase):
                 # the native policy errors, including complete source ranges.
                 actual=[d for d in actual if d['type']=='error']
                 errors=[d for d in expected if d['type']=='error']
-                expected_messages=[[m.replace(str(self.root/'original.odin'),str(self.source)) for m in d['msgs']] for d in errors]
+                def original_message(message):
+                    original=self.root/'original.odin'
+                    return message.replace(str(original),str(self.source)).replace(original.as_posix(),str(self.source))
+                expected_messages=[[original_message(m) for m in d['msgs']] for d in errors]
                 self.assertEqual([d['msgs'] for d in actual],expected_messages,actual)
                 for found,native_error in zip(actual,errors):
                     if not native_error.get('pos'):
@@ -160,7 +163,8 @@ class NativeVetTests(unittest.TestCase):
                     self.call(engine,'-vet-cast',command=command)
             for flags in [native.UNCHECKED, ['-debug'],['-build-mode:obj','-use-single-module']]:
                 with self.subTest(engine=engine,flags=flags):
-                    output=self.root/(engine+'artifact')
+                    extension=('.obj' if os.name=='nt' else '.o') if '-build-mode:obj' in flags else ('.exe' if os.name=='nt' else '')
+                    output=self.root/(engine+'artifact'+extension)
                     self.call(engine,'-vet','-vet-packages:main','-out:'+str(output),*flags,command='build')
                     self.assertTrue(output.is_file())
             self.source.write_text('#+test\n#+vet unused cast\npackage main\nimport "core:testing"\n@(test)\nworks::proc(t:^testing.T){testing.expect(t,2+2==4)}\n')

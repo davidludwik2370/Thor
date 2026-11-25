@@ -582,6 +582,36 @@ main::proc(){REP{*}ORT}
 }
 
 @(test)
+thor_hover_dependent_generic_constant :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+square::fn(value:$T)->T{return value*value}
+LATER::square(FIRST)
+FIRST::square(3)
+main::proc(){LAT{*}ER}
+`)
+    test.expect_hover_contains(t,&source,"LATER :: square(FIRST)")
+}
+
+@(test)
+thor_hover_nested_generic_call :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+identity::proc(value:$T)->T{return value}
+main::proc(){result:=identity(identity(i32(3)));res{*}ult}
+`)
+    test.expect_hover_contains(t,&source,"result: i32")
+}
+
+@(test)
+thor_hover_generic_alias_nested_call :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+identity::proc(value:$T)->T{return value}
+alias::identity
+main::proc(){result:=alias(identity(f64(3)));res{*}ult}
+`)
+    test.expect_hover_contains(t,&source,"result: f64")
+}
+
+@(test)
 thor_hover_set_library_parameter :: proc(t:^testing.T) {
     source:=thor_source(`package test
 import "thor:sets"

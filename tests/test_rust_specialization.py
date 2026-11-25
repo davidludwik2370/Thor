@@ -11,6 +11,7 @@ import unittest
 from thorlang.driver import Project, frontend_binary
 from thorlang.semantics import Type
 from thorlang.specialization import Binding, Specializations, Unresolved, type_code
+from tests.native_paths import rust_binary
 from tests import test_rust_compiler as native
 
 
@@ -91,7 +92,7 @@ class RustSpecializationTests(unittest.TestCase):
                         'declarations': {'code': state.declarations(main, state.bindings)},
                         'predicate': {'code': state.predicate(main.root, state.bindings)},
                         'restored': True, 'changed': bool(state.bindings), 'frames': [1, 0]}
-            result = subprocess.run([str(native.ROOT/'rust/target/release/examples/specialization_protocol'),
+            result = subprocess.run([str(rust_binary('specialization_protocol', example=True)),
                                      str(entry)], capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
             def normalize(packet):

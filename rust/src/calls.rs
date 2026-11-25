@@ -79,7 +79,13 @@ impl Resolver<'_> {
             crate::profile::count("resolver.call_plan_hits", 1);
             return plans.clone();
         }
-        let stable = self.active.is_empty() && self.planning.is_empty() && self.conditions.borrow().is_empty();
+        let tracking = self.track_import_demands.get();
+        let local_key = (context.clone(), tracking);
+        if let Some(plans) = self.metadata.as_ref().and_then(|m|m.local_calls.get(&call)?.get(&local_key))
+            .or_else(||self.base_metadata.as_ref()?.local_calls.get(&call)?.get(&local_key)) {
+            crate::profile::count("resolver.local_call_plan_hits", 1);
+            return plans.clone();
+        }
         let epoch = self.incomplete_plans.get();
         let key = (
             call,
@@ -93,10 +99,13 @@ impl Resolver<'_> {
             return vec![];
         }
         let plans = self.plan_calls(call, context);
+        // A nested query can also finish independently of its caller. The
+        // recursion epoch records any curtailed type/condition/call query;
+        // requiring an empty inference stack discarded most complete plans.
         // Retain only a unique plan with fully known inputs/bindings. Partial,
         // ambiguous, recursively curtailed and unloaded-import plans take the
         // existing planner path on their next use.
-        if stable && plans.len() == 1 && !self.has_demanded_packages()
+        if plans.len() == 1 && !self.has_demanded_packages()
             && context.values().all(Type::resolved)
             && plans[0].bindings.values().all(Type::resolved)
             && plans[0].arguments.iter().flatten()
@@ -104,6 +113,20 @@ impl Resolver<'_> {
             && epoch == self.incomplete_plans.get() && !self.has_demanded_packages() {
             if let Some(memo) = &mut self.metadata {
                 memo.calls.entry(call).or_default().insert(context.clone(),plans.clone());
+                crate::profile::count("resolver.call_plans_cached", 1);
+            }
+        } else if epoch == self.incomplete_plans.get() && !self.has_demanded_packages() {
+            // Generic/ambiguous/empty answers are still deterministic for the
+            // exact substitutions and fixed source graph. Never move them to
+            // discovery's append-only cache; new declarations can refine them.
+            // Include demand tracking because a miss must still record imports
+            // when the permission-discovery pass enables that observation.
+            if let Some(memo) = &mut self.metadata {
+                if memo.local_call_count < 65_536 {
+                    let previous = memo.local_calls.entry(call).or_default().insert(local_key, plans.clone());
+                    if previous.is_none() { memo.local_call_count += 1; }
+                    crate::profile::count("resolver.local_call_plans_cached", 1);
+                }
             }
         }
         // Keep the recursion guard while proving the argument types complete.

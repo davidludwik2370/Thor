@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.22.2",
+  "version": "0.23.3",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -15,6 +15,7 @@
   ],
   "main": "./extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:thor",
     "onDebugResolve:thor-lldb",
     "onTaskType:thor-debug-build"
@@ -89,6 +90,14 @@
       {
         "command": "thor.restoreConstantColor",
         "title": "Thor: Restore Previous Constant Color"
+      },
+      {
+        "command": "thor.applyRecommendedColors",
+        "title": "Thor: Apply Recommended Colors"
+      },
+      {
+        "command": "thor.restoreRecommendedColors",
+        "title": "Thor: Restore Previous Colors"
       }
     ],
     "configuration": {
@@ -99,11 +108,17 @@
           "default": true,
           "description": "Run the local TLS language server."
         },
+        "tls.hoverSize": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show a compact size line below hover declarations. Sizes describe the value itself; pointers and headers exclude referenced allocations."
+        },
         "tls.vet": {
           "type": "boolean",
           "default": false,
           "scope": "resource",
-          "description": "Enable Thor immutable-binding, pure-function, unused-declaration and unnecessary-semicolon warnings, with quick fixes for immutable, pure, unused-import and semicolon suggestions."
+          "description": "Enable Thor convention and memory checks. Definite memory issues remain warnings; incomplete analyses are summarized by default. Verified convention corrections offer quick fixes."
         },
         "tls.server.path": {
           "type": "string",
@@ -144,6 +159,27 @@
           "default": "normal",
           "scope": "resource",
           "description": "Thor compile-time execution policy for live diagnostics. Use the matching --comptime mode in build/run commands. Override ignores #runtime barriers; purity and ownership rules remain enforced."
+        },
+        "tls.unverified": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "show",
+            "error"
+          ],
+          "default": "summary",
+          "scope": "resource",
+          "enumDescriptions": [
+            "Show one informational count per affected file (default).",
+            "Show individual unverified findings as information.",
+            "Show individual unverified findings as errors."
+          ],
+          "description": "Presentation and severity of incomplete Thor analyses when tls.vet is enabled. Unverified does not mean a confirmed bug. Changing this restarts TLS."
+        },
+        "thor.colors.recommended": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in Thor-only semantic colors. Existing explicit customizations are preserved; disabling removes only unchanged rules added by Thor."
         }
       }
     },
@@ -186,9 +222,14 @@
     "taskDefinitions": [
       {
         "type": "thor-debug-build",
-        "required": ["directory"],
+        "required": [
+          "directory"
+        ],
         "properties": {
-          "directory": {"type": "string", "description": "Thor source directory to build for debugging."}
+          "directory": {
+            "type": "string",
+            "description": "Thor source directory to build for debugging."
+          }
         }
       }
     ],

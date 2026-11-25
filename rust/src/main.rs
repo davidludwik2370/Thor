@@ -178,15 +178,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         return thor_compiler::migrate::main(&args[1..], &thor_compiler::cli::root()?);
     }
     if args.first().is_some_and(|arg| arg == "new") {
-        let root = env::var_os("THOR_ROOT")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .parent()
-                    .unwrap()
-                    .to_path_buf()
-            });
-        return thor_compiler::project_template::main(&args[1..], &absolute(&root)?);
+        return thor_compiler::project_template::main(&args[1..], &thor_compiler::cli::root()?);
     }
     let command = args.remove(0);
     if !thor_compiler::cli::source_command(&command) {
@@ -238,15 +230,12 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         entry,
         output: None,
         cache: None,
-        odin: env::var("THOR_ODIN").unwrap_or_else(|_| "odin".into()),
+        odin: thor_compiler::cli::odin_option(&[]),
         flags: vec![],
         args: vec![],
         no_cache: false,
         json: false,
-        root: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .to_path_buf(),
+        root: thor_compiler::cli::root()?,
         maps: false,
         tracking: "auto".into(),
         no_sanitize: false,
@@ -260,12 +249,11 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         vet: None,
         vet_apply: false,
         vet_ask: false,
+        unverified: Default::default(),
     };
-    if let Some(root) = env::var_os("THOR_ROOT") {
-        options.root = absolute(&PathBuf::from(root))?;
-    }
     let mut publishing = thor_compiler::publishing::Options::default();
     let mut packaging_options = false;
+    let mut unverified_requested = false;
     let mut expanded = vec![];
     let mut runtime_arguments = false;
     for argument in args {
@@ -367,6 +355,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "--cache-report" => options.cache_report = true,
             "--raw-diagnostics" => options.raw_diagnostics = true,
             "--vet" => options.vet = Some(thor_compiler::vet::CHECKS.iter().map(|check| (*check).into()).collect()),
+            "--unverified" => {
+                unverified_requested = true;
+                options.unverified = thor_compiler::unverified::Mode::Show;
+            }
             "--apply" => options.vet_apply = true,
             "--ask" => options.vet_ask = true,
             "--source-maps" => options.maps = true,
@@ -398,6 +390,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             }
             _ if argument.starts_with("--vet=") => {
                 options.vet = Some(argument[6..].split(',').map(str::to_string).collect())
+            }
+            _ if argument.starts_with("--unverified=") => {
+                unverified_requested = true;
+                options.unverified = thor_compiler::unverified::Mode::parse(&argument[13..])?;
             }
             _ if argument.starts_with("--run-timeout=") => {
                 options.run_timeout = parse_run_timeout(&argument[14..])?;
@@ -459,6 +455,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         return Err(Error::usage(
             "Thor vet requires mapped diagnostics without --raw-diagnostics",
         ));
+    }
+    if unverified_requested && (!matches!(options.command.as_str(), "check"|"build"|"run"|"test"|"vet"|"publish")
+        || options.command != "vet" && options.vet.is_none()) {
+        return Err(Error::usage("--unverified requires Thor vet checks: use thor vet, or add --vet to check/build/run/test/publish. Native -vet alone does not enable Thor analysis."));
     }
     if packaging_options && options.command != "publish" {
         return Err(Error::usage(

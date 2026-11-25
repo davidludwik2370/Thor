@@ -9,6 +9,7 @@ import sys
 import unittest
 from unittest.mock import patch
 from tests import test_rust_compiler as native
+from tests.native_paths import native_test_compiler
 
 
 class CompilerOutputTests(unittest.TestCase):
@@ -139,7 +140,8 @@ main :: proc() { fmt.println("reports") }
             deps=self.root/(engine+'-dependencies.json')
             self.call(engine,'build','-export-dependencies:json','-export-dependencies-file:'+str(deps))
             document=json.loads(deps.read_text())
-            self.assertIn(str(self.source),json.dumps(document))
+            paths=[str(value).replace('\\','/') for value in document.get('source_files',[])]
+            self.assertIn(self.source.as_posix(),paths)
             self.assertNotIn('/input/main.odin',json.dumps(document))
             makefile=self.root/(engine+'-dependencies.d')
             self.call(engine,'build','--output-dir',self.root/(engine+' generated'),'-export-dependencies:make','-export-dependencies-file:'+str(makefile))
@@ -216,12 +218,13 @@ main :: proc() {
         for engine in compiler_engines():
             self.source.write_bytes(raw.replace('\n','\r\n').encode())
             self.source.chmod(0o640)
+            original_mode=self.source.stat().st_mode&0o777
             backup=Path(str(self.source)+'~backup.thor-temp');backup.unlink(missing_ok=True)
             result=self.call(engine,'strip-semicolon','-keep-temp-files','-json-errors')
             packet=json.loads(result.stderr);self.assertEqual(packet['errors'],[])
             self.assertIn('Files stripped',packet['information'])
             self.assertEqual(backup.read_bytes(),raw.replace('\n','\r\n').encode())
-            self.assertEqual(self.source.stat().st_mode&0o777,0o640)
+            self.assertEqual(self.source.stat().st_mode&0o777,original_mode)
             edited=self.source.read_bytes()
             self.assertNotIn(b'package main;',edited)
             self.assertIn(b'for i:=0;',edited);self.assertIn(b'i<1;',edited)
@@ -273,6 +276,7 @@ main :: proc() {}
         fake=self.root/'fake-odin'
         fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
         fake.chmod(0o755)
+        if os.name=='nt':fake=native_test_compiler(self.root,'delegate')
         for engine in compiler_engines():
             result=self.call(engine,'bundle','android','--odin',fake,'-android-keystore:key',cwd=self.root)
             self.assertEqual(result.stdout.splitlines(),['bundle','android','.','-android-keystore:key'])
