@@ -29,6 +29,10 @@ origin. No command uploads or publishes anything.
 
 ## Automatic prerequisites and supported hosts
 
+On Ubuntu/Debian, setup waits up to five minutes for package-manager locks held
+by automatic updates or another package operation. Package-list lock contention
+is retried within the same limit; other package-manager errors are reported.
+
 The installer reuses working tools and installs missing prerequisites. On macOS
 it opens Apple's Command Line Tools installer and waits for its completion;
 Apple's license/installation dialog still needs approval. On Linux it uses the
