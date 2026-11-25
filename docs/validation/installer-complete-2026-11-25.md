@@ -88,3 +88,12 @@ installations are available through the workflow's explicit source-build run.
 
 Detailed transient logs and checksum-verified release bundles are kept under
 ignored `dist/install-v2-validation/`; no binaries or build caches are committed.
+
+Release 0.41.7 publishes macOS ARM64, Linux ARM64 and Windows x64 bundles. All
+six uploaded archive/checksum assets have GitHub SHA-256 digests matching the
+local files. A final macOS ARM64 run downloaded through the ordinary repository
+bootstrap, installed, passed checked/unchecked compilation and doctor, and
+uninstalled successfully. Hosts without a published native asset use the
+documented source fallback. Temporary Mac/Ubuntu validation installations and
+editor directories were removed; Ubuntu's original registration and shell
+profile were restored.
