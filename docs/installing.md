@@ -192,7 +192,21 @@ registry directly.
 
 Profiles apply to windows/workspaces, not automatically to `.thor` extensions.
 Open a project with `code /path/to/project --profile Thor`; VS Code can remember
-that association. Cmd+R/Cmd+Shift+R on macOS (Ctrl+R/Ctrl+Shift+R elsewhere) are
+that association. Restarting a window that uses a different profile does not
+switch its profile. If a `.thor` file shows **Plain Text** in the status bar,
+first open the project explicitly in the profile selected during installation.
+On macOS, if the `code` shell command is unavailable, use the application launcher:
+
+```bash
+"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --new-window --profile Thor /path/to/project
+```
+
+An application installed in `~/Applications` has the same launcher path under
+that directory. Extensions installed with `--profile Thor` are available in Thor
+profile windows; this does not install them into the default profile. Compiler
+reinstallation is unnecessary when the issue is the active VS Code profile.
+
+Cmd+R/Cmd+Shift+R on macOS (Ctrl+R/Ctrl+Shift+R elsewhere) are
 provided by the extension and apply only in Thor editors. Existing user bindings
 retain precedence. Projects' `.vscode` files are not rewritten.
 

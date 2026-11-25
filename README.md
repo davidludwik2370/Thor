@@ -22,6 +22,9 @@ project configurations are preserved. Windows uses `thor-install.cmd`.
 Editor setup includes Thor tools, the standard Odin Language Server (OLS) extension and CodeLLDB. The
 extension makes installed Thor commands available in new VS Code terminals;
 reload the window after updates and relaunch terminals with a stale environment.
+When using `--profile Thor`, open your project in that VS Code profile, for example
+with `code --profile Thor /path/to/project`. Restarting an existing window keeps
+its selected profile; Thor files should show **Thor** in the status bar.
 The [installation guide](docs/installing.md) covers prerequisites, optional Thor
 colors, source builds, verification and uninstall. Native bundles are downloaded
 automatically when available; otherwise supported hosts build from the checkout.

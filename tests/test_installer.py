@@ -311,7 +311,9 @@ if '--new-window' in a:
 
     def test_new_profile_uses_template_and_installs_all_three_extensions(self):
         code,data,extensions,profile=self.fake_code()
-        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        self.assertIn('Open your project in VS Code profile "Thor"',result.stdout)
+        self.assertIn('Restarting a window in another profile will not switch it.',result.stdout)
         settings=json.loads((profile/'settings.json').read_text())
         expected={'workbench.colorTheme':'Dark Modern','thor.colors.recommended':True}
         if NATIVE_OLS:expected['ols.server.path']=str(next((self.prefix/'editor/ols').glob('*/ols')))
@@ -333,7 +335,8 @@ if '--new-window' in a:
     def test_existing_profile_settings_and_keybindings_are_preserved_byte_for_byte(self):
         code,data,extensions,profile=self.fake_code(existing=True)
         before={p.name:p.read_bytes() for p in profile.iterdir()}
-        self.invoke(self.bundle(),'--vscode','--profile','Thor','--colors','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--colors','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        self.assertIn('Open your project in VS Code profile "Thor"',result.stdout)
         if NATIVE_OLS:
             self.assertEqual((profile/'keybindings.json').read_bytes(),before['keybindings.json'])
             self.assertIn(before['settings.json'].decode().rstrip('}'),(profile/'settings.json').read_text())
@@ -348,7 +351,8 @@ if '--new-window' in a:
 
     def test_default_profile_install_does_not_change_settings(self):
         code,data,extensions,profile=self.fake_code()
-        self.invoke(self.bundle(),'--vscode','--code',str(code),'--code-user-data',str(data))
+        result=self.invoke(self.bundle(),'--vscode','--code',str(code),'--code-user-data',str(data))
+        self.assertNotIn('Open your project in VS Code profile',result.stdout)
         self.assertFalse(profile.exists())
         if NATIVE_OLS:
             self.assertTrue(json.loads((data/'User/settings.json').read_text())['custom'])

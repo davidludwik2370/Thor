@@ -123,6 +123,9 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
         command(cmd).map_err(|e|format!("Thor CLI is installed, but editor setup is incomplete. Correct the error and rerun the same installer command. {e}"))?;
     }
     println!("Thor, the standard Odin Language Server (OLS), and CodeLLDB extensions installed. Reload the profile's window to activate them, then open a new terminal for Thor's PATH. OLS owns .odin files; TLS owns .thor files. Shortcuts apply only in Thor editors.");
+    if let Some(profile)=&o.profile {
+        println!("Open your project in VS Code profile {profile:?}; the extensions were installed in that profile only. Restarting a window in another profile will not switch it. A .thor file should show Thor, rather than Plain Text, in the status bar.");
+    }
     Ok(())
 }
 
