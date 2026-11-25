@@ -58,7 +58,9 @@ try {
                 InvokeChecked 'winget' @('install','--id',$tool[1],'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
             }
         }
-        $env:PATH=[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine')
+        # Registry refresh must retain process-only entries (CI tool caches,
+        # activated environments and user shell tools).
+        $env:PATH=$env:PATH+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine')
         # Export the selected MSVC environment only into the source-build child.
         # The caller imports this snapshot rather than changing global PATH.
         $dev=Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'

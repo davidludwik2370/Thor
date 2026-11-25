@@ -70,6 +70,16 @@ case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; FreeBSD) os=freebsd;;
 machine=$(uname -m)
 if [ "$machine" = evbarm ]; then machine=$(uname -p); fi
 case "$machine" in arm64|aarch64) arch=aarch64;; x86_64|amd64) arch=x86_64;; *) echo 'thor-install: unsupported architecture' >&2; exit 1;; esac
+source_install() {
+    PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
+    python=
+    for candidate in python3 python3.14 python3.13 python3.12 python3.11; do
+        if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3,11))' >/dev/null 2>&1; then python=$candidate; break; fi
+    done
+    [ -n "$python" ] || { echo 'Source installation requires Python 3.11+. Install it and rerun.' >&2; exit 1; }
+    set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+    "$python" "$root/install/from_source.py" "$@"
+}
 # Maintenance uses the installed native installer, copied away from files that
 # uninstall will remove. It never downloads a release or provisions software.
 if [ -n "$maintenance" ]; then
@@ -104,9 +114,7 @@ if $from_source; then
     # --dry-run must not install Python/Rust or change the checkout.
     if $dry; then echo 'Source install plan: acquire pinned build tools/Odin, build Thor/TLS/editor, verify and install; no changes made.'; exit 0; fi
     if ! $no_deps; then sh "$root/install/prerequisites.sh" --source; fi
-    PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
-    set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
-    python3 "$root/install/from_source.py" "$@"; exit $?
+    source_install; exit $?
 fi
 if [ -z "$bundle" ]; then
     if ! $no_deps && ! $dry; then sh "$root/install/prerequisites.sh" --download-only; fi
@@ -125,9 +133,7 @@ if [ -z "$bundle" ]; then
         if $dry; then echo 'No prebuilt release: source-build fallback would be used; no changes made.'; exit 0; fi
         echo 'No release binary exists for this host; building the checked-out source.'
         if ! $no_deps; then sh "$root/install/prerequisites.sh" --source; fi
-        PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
-        set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
-        python3 "$root/install/from_source.py" "$@"; exit $?
+        source_install; exit $?
     fi
     case "$status" in 2??) ;; *) echo "Release download failed (HTTP $status); no source fallback on transport errors." >&2; exit 1;; esac
     if [ -z "$checksum" ]; then

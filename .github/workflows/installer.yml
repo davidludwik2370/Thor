@@ -10,6 +10,10 @@ on:
         description: Build and install the complete toolchain from pinned source
         type: boolean
         default: true
+      windows_only:
+        description: Limit a source-install retry to the Windows host
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -17,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+        os: ${{ fromJSON(inputs.windows_only && '["windows-2025"]' || '["ubuntu-24.04","ubuntu-24.04-arm","macos-15","macos-15-intel","windows-2025"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -34,7 +38,15 @@ jobs:
       - name: Complete Windows source installation
         if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         shell: powershell
-        run: .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-install" --path
+        run: |
+          # Preserve process-only PATH entries while refreshing installed tools.
+          $sentinel=Join-Path $env:RUNNER_TEMP 'thor-prerequisite-sentinel'
+          New-Item -ItemType Directory -Force $sentinel | Out-Null
+          Set-Content -LiteralPath (Join-Path $sentinel 'thor-prerequisite-sentinel.cmd') -Value '@exit /b 0'
+          $env:PATH=$sentinel+';'+$env:PATH
+          . .\install\prerequisites.ps1 -SourceBuild
+          if (!(Get-Command thor-prerequisite-sentinel -ErrorAction SilentlyContinue)) {throw 'Prerequisite setup lost the process PATH'}
+          .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-install" --path
       - name: POSIX doctor and uninstall
         if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         run: |

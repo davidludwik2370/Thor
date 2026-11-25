@@ -471,6 +471,7 @@ fn activate(prefix: &Path, root: &Path, manifest: &Value) -> Result<()> {
     }
     atomic_write(&record_path,&serde_json::to_vec_pretty(&record).map_err(err)?)
 }
+#[cfg(unix)]
 fn shell_quote(p: &Path) -> String { format!("'{}'",p.to_string_lossy().replace('\'',"'\\''")) }
 fn add_path(bin: &Path) -> Result<()> {
     if bin.to_string_lossy().contains(if cfg!(windows) {';'}else{':'}) {

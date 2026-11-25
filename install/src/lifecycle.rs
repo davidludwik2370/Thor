@@ -100,9 +100,11 @@ fn remove_inventory(root:&Path,manifest:&Value,dry:bool)->Result<()> {
         let views=root.join("lib");
         if generated_views(root,&views) {let _=fs::remove_dir_all(views);}
     }
+    let mut directories=BTreeSet::new();
     for (name,record) in manifest["files"].as_object().ok_or("invalid inventory")? {
         if !safe_path(Path::new(name)) {return Err("unsafe uninstall inventory".into());}
         let path=root.join(name);
+        let mut parent=path.parent();while let Some(p)=parent {if p==root{break;}directories.insert(p.to_path_buf());parent=p.parent();}
         let mut ancestor=path.parent();let mut linked=false;
         while let Some(p)=ancestor {if p==root{break;}if p.is_symlink(){linked=true;break;}ancestor=p.parent();}
         if !linked && !path.is_symlink() && digest(&path).ok().as_deref()==record["sha256"].as_str() {
@@ -110,13 +112,15 @@ fn remove_inventory(root:&Path,manifest:&Value,dry:bool)->Result<()> {
         } else if path.exists() || path.is_symlink() {println!("RETAINED: modified/unmanaged file {}",path.display());}
     }
     if !dry {
-        let _=fs::remove_file(root.join(MANIFEST));remove_empty(root);
+        let _=fs::remove_file(root.join(MANIFEST));
+        let mut directories=directories.into_iter().collect::<Vec<_>>();directories.sort_by_key(|p|std::cmp::Reverse(p.components().count()));
+        for path in directories {let _=fs::remove_dir(path);}
+        remove_empty(root);
     }
     Ok(())
 }
 fn remove_empty(root:&Path) {
     if root.is_symlink(){return;}
-    if let Ok(entries)=fs::read_dir(root) {for entry in entries.flatten() {if entry.file_type().is_ok_and(|t|t.is_dir()){remove_empty(&entry.path());}}}
     let _=fs::remove_dir(root);
 }
 
@@ -195,7 +199,9 @@ pub(super) fn uninstall(o:&Options)->Result<()> {
         clean_shared_cache(o.dry)?;
         for name in ["setup-state.json","previous-installation.json",MARKER] {let _=fs::remove_file(prefix.join(name));}
         fs::remove_file(registry()?).map_err(err)?;
-        drop(guard);remove_empty(&prefix);
+        drop(guard);
+        for name in ["bin","versions","editor/ols","editor"] {remove_empty(&prefix.join(name));}
+        remove_empty(&prefix);
     }
     println!("{}Thor uninstall complete. VS Code, developer tools, projects, source checkouts and user-modified files are retained.",if o.dry{"Dry run: "}else{""});Ok(())
 }
@@ -216,6 +222,7 @@ fn clean_shared_cache(dry:bool)->Result<()> {
                 key.len()==64&&key.bytes().all(|b|b.is_ascii_hexdigit()&&!b.is_ascii_uppercase()));
             if owned&&entry.file_type().is_ok_and(|t|t.is_file())&&!dry {fs::remove_file(entry.path()).map_err(err)?;}
         }}
+        if !dry {remove_empty(&bucket);}
     }
-    if !dry{remove_empty(&root);}Ok(())
+    if !dry{remove_empty(&root.join("store-v2"));remove_empty(&root);}Ok(())
 }
