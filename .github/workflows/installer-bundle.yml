@@ -1,0 +1,54 @@
+name: Installer bundle verification
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful Installer source-build run containing the Windows bundle
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows-editor:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: thor-native-windows-2025
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source-bundle
+      - name: Build current standalone installer
+        run: cargo build --release --locked --manifest-path install/Cargo.toml -j 2
+      - name: Prepare release license metadata
+        run: cargo fetch --locked --manifest-path rust/Cargo.toml
+      - name: Repackage and verify editor installation
+        shell: powershell
+        run: |
+          $bundle=Get-ChildItem "$env:RUNNER_TEMP\source-bundle\*.tar.gz" | Select-Object -First 1
+          $expected=(Get-Content ($bundle.FullName+'.sha256')).Split(' ')[0]
+          if ((Get-FileHash $bundle.FullName -Algorithm SHA256).Hash.ToLower() -ne $expected) {throw 'Source artifact checksum mismatch'}
+          $root=Join-Path $env:RUNNER_TEMP 'bundle-input'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          tar -xzf $bundle.FullName -C $root
+          if ($LASTEXITCODE -ne 0) {throw 'Could not extract source artifact'}
+          python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler "$root\thor.exe" --installer install/target/release/thor-install.exe --tls "$root\tls\bin\tls.exe" --vsix "$root\editors\thor-language.vsix" --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
+          if ($LASTEXITCODE -ne 0) {throw 'Could not package current installer'}
+          $release=(Get-ChildItem "$env:RUNNER_TEMP\verified-release\*.tar.gz" | Select-Object -First 1).FullName
+          .\thor-install.ps1 --bundle $release --prefix "$env:RUNNER_TEMP\thor-final" --path --vscode --code-user-data "$env:RUNNER_TEMP\code-data" --extensions-dir "$env:RUNNER_TEMP\code-extensions"
+          if ($LASTEXITCODE -ne 0) {throw 'Editor installation verification failed'}
+          .\thor-install.ps1 --doctor --prefix "$env:RUNNER_TEMP\thor-final"
+          if ($LASTEXITCODE -ne 0) {throw 'Doctor failed'}
+          .\thor-install.ps1 --uninstall --prefix "$env:RUNNER_TEMP\thor-final"
+          if ($LASTEXITCODE -ne 0) {throw 'Uninstall failed'}
+          .\thor-install.ps1 --uninstall --prefix "$env:RUNNER_TEMP\thor-final"
+          if ($LASTEXITCODE -ne 0) {throw 'Repeated uninstall failed'}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thor-verified-windows
+          path: ${{ runner.temp }}/verified-release/*
+          if-no-files-found: error
+          retention-days: 3

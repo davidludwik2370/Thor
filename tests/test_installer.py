@@ -279,6 +279,7 @@ inventory=d/'installed-extensions.json'
 ids=set(json.loads(inventory.read_text()) if inventory.exists() else [])
 extension=d/'thor-local.thor-language'
 if '--locate-extension' in a:
+ if os.environ.get('CODE_LOCATE_EMPTY'):sys.exit(0)
  print(extension);sys.exit(0)
 if '--list-extensions' in a:
  print('\\n'.join(sorted(ids)));sys.exit(0)
@@ -293,12 +294,20 @@ if '--install-extension' in a:
   client=extension/'node_modules/vscode-languageclient';client.mkdir(parents=True,exist_ok=True)
   (extension/'package.json').write_text(json.dumps({'main':'extension.js','dependencies':{'vscode-languageclient':'9.0.1'}}));(extension/'extension.js').write_text('fixture')
   (client/'package.json').write_text('{"main":"node.js"}');(client/'node.js').write_text('fixture')
+  profile=d/('User/profiles/profile-id' if '--profile' in a else 'User');profile.mkdir(parents=True,exist_ok=True)
+  (profile/'extensions.json').write_text(json.dumps([{'identifier':{'id':'thor-local.thor-language'},'location':{'scheme':'file','path':str(extension)}}]))
 if '--new-window' in a:
  p=d/'User/globalStorage/storage.json';p.parent.mkdir(parents=True,exist_ok=True)
  p.write_text(json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]}))
 ''')
         code.chmod(0o755)
         return code,data,extensions,profile
+
+    def test_editor_location_falls_back_to_selected_profile_inventory(self):
+        code,data,extensions,profile=self.fake_code()
+        self.env['CODE_LOCATE_EMPTY']='1'
+        result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        self.assertIn('JavaScript runtime dependencies',result.stdout)
 
     def test_new_profile_uses_template_and_installs_all_three_extensions(self):
         code,data,extensions,profile=self.fake_code()

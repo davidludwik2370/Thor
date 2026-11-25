@@ -172,10 +172,23 @@ pub(super) fn verify_editors(record:&Value)->Result<()> {
         locate.args(["--locate-extension","thor-local.thor-language"]);
         let output=locate.output().map_err(err)?;
         if !output.status.success(){return Err("could not locate the installed Thor extension".into());}
-        let extension=PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        let directory=if let Some(name)=&o.profile {profiles(&data_dir(&o)?)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
+        let located=String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        // Some VS Code versions locate extensions only in the default profile,
+        // even when --profile was supplied. Read the selected profile's own
+        // inventory when that command succeeds without returning a location.
+        let extension=if !located.is_empty(){PathBuf::from(located)}else{
+            let inventory=read_json(&directory.join("extensions.json"))?;
+            let entry=inventory.as_array().and_then(|entries|entries.iter().find(|entry|
+                entry["identifier"]["id"].as_str().is_some_and(|id|id.eq_ignore_ascii_case("thor-local.thor-language"))))
+                .ok_or("could not locate Thor in the selected VS Code profile")?;
+            if entry["location"]["scheme"]!="file" {return Err("unsupported editor extension location".into());}
+            let path=field(&entry["location"],"path")?;
+            let path=if cfg!(windows)&&path.starts_with('/')&&path.as_bytes().get(2)==Some(&b':'){&path[1..]}else{path};
+            PathBuf::from(path)
+        };
         verify_node_package(&extension,&extension,&mut BTreeSet::new())?;
         println!("PASS: installed Thor extension entry point and JavaScript runtime dependencies");
-        let directory=if let Some(name)=&o.profile {profiles(&data_dir(&o)?)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
         if let Ok(text)=fs::read_to_string(directory.join("settings.json")) {
             let doc=jsonc::Document::parse(text)?;
             if let Some(server)=doc.value["ols.server.path"].as_str().filter(|s|!s.is_empty()) {

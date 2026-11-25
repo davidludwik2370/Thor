@@ -269,6 +269,13 @@ allows its installed executable to be removed after it is no longer running.
 
 ## Maintainer release builds
 
+A successful source install can retain its already verified native bundle with
+`./thor-install --from-source --export-bundle /path/to/releases`. This is a
+maintainer option; normal source installation removes the temporary bundle and
+build directories. The separate Installer bundle verification workflow can reuse
+a Windows source-build artifact to check a newer installer and editor setup
+without compiling the transpiler again.
+
 Maintainers need Rust/Cargo, Python 3.11+, Node/npm and the reviewed Odin SDK:
 
 ```sh

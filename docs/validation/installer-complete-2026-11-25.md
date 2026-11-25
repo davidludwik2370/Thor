@@ -32,6 +32,18 @@ new-profile extension inventory ordering, and official Node archive top-director
 handling. Review also corrected settings ownership across upgrades: intervening
 user keys/comments do not become installer-owned and survive uninstall.
 
+Final packaging validation also caught missing VSIX JavaScript dependencies and
+the Windows SDK's omitted `bin` helpers (including `radlink.exe`). Both are now
+included. Packaging rejects an incomplete language-client payload; installation
+checks the actual installed extension entry point and its runtime dependency
+graph. Named-profile verification handles VS Code versions whose extension
+location command only searches the default profile.
+
+The macOS installed-VSIX integration test also passes activation, standard Odin
+grammar/icons, terminal PATH, TLS hover/completion, color enable/restore, Run,
+an original Thor source breakpoint and clean debugger exit. It uses a separate
+editor data directory and extensions directory, leaving the user's editor alone.
+
 ## Scope and limits
 
 Normal setup verifies actual checked/unchecked compilation and execution, file
