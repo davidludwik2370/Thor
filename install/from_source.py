@@ -78,7 +78,8 @@ def ensure_node(work, env):
 
 def build(work, forward, odin=None, export_bundle=None):
     target = host()
-    env = dict(os.environ)
+    install_env = dict(os.environ)
+    env = dict(install_env)
     paths = [str(Path.home()/'.cargo/bin'), '/usr/local/bin', '/usr/pkg/bin', env.get('PATH', '')]
     env['PATH'] = os.pathsep.join(paths)
     if os.name=='nt':
@@ -158,7 +159,9 @@ def build(work, forward, odin=None, export_bundle=None):
          '--installer', work/'target/release'/('thor-install'+suffix),
          '--tls', tls, '--vsix', vsix, '--output', output], env=env)
     bundle = output/f'thor-{version}-{target}.tar.gz'
-    run([work/'target/release'/('thor-install'+suffix), '--bundle', bundle, *forward], env=env)
+    # Code can outlive this process. Its terminals must inherit the caller's
+    # environment, not Cargo/Rustup/npm paths that disappear with work/.
+    run([work/'target/release'/('thor-install'+suffix), '--bundle', bundle, *forward], env=install_env)
     if export_bundle:
         export_bundle=Path(export_bundle).resolve()
         export_bundle.mkdir(parents=True,exist_ok=True)

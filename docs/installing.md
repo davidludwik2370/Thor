@@ -133,6 +133,8 @@ scripts, and runs VSCE without an additional network installation. Cargo builds
 use two jobs and release optimizations. Tools that were already installed remain
 untouched. A source install takes longer and uses more temporary space than a
 binary install; it does not add a runtime layer to generated programs.
+The final installer/editor starts with the caller's original environment, so
+VS Code terminals do not retain temporary Cargo, Rustup, npm or build-cache paths.
 
 The reduced dependency path has been exercised on current macOS with Apple's
 Python 3.9; a complete native macOS 13 installation still needs confirmation.

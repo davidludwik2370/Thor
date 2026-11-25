@@ -50,7 +50,12 @@ class SourceInstallerTests(unittest.TestCase):
             calls=[]
             def run(args,**kwargs):
                 calls.append((list(map(str,args)),kwargs))
-            with patch.dict(os.environ,{'NPM_CONFIG_CACHE':'/user/cache','NODE_COMPILE_CACHE':'/user/node-cache'}),patch.object(source,'run',side_effect=run),patch.object(source.source_tools,'ensure_rust'),patch.object(source,'ensure_node'),patch.object(source,'llvm_config',side_effect=AssertionError('reused Odin does not need LLVM')):
+            def private_rust(work,env,target):
+                env.update(RUSTUP_HOME=str(work/'private-rustup'),CARGO_HOME=str(work/'private-cargo'))
+                env['PATH']=str(work/'private-bin')+os.pathsep+env['PATH']
+            caller={'NPM_CONFIG_CACHE':'/user/cache','NODE_COMPILE_CACHE':'/user/node-cache',
+                    'RUSTUP_HOME':'/user/rustup','CARGO_HOME':'/user/cargo','CARGO_TARGET_DIR':'/user/target'}
+            with patch.dict(os.environ,caller),patch.object(source,'run',side_effect=run),patch.object(source.source_tools,'ensure_rust',side_effect=private_rust),patch.object(source,'ensure_node'),patch.object(source,'llvm_config',side_effect=AssertionError('reused Odin does not need LLVM')):
                 source.build(work,[],odin)
             cargo=[(a,k) for a,k in calls if a[0]=='cargo']
             self.assertEqual(len(cargo),2)
@@ -67,6 +72,9 @@ class SourceInstallerTests(unittest.TestCase):
             self.assertIn('--omit=optional',npm_ci);self.assertIn('--ignore-scripts',npm_ci)
             npm_exec=next(a for a,k in calls if a[0] in ('npm','npm.cmd') and a[1]=='exec')
             self.assertIn('--offline',npm_exec)
+            installer_env=calls[-1][1]['env']
+            for key,value in caller.items():self.assertEqual(installer_env[key],value)
+            self.assertNotIn(str(work/'private-bin'),installer_env['PATH'])
 
     @unittest.skipIf(os.name=='nt','POSIX bootstrap; Windows bootstrap is covered by native CI source installation')
     def test_maintenance_never_downloads_or_requires_build_tools(self):
