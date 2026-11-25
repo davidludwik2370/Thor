@@ -1,4 +1,4 @@
-//! Build unmodified upstream OLS for platforms its extension cannot download.
+//! Build pinned standard OLS with reviewed SDK compatibility where necessary.
 use super::*;
 
 pub(super) const REVISION:&str="0c9438faeba846232caaa22fe9f22b30c302dba2";

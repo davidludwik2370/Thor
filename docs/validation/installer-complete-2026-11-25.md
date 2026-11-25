@@ -57,6 +57,15 @@ tests. Bundled upstream sources remain unchanged, and OLS retains its standard
 Odin language behavior. Windows downloads suppress expensive PowerShell progress
 rendering without changing the caller's preference.
 
+The [Windows release/editor run](https://github.com/davidludwik2370/Thor/actions/runs/45606409300)
+passes automatic official VS Code installation, checked/unchecked JSON adapter
+tests, checked/unchecked Thor execution, standard native OLS compilation, actual
+TLS/OLS hover and completion, installed JavaScript dependency checks, doctor and
+two uninstall attempts. This is non-interactive editor verification, not a claim
+that Windows GUI rendering or every debugger scenario was tested here.
+The [five-host regression matrix](https://github.com/davidludwik2370/Thor/actions/runs/45606038615)
+also passes on Windows x64, Intel/ARM64 macOS and x64/ARM64 Linux.
+
 ## Scope and limits
 
 Normal setup verifies actual checked/unchecked compilation and execution, file
