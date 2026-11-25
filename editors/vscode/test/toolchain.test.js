@@ -5,7 +5,8 @@ const test = require('node:test');
 const {findToolchain, findCompiler,findRegisteredToolchain,findBundledOdin,installationRecord} = require('../toolchain');
 
 function installed(...roots) {
-    return file => roots.some(root => [path.join(root, 'thor'), path.join(root, 'tls')].includes(file));
+    return file => roots.some(root => [path.join(root, 'thor'),path.join(root,'thor.exe'),
+        path.join(root, 'tls'),path.join(root,'tls/bin/tls'),path.join(root,'tls/bin/tls.exe')].includes(file));
 }
 
 test('ordinary projects use the shared Thor installation', () => {
@@ -25,8 +26,8 @@ test('missing installations are reported rather than invented', () => {
 test('native Windows installations need no POSIX launcher', () => {
     const root = path.resolve('/tools/native Thor');
     for (const compiler of ['thor.exe', path.join('rust', 'target', 'release', 'thor-rust.exe'), path.join('bin', 'thor.exe')]) {
-        const files = [path.join(root, compiler), path.join(root, 'tls')];
-        assert.equal(findToolchain('/projects/app', {env: {THOR_ROOT: root}, home: '/home/user', exists: file => files.includes(file)}), root);
+        const files = [path.join(root, compiler), path.join(root, 'tls'),path.join(root,'tls/bin/tls.exe')];
+        assert.equal(findToolchain('/projects/app', {platform:'win32',env: {THOR_ROOT: root}, home: '/home/user', exists: file => files.includes(file)}), root);
     }
 });
 
@@ -49,6 +50,32 @@ test('installed bundles are discoverable from GUI environments without shell var
     assert.equal(findToolchain('/projects/app',options),root);
     assert.equal(findToolchain('/projects/app',{...options,read:()=>'{bad'}),undefined);
     assert.equal(findToolchain('/projects/app',{...options,read:()=>JSON.stringify({schema:1,root})}),undefined);
+});
+test('unbuilt source checkouts do not shadow the installed TLS server',()=>{
+    const checkout=path.resolve('/Users/user/Thor'),root=path.resolve('/Users/user/Library/Application Support/Thor/versions/current');
+    for(const platform of ['darwin','linux','win32']) {
+        const compiler=platform==='win32'?'thor.exe':'thor',server=platform==='win32'?'tls.exe':'tls';
+        const files=new Set([path.join(checkout,'thor'),path.join(checkout,'tls'),path.join(checkout,'tls/src'),
+            path.join(root,compiler),path.join(root,'tls'),path.join(root,'tls/bin',server)]);
+        const options={platform,home:'/Users/user',env:{},requireServer:true,exists:file=>files.has(file),
+            read:()=>JSON.stringify({schema:1,managed_by:'thor-install',root})};
+        const selected=findToolchain(checkout,options);
+        assert.equal(selected,root);
+        const withStaleEnvironment=findToolchain(checkout,{...options,env:{THOR_ROOT:checkout}});
+        assert.equal(withStaleEnvironment,root);
+        files.delete(path.join(root,'tls/bin',server));
+        const missing=findRegisteredToolchain(options);
+        assert.equal(missing,undefined);
+    }
+});
+test('a registered record without its TLS binary does not hide a built checkout',()=>{
+    const checkout=path.resolve('/projects/Thor'),root=path.resolve('/data/Thor');
+    const complete=installed(checkout);
+    const options={platform:'linux',env:{},home:'/Users/user',requireServer:true,
+        exists:file=>complete(file)||file===path.join(root,'thor')||file===path.join(root,'tls'),
+        read:()=>JSON.stringify({schema:1,managed_by:'thor-install',root})};
+    const registered=findRegisteredToolchain(options),selected=findToolchain(checkout,options);
+    assert.equal(registered,undefined);assert.equal(selected,checkout);
 });
 test('installation records follow XDG, macOS and Windows locations',()=>{
     for (const [platform,env,file] of [['linux',{XDG_CONFIG_HOME:'/config'},'/config/thor/installation.json'],

@@ -225,6 +225,12 @@ Cmd+R/Cmd+Shift+R on macOS (Ctrl+R/Ctrl+Shift+R elsewhere) are
 provided by the extension and apply only in Thor editors. Existing user bindings
 retain precedence. Projects' `.vscode` files are not rewritten.
 
+TLS discovery requires an actual built server executable. Opening the cloned
+Thor repository uses the registered installed toolchain if the checkout contains
+only TLS source files. Building TLS in the checkout is optional; a built development
+checkout and explicit server-path settings remain supported. Compiler-only Run
+and Debug discovery does not require the TLS executable.
+
 Colors can be used in any profile: **Thor: Apply Recommended Colors** enables
 `thor.colors.recommended`; **Thor: Restore Previous Colors** removes only unchanged
 rules added by Thor. Rules are scoped to `:thor`, adapt to light/dark themes,

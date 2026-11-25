@@ -18,15 +18,21 @@ function installationRecord({env = process.env, home = os.homedir(), platform = 
 
 function findRegisteredToolchain(options = {}) {
     const record = installationRecord(options), exists = options.exists || fs.existsSync;
-    return record && findCompiler(record.root, options) && exists(path.join(record.root, 'tls')) ? record.root : undefined;
+    return record && findCompiler(record.root, options)
+        && (options.requireServer ? findServer(record.root, options) : exists(path.join(record.root,'tls'))) ? record.root : undefined;
+}
+
+function findServer(root, {platform = process.platform, exists = fs.existsSync} = {}) {
+    const binary = path.join(root, 'tls', 'bin', platform === 'win32' ? 'tls.exe' : 'tls');
+    return exists(binary) ? binary : undefined;
 }
 
 function findToolchain(workspace, options = {}) {
-    const {env = process.env, home = os.homedir(), exists = fs.existsSync} = options;
+    const {env = process.env, home = os.homedir(), exists = fs.existsSync, requireServer = false} = options;
     const candidates = [env.THOR_ROOT, workspace, findRegisteredToolchain(options), path.join(home, 'Thor')];
     return candidates.filter(Boolean).map(root => path.resolve(root))
-        .find(root => ['thor', 'thor.exe', path.join('rust', 'target', 'release', 'thor-rust.exe'), path.join('bin', 'thor.exe')]
-            .some(name => exists(path.join(root, name))) && exists(path.join(root, 'tls')));
+        .find(root => findCompiler(root, options)
+            && (requireServer ? findServer(root, options) : exists(path.join(root,'tls'))));
 }
 
 function findCompiler(root, {platform = process.platform, exists = fs.existsSync} = {}) {

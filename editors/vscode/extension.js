@@ -46,7 +46,7 @@ async function start(context) {
     const config = vscode.workspace.getConfiguration('tls', folder?.uri);
     if (!folder || !config.get('enabled', true)) return;
     const configured = config.get('server.path', '');
-    const toolchain = findToolchain(folder.uri.fsPath) || folder.uri.fsPath;
+    const toolchain = findToolchain(folder.uri.fsPath, {requireServer:true}) || folder.uri.fsPath;
     const executable = configured
         ? path.resolve(folder.uri.fsPath, configured)
         : path.join(toolchain, 'tls', 'bin', process.platform === 'win32' ? 'tls.exe' : 'tls');
