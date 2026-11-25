@@ -44,6 +44,12 @@ grammar/icons, terminal PATH, TLS hover/completion, color enable/restore, Run,
 an original Thor source breakpoint and clean debugger exit. It uses a separate
 editor data directory and extensions directory, leaving the user's editor alone.
 
+The same installed-VSIX test passes in the Ubuntu ARM64 Fusion desktop, including
+native OLS, TLS, Run, a mapped source breakpoint and debugger exit. Local final
+regressions pass: 67 installer/source/OLS cases, 7 Rust installer tests, 186 editor
+unit tests and 7 assertion-hygiene tests. The Windows x64 complete pinned-source
+build, checked/unchecked execution, doctor and uninstall pass in GitHub Actions.
+
 ## Scope and limits
 
 Normal setup verifies actual checked/unchecked compilation and execution, file

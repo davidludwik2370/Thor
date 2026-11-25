@@ -243,6 +243,10 @@ keeping the active version and one rollback. Modified files are preserved.
 
 ## Uninstall
 
+For installations older than 0.41.7, rerun setup first to install the maintenance
+commands. The repository bootstrap delegates maintenance to the installed
+installer and does not download or install software during removal.
+
 ```sh
 ./thor-install --uninstall --dry-run
 ./thor-install --uninstall
