@@ -145,8 +145,13 @@ def relocate_odin(stage):
     if os.name == 'nt':
         return  # The builder copies DLLs shipped next to the selected Odin binary.
     system = platform.system()
+    if system in ('FreeBSD','NetBSD','OpenBSD'):
+        # Initial BSD distributions are native source installs on the same host.
+        # Keep the package-manager LLVM dependency installed by prerequisites;
+        # do not apply Linux patchelf/loader assumptions to BSD ELF binaries.
+        return
     if system not in ('Darwin', 'Linux'):
-        raise ValueError('Only macOS, Linux and Windows release builders are supported.')
+        raise ValueError('Unsupported native release builder host.')
     pending = [(odin, odin)]
     symbolizer=directory/'libexec/llvm-symbolizer'
     if symbolizer.exists():pending.append((symbolizer,symbolizer))
@@ -220,6 +225,10 @@ def build(options):
             native_lib=(system=='windows' and p.suffix.lower()=='.dll' or system=='macos' and p.suffix.lower()=='.dylib' or system=='linux' and '.so' in p.name)
             if p.is_file() and (native_lib or re.match(r'(?i)^(license|copying|notice)',p.name)):
                 copy(p, stage/'odin'/p.name)
+        if system=='windows' and (stage/'odin/LLVM-C.dll').is_file():
+            # The reviewed Windows SDK commit updates this vendored runtime to
+            # LLVM 22.1.8, but Odin's root license covers Odin itself.
+            copy(ROOT/'install/licenses/LLVM-22.1.8.txt',stage/'licenses/native/LLVM-C.dll/LICENSE.txt')
         for name in ('LICENSE','NOTICE','cli/LICENSE','tls/LICENSE','editors/vscode/LICENSE','install/profiles/Thor.code-profile'):
             copy(ROOT/name, stage/name)
         rust_licenses(stage)

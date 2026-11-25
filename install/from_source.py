@@ -132,6 +132,14 @@ def build(work, forward, odin=None):
     env = dict(os.environ)
     paths = [str(Path.home()/'.cargo/bin'), '/usr/local/bin', '/usr/pkg/bin', env.get('PATH', '')]
     env['PATH'] = os.pathsep.join(paths)
+    if os.name=='nt':
+        # Preserve the caller's environment, but give cmd-based build tools a
+        # compact child PATH. Hosted/dev shells can exceed cmd's 8191-byte limit.
+        directories=[str(Path(sys.executable).parent),str(Path(env.get('SystemRoot','C:/Windows'))/'System32')]
+        for tool in ('cargo','rustc','git','git-lfs','node','npm.cmd','cl.exe','link.exe','lib.exe','rc.exe','mt.exe','powershell.exe','tar.exe'):
+            executable=shutil.which(tool,path=env['PATH'])
+            if executable:directories.append(str(Path(executable).parent))
+        env['PATH']=os.pathsep.join(dict.fromkeys(directories))
     env.update(CARGO_TARGET_DIR=str(work/'target'), CARGO_INCREMENTAL='0', CARGO_BUILD_JOBS='2')
     ensure_rust(env)
     profile = json.loads((ROOT/'rust/data'/('noalloc-io-sdk-windows.json' if os.name == 'nt' else 'noalloc-io-sdk.json')).read_text())
@@ -160,7 +168,7 @@ def build(work, forward, odin=None):
         odin = checkout/('odin.exe' if os.name == 'nt' else 'odin')
     # The release builder checks revision AND the SDK file hashes before staging.
     for manifest in ('rust/Cargo.toml', 'install/Cargo.toml'):
-        run(['cargo', 'build', '--release', '--locked', '--manifest-path', ROOT/manifest, '-j', '2'], env=env)
+        run(['cargo', 'build', '--release', '--locked', '--manifest-path', ROOT/manifest, '-j', '2'], env=env, cwd=ROOT)
     suffix = '.exe' if os.name == 'nt' else ''
     version = (ROOT/'release/version').read_text().strip()
     tls = work/('tls'+suffix)

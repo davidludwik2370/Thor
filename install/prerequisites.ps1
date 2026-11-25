@@ -13,6 +13,44 @@ function InvokeChecked($file, $arguments) {
     & $file @arguments
     if ($LASTEXITCODE -ne 0) {throw "$file failed ($LASTEXITCODE)"}
 }
+function MergeProcessPaths($values) {
+    $seen=[System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $paths=[System.Collections.Generic.List[string]]::new()
+    foreach($value in $values) {foreach($part in ($value -split ';')) {
+        if ($part -and $seen.Add($part)) {$paths.Add($part)}
+    }}
+    return ($paths -join ';')
+}
+function InvokeVcVars($dev,$tail) {
+    # cmd/vcvars has an 8191-character expansion limit. Do not feed it the
+    # caller's potentially long PATH or append its entries repeatedly.
+    $original=$env:PATH
+    try {
+        $env:PATH="$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0;$env:SystemRoot\System32\Wbem"
+        $lines=& cmd.exe /d /s /c "`"$dev`" >nul && $tail"
+        if ($LASTEXITCODE -ne 0) {throw 'Could not initialize the MSVC build environment'}
+        return $lines
+    } finally {$env:PATH=$original}
+}
+function FindSourcePython {
+    $candidates=[System.Collections.Generic.List[string]]::new()
+    $command=Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command -and $command.Source -notmatch '\\Microsoft\\WindowsApps\\') {$candidates.Add($command.Source)}
+    foreach($key in @('HKCU:\Software\Python\PythonCore','HKLM:\Software\Python\PythonCore')) {
+        foreach($version in Get-ChildItem $key -ErrorAction SilentlyContinue) {
+            $install=Get-Item (Join-Path $version.PSPath 'InstallPath') -ErrorAction SilentlyContinue
+            if($install -and $install.GetValue('')){$candidates.Add((Join-Path $install.GetValue('') 'python.exe'))}
+        }
+    }
+    foreach($file in Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe","$env:ProgramFiles\Python*\python.exe" -ErrorAction SilentlyContinue) {$candidates.Add($file.FullName)}
+    foreach($candidate in $candidates) {
+        if(Test-Path -LiteralPath $candidate) {
+            & $candidate -c 'import sys; sys.exit(sys.version_info < (3,11))' 2>$null
+            if($LASTEXITCODE -eq 0){return $candidate}
+        }
+    }
+    return $null
+}
 $work=Join-Path ([IO.Path]::GetTempPath()) ('thor-prerequisites-'+[Guid]::NewGuid())
 [IO.Directory]::CreateDirectory($work)|Out-Null
 try {
@@ -27,8 +65,14 @@ try {
         $old=Get-Location
         try {
             Set-Location $work
-            & cmd.exe /d /s /c "`"$dev`" >nul && cl /nologo check.c /Fe:check.exe >nul 2>&1"
-            if ($LASTEXITCODE -ne 0) {return $false}
+            $cl=Get-Command cl.exe -ErrorAction SilentlyContinue
+            if ($cl -and $cl.Source.StartsWith($directory,[StringComparison]::OrdinalIgnoreCase) -and $env:INCLUDE -and $env:LIB) {
+                & cl.exe /nologo check.c /Fe:check.exe *> $null
+                if ($LASTEXITCODE -ne 0) {return $false}
+            } else {
+                try {InvokeVcVars $dev 'cl /nologo check.c /Fe:check.exe >nul 2>&1' | Out-Null}
+                catch {return $false}
+            }
             & (Join-Path $work 'check.exe')
             return $LASTEXITCODE -eq 0
         } finally {Set-Location $old}
@@ -53,19 +97,26 @@ try {
         # use their registered package identities and never upgrade existing tools.
         $tools=@(@('python','Python.Python.3.12'),@('node','OpenJS.NodeJS.LTS'),@('git','Git.Git'),@('cargo','Rustlang.Rustup'),@('git-lfs','GitHub.GitLFS'))
         foreach($tool in $tools) {
-            if (!(Get-Command $tool[0] -ErrorAction SilentlyContinue)) {
+            $available=if($tool[0] -eq 'python'){FindSourcePython}else{Get-Command $tool[0] -ErrorAction SilentlyContinue}
+            if (!$available) {
                 if (!(Get-Command winget -ErrorAction SilentlyContinue)) {throw "Source builds need $($tool[0]). Install it or install Microsoft App Installer (winget), then rerun. Binary installation does not need winget."}
-                InvokeChecked 'winget' @('install','--id',$tool[1],'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
+                $arguments=@('install','--id',$tool[1],'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
+                if($tool[0] -eq 'cargo') {$arguments+=@('--override','-y --profile minimal --no-modify-path')}
+                InvokeChecked 'winget' $arguments
             }
         }
         # Registry refresh must retain process-only entries (CI tool caches,
         # activated environments and user shell tools).
-        $env:PATH=$env:PATH+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine')
+        $env:PATH=MergeProcessPaths @($env:PATH,[Environment]::GetEnvironmentVariable('Path','User'),[Environment]::GetEnvironmentVariable('Path','Machine'))
+        $ThorSourcePython=FindSourcePython
+        if(!$ThorSourcePython){throw 'Python 3.11+ was not found after installation. Restart the terminal and retry.'}
         # Export the selected MSVC environment only into the source-build child.
         # The caller imports this snapshot rather than changing global PATH.
         $dev=Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
-        $variables=& cmd.exe /d /s /c "`"$dev`" >nul && set"
+        $variables=InvokeVcVars $dev 'set'
+        $original=$env:PATH
         foreach($line in $variables) {if($line -match '^([^=]+)=(.*)$') {[Environment]::SetEnvironmentVariable($Matches[1],$Matches[2],'Process')}}
+        $env:PATH=MergeProcessPaths @($env:PATH,$original)
     }
     if ($VSCode -and !(Get-Command code -ErrorAction SilentlyContinue) -and !(Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd") -and !(Test-Path "$env:ProgramFiles\Microsoft VS Code\bin\code.cmd")) {
         $setup=Join-Path $work 'vscode-setup.exe'

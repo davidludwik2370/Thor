@@ -1,7 +1,9 @@
 # Native Windows bootstrap; does not change execution policy or require Python.
 $ErrorActionPreference = 'Stop'
+$checkoutRoot=$PSScriptRoot
+$ThorSourcePython=$null
 $forward = [System.Collections.Generic.List[string]]::new()
-$version = (Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'release/version')).Trim()
+$version = (Get-Content -Raw -LiteralPath (Join-Path $checkoutRoot 'release/version')).Trim()
 $bundle = ''; $checksum = ''; $base = $env:THOR_RELEASE_BASE
 $sourceBuild=$false; $noDeps=$false; $maintenance=''; $prefix=''; $dry=$false
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -44,14 +46,15 @@ try {
     if ($sourceBuild) {
         if ($bundle -or $checksum) {throw '--from-source cannot use --bundle/--sha256'}
         if ($dry) {Write-Output 'Source install plan: pinned tools/Odin, Thor/TLS/editor release builds, inventoried install and verification. No changes made.'; exit 0}
-        if (!$noDeps) {. (Join-Path $PSScriptRoot 'install/prerequisites.ps1') -SourceBuild}
-        & python (Join-Path $PSScriptRoot 'install/from_source.py') @forward
+        if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}
+        $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
+        & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
         if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
         exit 0
     }
     if (!$bundle) {
         if (!$base) {
-            $origin = (& git -C $PSScriptRoot remote get-url origin 2>$null)
+            $origin = (& git -C $checkoutRoot remote get-url origin 2>$null)
             if ($origin -match '^(https://github.com/|git@github.com:)([^/]+/[^/]+?)(\.git)?$') { $base="https://github.com/$($Matches[2])/releases/download/v$version" }
             else { throw 'No release location configured. Use --bundle FILE or --release-base URL until releases are published.' }
         }
@@ -63,8 +66,9 @@ try {
             if (!$_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {throw}
             if ($dry) {Write-Output 'Source fallback would be used; no changes made.'; exit 0}
             Write-Output 'No release binary for this host; building the checked-out source.'
-            if (!$noDeps) {. (Join-Path $PSScriptRoot 'install/prerequisites.ps1') -SourceBuild}
-            & python (Join-Path $PSScriptRoot 'install/from_source.py') @forward
+            if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}
+            $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
+            & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
             if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
             exit 0
         }

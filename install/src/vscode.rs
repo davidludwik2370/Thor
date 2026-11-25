@@ -130,10 +130,18 @@ pub(super) fn uninstall(state:&Value,record:&Value,dry:bool)->Result<()> {
     if let Some(editors)=state["editors"].as_array() {for editor in editors {
         let identity=&editor["identity"];let o=editor_options(identity);
         let code=Path::new(field(identity,"code")?);
+        let installed=if dry {None}else{
+            if !code.is_file(){println!("RETAINED: editor extensions (VS Code launcher is missing); remove them through VS Code when available");continue;}
+            let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
+            if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
+            cmd.arg("--list-extensions");let result=cmd.output().map_err(err)?;
+            if !result.status.success(){println!("RETAINED: editor extensions (profile is unavailable); remove through VS Code if still present");continue;}
+            Some(String::from_utf8_lossy(&result.stdout).lines().map(|s|s.to_ascii_lowercase()).collect::<BTreeSet<_>>())
+        };
         for id in editor["owned"].as_array().ok_or("invalid owned extensions")? {
+            if installed.as_ref().is_some_and(|set|!set.contains(id.as_str().unwrap_or(""))) {continue;}
             println!("Remove installer-added extension {} from {}",id,o.profile.as_deref().unwrap_or("Default"));
             if dry {continue;}
-            if !code.is_file(){return Err("VS Code launcher is missing. Restore it and retry uninstall so extensions can be removed safely.".into());}
             let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
             if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
             cmd.args(["--uninstall-extension",id.as_str().ok_or("invalid extension ID")?]);command(cmd)?;

@@ -1,0 +1,4 @@
+# The bootstrap must run on a clean Windows machine before MSVC is installed.
+# Keep both native executables independent of an installed VC redistributable.
+[target.'cfg(all(target_os = "windows", target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

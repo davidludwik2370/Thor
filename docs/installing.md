@@ -58,6 +58,8 @@ installer CI covers Windows x64, macOS Intel/ARM64 and Linux x64/ARM64. BSD path
 are implemented and covered by platform-selection tests, but have not yet been
 exercised on native BSD machines. Distribution/ABI and upstream Rust/editor
 availability can impose further requirements on older OS versions.
+BSD source installs retain their system LLVM runtime dependency; standalone BSD
+binary releases need separate loader/redistribution validation before publication.
 
 A named profile is created through VS Code's launcher, which can open a window.
 Run profile setup in a graphical session. Toolchain-only installation works
@@ -84,7 +86,8 @@ files are checked against the reviewed source hashes. A compatible existing Odin
 can be selected explicitly. BSD builds use system Rust packages. Windows source
 prerequisite acquisition uses winget for missing developer tools; if App Installer
 is unavailable, it reports which tool to install. Binary setup does not require
-winget, Rust, Python or Node.
+winget, Rust, Python or Node. Windows Rust executables link their C runtime
+statically so the installer can start before developer tools are installed.
 
 Older Linux Node packages are retained; packaging can use a disposable official
 Node 22.14.0 build verified against its official checksum inventory. Build targets,

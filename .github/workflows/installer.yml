@@ -26,10 +26,29 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Parse Windows bootstrap scripts
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          foreach($file in @('thor-install.ps1','install/prerequisites.ps1')) {
+            $tokens=$null; $errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path (Get-Location) $file),[ref]$tokens,[ref]$errors)
+            if ($errors.Count) {throw ($errors | Out-String)}
+          }
       - name: Rust installer tests
         run: cargo test --locked --manifest-path install/Cargo.toml -j 2
       - name: Build installer fixture executable
         run: cargo build --release --locked --manifest-path install/Cargo.toml -j 2
+      - name: Check standalone Windows installer imports
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs=(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          $dumpbin=(Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $imports=& $dumpbin /DEPENDENTS install\target\release\thor-install.exe
+          if ($LASTEXITCODE -ne 0) {throw 'Could not inspect installer dependencies'}
+          if (($imports -join "`n") -match '(?im)^\s*(VCRUNTIME|MSVCP)[^\s]*\.dll\s*$') {throw 'Installer requires an external VC runtime before prerequisite installation'}
       - name: Installer regression tests
         run: python -m unittest tests.test_installer tests.test_installer_source tests.test_ols_source
       - name: Complete POSIX source installation

@@ -6,7 +6,21 @@ use std::sync::mpsc;
 use std::time::{Duration,Instant};
 
 struct Server(Child);
-impl Drop for Server {fn drop(&mut self){let _=self.0.kill();let _=self.0.wait();}}
+impl Drop for Server {fn drop(&mut self){
+    #[cfg(unix)] {
+        extern "C" {fn kill(pid:i32,signal:i32)->i32;}
+        // spawn creates a dedicated process group. The unreaped child reserves
+        // this PID, so only this probe and its descendants can belong to it.
+        // Kill descendants too: an inherited stdout pipe must not defeat the
+        // LSP deadline by keeping the reader thread alive after parent exit.
+        unsafe {kill(-(self.0.id() as i32),9);}
+    }
+    #[cfg(windows)] {
+        let _=Command::new("taskkill.exe").args(["/PID",&self.0.id().to_string(),"/T","/F"])
+            .stdout(Stdio::null()).stderr(Stdio::null()).status();
+    }
+    let _=self.0.kill();let _=self.0.wait();
+}}
 fn uri(path:&Path)->String {
     let path=path.to_string_lossy().replace('\\',"/");
     let encoded=path.bytes().map(|b|if b.is_ascii_alphanumeric()||b"/-_.:~".contains(&b){(b as char).to_string()}else{format!("%{b:02X}")}).collect::<String>();
@@ -47,6 +61,7 @@ pub(super) fn lsp(binary:&Path,root:&Path,thor:bool)->Result<()> {
     let source="package main\nRecord :: struct { number: int }\nmain :: proc() { record := Record{42}; _ = record.number }\n";
     let file=temp.join(if thor{"main.thor"}else{"main.odin"});fs::write(&file,source).map_err(err)?;
     let mut cmd=Command::new(binary);
+    #[cfg(unix)] {use std::os::unix::process::CommandExt;cmd.process_group(0);}
     cmd.current_dir(&temp).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
         .env("OLS_BUILTIN_FOLDER",if thor{root.join("tls/builtin")}else{binary.parent().unwrap_or(root).join("builtin")});
     let mut child=Server(cmd.spawn().map_err(err)?);

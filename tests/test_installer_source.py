@@ -13,6 +13,11 @@ spec=importlib.util.spec_from_file_location('thor_source_installer',ROOT/'instal
 source=importlib.util.module_from_spec(spec);spec.loader.exec_module(source)
 
 class SourceInstallerTests(unittest.TestCase):
+    def test_bsd_source_packaging_does_not_invoke_linux_or_macos_loader_tools(self):
+        from tools import build_distribution
+        for system in ['FreeBSD','NetBSD','OpenBSD']:
+            with self.subTest(system=system),patch.object(build_distribution.platform,'system',return_value=system),patch.object(build_distribution,'capture',side_effect=AssertionError('foreign loader command')):
+                build_distribution.relocate_odin(Path('/unused-stage'))
     def test_all_documented_odin_hosts_and_no_unsupported_architectures(self):
         for system,architectures in [('Darwin',['arm64','x86_64']),('Linux',['aarch64','x86_64']),('Windows',['AMD64']),('FreeBSD',['amd64','aarch64']),('NetBSD',['amd64','aarch64']),('OpenBSD',['amd64'])]:
             for arch in architectures:

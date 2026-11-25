@@ -280,6 +280,7 @@ ids=set(json.loads(inventory.read_text()) if inventory.exists() else [])
 if '--list-extensions' in a:
  print('\\n'.join(sorted(ids)));sys.exit(0)
 if '--uninstall-extension' in a:
+ if os.environ.get('FAIL_CODE_UNINSTALL')==a[a.index('--uninstall-extension')+1]:sys.exit(37)
  ids.discard(a[a.index('--uninstall-extension')+1].lower());inventory.write_text(json.dumps(sorted(ids)));sys.exit(0)
 if '--install-extension' in a and os.environ.get('FAIL_CODE_EXTENSION')==a[a.index('--install-extension')+1]:sys.exit(37)
 if '--install-extension' in a:
@@ -582,6 +583,12 @@ class InstallerLifecycleTests(InstallerTests):
         self.assertIn('language server closed',result.stderr)
         self.assertTrue((self.prefix/'bin/thor').exists())
 
+    def test_language_server_deadline_also_cleans_inherited_child_pipes(self):
+        code,data,extensions,profile=self.fake_code()
+        result=self.invoke(self.bundle(files={'tls/bin/tls':b'#!/bin/sh\nsleep 90\n'}),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),ok=False)
+        self.assertIn('verification timed out',result.stderr)
+        self.assertTrue((self.prefix/'bin/thor').exists())
+
     def test_editor_upgrade_does_not_adopt_intervening_user_settings(self):
         code,data,extensions,profile=self.fake_code()
         flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
@@ -611,6 +618,24 @@ class InstallerLifecycleTests(InstallerTests):
         (self.prefix/'setup-state.json').unlink()
         self.invoke(None,'--uninstall')
         self.assertNotIn('thor-install PATH',(self.home/'.profile').read_text())
+
+    def test_partial_extension_uninstall_can_be_retried(self):
+        code,data,extensions,profile=self.fake_code()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.env['FAIL_CODE_UNINSTALL']='danielgavin.ols'
+        self.invoke(None,'--uninstall',ok=False)
+        self.assertTrue(self.registry.exists())
+        self.env.pop('FAIL_CODE_UNINSTALL')
+        self.invoke(None,'--uninstall')
+        self.assertFalse(self.registry.exists())
+
+    def test_uninstall_does_not_require_reinstalling_a_missing_editor(self):
+        code,data,extensions,profile=self.fake_code()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        code.unlink()
+        result=self.invoke(None,'--uninstall')
+        self.assertIn('RETAINED: editor extensions',result.stdout)
+        self.assertFalse((self.prefix/'bin/thor').exists())
 
 # Avoid inherited test duplication while retaining the fixture methods.
 for _name in list(InstallerTests.__dict__):

@@ -20,3 +20,8 @@ original licenses, runtime library notices, and a generated licenses/index.json
 inventory of Rust dependencies. Thor's LICENSE does not replace any of these
 terms. CodeLLDB and VS Code are installed separately from their publishers and
 retain their own licenses.
+
+The reviewed Windows Odin SDK includes LLVM-C.dll from LLVM 22.1.8, under the
+Apache License 2.0 with LLVM Exceptions. Its upstream license is preserved in
+install/licenses/LLVM-22.1.8.txt and in Windows distributions under
+licenses/native/LLVM-C.dll/LICENSE.txt.
