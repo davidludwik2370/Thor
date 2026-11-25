@@ -175,3 +175,50 @@ class ToolAcquisitionTests(unittest.TestCase):
             self.assertEqual((stage / 'odin/bin/llvm-notices/LICENSE-LLVM.txt').read_text(), 'upstream LLVM license')
             self.assertEqual((stage / 'odin/bin/llvm-notices/LICENSE-zstd-COPYING.txt').read_text(), 'upstream zstd license')
             self.assertFalse((stage / 'odin/bin/llvm-notices/bin/llvm-config').exists())
+
+class MacDebugToolsTests(unittest.TestCase):
+    def test_source_llvm_selection_keeps_matching_dsymutil_without_compiling_it(self):
+        self.assertTrue(tools.llvm_files(Path('bin/dsymutil')))
+        self.assertTrue(tools.llvm_files(Path('bin/llvm-symbolizer')))
+        self.assertFalse(tools.llvm_files(Path('bin/clang')))
+
+    def test_distribution_keeps_matching_symbol_tools_and_sanitizer_runtime(self):
+        from tools import build_distribution as distribution
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);llvm=root/'LLVM with spaces';(llvm/'bin').mkdir(parents=True)
+            symbolizer=llvm/'bin/llvm-symbolizer-18';symbolizer.write_bytes(b'symbolizer')
+            (llvm/'bin/dsymutil').write_bytes(b'matching dsymutil')
+            runtime=llvm/'lib/clang/18/lib/darwin';runtime.mkdir(parents=True)
+            (runtime/'libclang_rt.asan_osx_dynamic.dylib').write_bytes(b'runtime')
+            stage=root/'stage'
+            with patch.object(distribution.shutil,'which',return_value=str(symbolizer)):
+                distribution.stage_macos_tools(stage)
+            self.assertEqual((stage/'odin/libexec/dsymutil').read_bytes(),b'matching dsymutil')
+            self.assertEqual((stage/'odin/libexec/llvm-symbolizer').read_bytes(),b'symbolizer')
+            self.assertEqual((stage/'odin/clang-resource/lib/darwin/libclang_rt.asan_osx_dynamic.dylib').read_bytes(),b'runtime')
+
+    def test_distribution_does_not_substitute_an_unrelated_system_dsymutil(self):
+        from tools import build_distribution as distribution
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'llvm/bin').mkdir(parents=True)
+            symbolizer=root/'llvm/bin/llvm-symbolizer';symbolizer.write_bytes(b'symbolizer')
+            with patch.object(distribution.shutil,'which',return_value=str(symbolizer)):
+                with self.assertRaisesRegex(ValueError,'matching dsymutil'):
+                    distribution.stage_macos_tools(root/'stage')
+
+    @unittest.skipIf(os.name=='nt','macOS binary relocation')
+    def test_distribution_relocates_and_signs_both_private_tools(self):
+        from tools import build_distribution as distribution
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'odin/libexec').mkdir(parents=True)
+            for name in ['llvm-symbolizer','dsymutil']:(root/'odin/libexec'/name).write_bytes(b'tool')
+            calls=[]
+            def capture(*args):
+                calls.append(tuple(map(str,args)))
+                return 'binary:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n'
+            with patch.object(distribution.platform,'system',return_value='Darwin'),patch.object(distribution,'capture',side_effect=capture),patch.object(distribution.subprocess,'run') as run:
+                distribution.relocate_odin(root)
+            for name in ['llvm-symbolizer','dsymutil']:
+                helper=str(root/'odin/libexec'/name)
+                self.assertIn(('otool','-L',helper),calls)
+                self.assertTrue(any(str(call.args[0][-1])==helper for call in run.call_args_list))

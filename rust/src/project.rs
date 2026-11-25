@@ -1198,6 +1198,9 @@ impl Project {
         let action = action.as_str();
         let mut command = Command::new(&self.frontend.odin);
         command.envs(&self.native_environment);
+        if let Some(path)=crate::memory::bundled_debug_path(&self.options.root,&self.frontend.odin,&self.options.flags,env::var_os("PATH").as_deref())? {
+            command.env("PATH",path);
+        }
         command
             .arg(if action == "vet" && self.frontend.test {
                 "build"

@@ -183,7 +183,7 @@ def ensure_node(work, env, target):
 
 
 def llvm_files(path):
-    return (path.as_posix().startswith(('bin/llvm-config', 'bin/llvm-symbolizer', 'include/', 'lib/clang/')) or
+    return (path.as_posix().startswith(('bin/llvm-config', 'bin/llvm-symbolizer', 'bin/dsymutil', 'include/', 'lib/clang/')) or
             path.parent == PurePosixPath('lib') and path.suffix == '.a' and
             (path.name.startswith(('libLLVM', 'libPolly')) or path.name in ('libRemarks.a', 'libLTO.a')) or
             path.name.upper().startswith(('LICENSE', 'COPYING', 'NOTICE', 'COPYRIGHT')))

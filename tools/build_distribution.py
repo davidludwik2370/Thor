@@ -175,8 +175,9 @@ def relocate_odin(stage):
     if system not in ('Darwin', 'Linux'):
         raise ValueError('Unsupported native release builder host.')
     pending = [(odin, odin)]
-    symbolizer=directory/'libexec/llvm-symbolizer'
-    if symbolizer.exists():pending.append((symbolizer,symbolizer))
+    helpers=[directory/'libexec'/name for name in ('llvm-symbolizer','dsymutil')
+             if (directory/'libexec'/name).is_file()]
+    pending.extend((helper,helper) for helper in helpers)
     copied = {}
     while pending:
         source, output = pending.pop()
@@ -204,8 +205,24 @@ def relocate_odin(stage):
             relative=os.path.relpath(directory/'lib',output.parent)
             subprocess.run(['patchelf', '--set-rpath', '$ORIGIN' if relative=='.' else '$ORIGIN/'+relative, str(output)], check=True)
     if system == 'Darwin':
-        for file in [*sorted((directory/'lib').glob('*')), *([symbolizer] if symbolizer.exists() else []), odin]:
+        for file in [*sorted((directory/'lib').glob('*')), *helpers, odin]:
             subprocess.run(['codesign', '--force', '--sign', '-', str(file)], check=True)
+
+
+def stage_macos_tools(stage):
+    symbolizer=shutil.which('llvm-symbolizer') or next((str(p) for p in [Path('/opt/homebrew/opt/llvm/bin/llvm-symbolizer'),Path('/usr/local/opt/llvm/bin/llvm-symbolizer')] if p.is_file()),None)
+    if not symbolizer:raise ValueError('A macOS distribution needs llvm-symbolizer for native source-mapped ASan reports.')
+    symbolizer=Path(symbolizer).resolve()
+    dsymutil=symbolizer.with_name('dsymutil')
+    if not dsymutil.is_file():raise ValueError('The selected LLVM must include its matching dsymutil for macOS DWARF debug information.')
+    # Apple CLT on older supported Macs cannot read LLVM's DWARF 5 range lists.
+    # Keep these tools private; compiler children select them for debug builds.
+    copy(symbolizer,stage/'odin/libexec/llvm-symbolizer')
+    copy(dsymutil,stage/'odin/libexec/dsymutil')
+    resources=symbolizer.parents[1]/'lib/clang'
+    candidates=sorted(p for p in resources.glob('*/lib/darwin') if (p/'libclang_rt.asan_osx_dynamic.dylib').is_file())
+    if not candidates:raise ValueError('LLVM must include the macOS compiler-rt sanitizer runtime.')
+    tree(candidates[-1],stage/'odin/clang-resource/lib/darwin')
 
 
 def build(options):
@@ -233,13 +250,7 @@ def build(options):
             tree(ROOT/name, stage/name)
         if os.name!='nt':copy(ROOT/'llvm-symbolizer-thor',stage/'llvm-symbolizer-thor')
         if system=='macos':
-            symbolizer=shutil.which('llvm-symbolizer') or next((str(p) for p in [Path('/opt/homebrew/opt/llvm/bin/llvm-symbolizer'),Path('/usr/local/opt/llvm/bin/llvm-symbolizer')] if p.is_file()),None)
-            if not symbolizer:raise ValueError('A macOS distribution needs llvm-symbolizer for native source-mapped ASan reports.')
-            copy(Path(symbolizer),stage/'odin/libexec/llvm-symbolizer')
-            resources=Path(symbolizer).resolve().parents[1]/'lib/clang'
-            candidates=sorted(p for p in resources.glob('*/lib/darwin') if (p/'libclang_rt.asan_osx_dynamic.dylib').is_file())
-            if not candidates:raise ValueError('LLVM must include the macOS compiler-rt sanitizer runtime.')
-            tree(candidates[-1],stage/'odin/clang-resource/lib/darwin')
+            stage_macos_tools(stage)
         tree(ROOT/'tls/builtin', stage/'tls/builtin')
         stage_source(stage/'ols',options.ols_source)
         # Odin invokes helpers relative to its own root (notably radlink on

@@ -9,8 +9,28 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     env,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
+
+/// Select the matching SDK's symbol tool only for native macOS debug builds.
+/// This environment belongs to the backend child, never the user's shell.
+pub fn bundled_debug_path(root: &Path, odin: &Path, flags: &[String], inherited: Option<&OsStr>) -> Result<Option<OsString>> {
+    if !cfg!(target_os = "macos") || !flags.iter().any(|flag|flag=="-debug") {
+        return Ok(None);
+    }
+    if flags.iter().any(|flag|flag.strip_prefix("-target:").is_some_and(|target|!target.starts_with("darwin_"))) {
+        return Ok(None);
+    }
+    let directory=root.join("odin/libexec");
+    if !directory.join("dsymutil").is_file()
+        || !root.join("odin/odin").canonicalize().is_ok_and(|path|path==odin) {
+        return Ok(None);
+    }
+    let inherited=inherited.unwrap_or_else(||OsStr::new("/usr/bin:/bin:/usr/sbin:/sbin"));
+    let paths=std::iter::once(directory.clone()).chain(env::split_paths(inherited).filter(|path|path!=&directory));
+    env::join_paths(paths).map(Some).map_err(|error|Error::new(format!("Cannot select bundled debug tools: {error}")))
+}
 #[derive(Clone)]
 pub struct Memory {
     pub tracking: String,
@@ -381,4 +401,39 @@ fn encode(value: &Value) -> Result<Vec<u8>> {
     }
     blob.extend(compressed);
     Ok(blob)
+}
+
+#[cfg(all(test,target_os="macos"))]
+mod debug_tool_tests {
+    use super::*;
+    #[test]
+    fn matching_symbol_tool_is_private_to_native_bundled_debug_builds() {
+        let nonce=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root=env::temp_dir().join(format!("thor-debug-tools-{}-{nonce}",std::process::id()));
+        struct Cleanup(PathBuf);
+        impl Drop for Cleanup {fn drop(&mut self){let _=std::fs::remove_dir_all(&self.0);}}
+        let _cleanup=Cleanup(root.clone());
+        let root=root.join("Thor O'Brien with spaces");
+        std::fs::create_dir_all(root.join("odin/libexec")).unwrap();
+        std::fs::write(root.join("odin/odin"),b"compiler").unwrap();
+        let odin=root.join("odin/odin").canonicalize().unwrap();
+        let debug=vec!["-debug".to_owned()];
+        let inherited=OsStr::new("/usr/bin:/bin");
+        let missing=bundled_debug_path(&root,&odin,&debug,Some(inherited)).unwrap();
+        assert!(missing.is_none());
+        std::fs::write(root.join("odin/libexec/dsymutil"),b"matching tool").unwrap();
+        let selected=bundled_debug_path(&root,&odin,&debug,Some(inherited)).unwrap().unwrap();
+        let paths:Vec<_>=env::split_paths(&selected).collect();
+        assert_eq!(paths,vec![root.join("odin/libexec"),PathBuf::from("/usr/bin"),PathBuf::from("/bin")]);
+        let repeated=bundled_debug_path(&root,&odin,&debug,Some(&selected)).unwrap().unwrap();
+        assert_eq!(repeated,selected);
+        let default=bundled_debug_path(&root,&odin,&debug,None).unwrap().unwrap();
+        assert!(env::split_paths(&default).any(|p|p==Path::new("/usr/bin")));
+        for flags in [vec![],vec!["-o:speed".into()],vec!["-debug".into(),"-target:linux_amd64".into()]] {
+            let ignored=bundled_debug_path(&root,&odin,&flags,Some(inherited)).unwrap();
+            assert!(ignored.is_none());
+        }
+        let external=bundled_debug_path(&root,Path::new("/unrelated/odin"),&debug,Some(inherited)).unwrap();
+        assert!(external.is_none());
+    }
 }

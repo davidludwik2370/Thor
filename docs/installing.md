@@ -118,6 +118,10 @@ those packages' compression dependency, retaining the LLVM and zstd notices.
 Intel Macs older than 13.7 need a compatible installed `LLVM_CONFIG` or an OS
 update; incompatible downloads are rejected before acquisition. Version pins,
 checksums and upstream references are recorded in `install/source-tools.json`.
+macOS distributions also include LLVM's matching `dsymutil`. Thor selects it
+only for debug builds using that bundled SDK, without changing the user's PATH
+or external Odin installations. Older Apple symbol tools can otherwise discard
+DWARF 5 information and prevent source breakpoints from resolving.
 
 Linux setup no longer installs Node/npm through the OS package manager. BSD
 continues to use native binary packages for Node, Rust and LLVM. Reusing Odin
@@ -137,7 +141,7 @@ The final installer/editor starts with the caller's original environment, so
 VS Code terminals do not retain temporary Cargo, Rustup, npm or build-cache paths.
 
 The reduced dependency path has been exercised on current macOS with Apple's
-Python 3.9; a complete native macOS 13 installation still needs confirmation.
+Python 3.9 and through uninstall/reinstall on an M1 Mac running macOS 13.5.1.
 
 The installation includes representative health checks, not the compiler's full
 regression suite. A clone already contains that suite; maintainers can run
