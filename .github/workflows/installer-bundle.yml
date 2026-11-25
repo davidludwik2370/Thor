@@ -12,7 +12,7 @@ permissions:
 jobs:
   windows-editor:
     runs-on: windows-2025
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -23,8 +23,8 @@ jobs:
           path: ${{ runner.temp }}/source-bundle
       - name: Build current standalone installer
         run: cargo build --release --locked --manifest-path install/Cargo.toml -j 2
-      - name: Prepare release license metadata
-        run: cargo fetch --locked --manifest-path rust/Cargo.toml
+      - name: Build current transpiler
+        run: cargo build --release --locked --manifest-path rust/Cargo.toml --bin thor-rust -j 2
       - name: Repackage and verify editor installation
         shell: powershell
         run: |
@@ -37,7 +37,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {throw 'Could not extract source artifact'}
           python tools/test_ols_json_compat.py --odin "$root\odin\odin.exe"
           if ($LASTEXITCODE -ne 0) {throw 'OLS SDK JSON compatibility checks failed'}
-          python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler "$root\thor.exe" --installer install/target/release/thor-install.exe --tls "$root\tls\bin\tls.exe" --vsix "$root\editors\thor-language.vsix" --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
+          $version=(Get-Content release/version -Raw).Trim()
+          & "$root\odin\odin.exe" build tls/src "-collection:src=$PWD/tls/src" "-collection:thor=$PWD/frontend" -o:speed -thread-count:2 "-define:VERSION=thor-$version+ols-0c9438f" "-out:$env:RUNNER_TEMP\tls.exe"
+          if ($LASTEXITCODE -ne 0) {throw 'Could not build current TLS'}
+          python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler rust/target/release/thor-rust.exe --installer install/target/release/thor-install.exe --tls "$env:RUNNER_TEMP\tls.exe" --vsix "$root\editors\thor-language.vsix" --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
           if ($LASTEXITCODE -ne 0) {throw 'Could not package current installer'}
           $release=(Get-ChildItem "$env:RUNNER_TEMP\verified-release\*.tar.gz" | Select-Object -First 1).FullName
           .\thor-install.ps1 --bundle $release --prefix "$env:RUNNER_TEMP\thor-final" --path --vscode --code-user-data "$env:RUNNER_TEMP\code-data" --extensions-dir "$env:RUNNER_TEMP\code-extensions"

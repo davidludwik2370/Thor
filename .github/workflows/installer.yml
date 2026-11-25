@@ -50,7 +50,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {throw 'Could not inspect installer dependencies'}
           if (($imports -join "`n") -match '(?im)^\s*(VCRUNTIME|MSVCP)[^\s]*\.dll\s*$') {throw 'Installer requires an external VC runtime before prerequisite installation'}
       - name: Installer regression tests
-        run: python -m unittest tests.test_installer tests.test_installer_source tests.test_ols_source
+        run: python -m unittest tests.test_installer tests.test_installer_source tests.test_installer_prerequisites tests.test_ols_source
       - name: Complete POSIX source installation
         if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         run: ./thor-install --from-source --prefix "$RUNNER_TEMP/thor-install" --path --export-bundle "$RUNNER_TEMP/thor-release"

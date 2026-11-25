@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "thor-compiler"
-version = "0.41.7"
+version = "0.41.8"
 dependencies = [
  "file-id",
  "filetime",

@@ -29,8 +29,10 @@ packages() {
     case "$system" in
         Linux)
             if command -v apt-get >/dev/null 2>&1; then
-                elevate apt-get update
-                elevate env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
+                elevate apt-get -o DPkg::Lock::Timeout=300 update
+                # Fresh Ubuntu desktops often run unattended upgrades at login.
+                # Let apt wait for the frontend lock instead of failing setup.
+                elevate env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends "$@"
             elif command -v dnf >/dev/null 2>&1; then elevate dnf install -y "$@"
             elif command -v zypper >/dev/null 2>&1; then elevate zypper --non-interactive install "$@"
             elif command -v pacman >/dev/null 2>&1; then elevate pacman -S --needed --noconfirm "$@"
@@ -147,7 +149,7 @@ if $editor; then
                 # Decline a new global repository; Code's package remains installed.
                 printf 'code code/add-microsoft-repo boolean false\n' | elevate debconf-set-selections
                 chmod 755 "$work"; chmod 644 "$work/code.deb"
-                elevate env DEBIAN_FRONTEND=noninteractive apt-get install -y "$work/code.deb"
+                elevate env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y "$work/code.deb"
             elif command -v dnf >/dev/null 2>&1; then
                 download "https://update.code.visualstudio.com/latest/linux-rpm-$arch/stable" "$work/code.rpm"
                 elevate dnf install -y "$work/code.rpm"
