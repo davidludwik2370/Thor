@@ -59,10 +59,20 @@ async function run(){
         while((!fs.existsSync(nextOutput)||executions.length<2)&&Date.now()<nextDeadline)await new Promise(resolve=>setTimeout(resolve,100));
         assert.equal(fs.readFileSync(nextOutput,'utf8'),'ok');
         assert.equal(vscode.window.activeTerminal,terminal);
+        // dispose() immediately invalidates the terminal API object; its close
+        // event and activeTerminal update may still be queued when Run starts.
+        fs.unlinkSync(nextOutput);
+        terminal.dispose();
+        await vscode.commands.executeCommand('thor.run');
+        const replacementDeadline=Date.now()+30000;
+        while(!fs.existsSync(nextOutput)&&Date.now()<replacementDeadline)await new Promise(resolve=>setTimeout(resolve,100));
+        assert.equal(fs.readFileSync(nextOutput,'utf8'),'ok');
+        assert.notEqual(vscode.window.activeTerminal,terminal);
         result.success=true;
         result.checks=['standalone .thor file with spaces and no workspace folder','unsaved edits saved',
             'existing terminal changes from the wrong directory','switching source folders reuses the terminal',
-            'directory names with spaces','integrated process execution without debugging'];
+            'directory names with spaces','integrated process execution without debugging',
+            'Run immediately after disposing the active terminal'];
     }catch(error){result.error=error.stack||String(error);throw error;}
     finally{
         executionSubscription?.dispose();

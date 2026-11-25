@@ -17,6 +17,7 @@ function fixture({workspace = '/projects/my project', file = '/projects/my proje
     const vscode = {
         env:{shell:'/bin/zsh'},
         window:{activeTextEditor:file ? {document:{uri:uri(file), languageId:'thor'}} : undefined,
+            get terminals(){return [...new Set([this.activeTerminal,...calls.created].filter(Boolean))];},
             createTerminal:options=>{const value=terminal(options);calls.created.push(value);vscode.window.activeTerminal=value;return value;}},
         workspace:{isTrusted:true, workspaceFolders:folder ? [folder] : [], getWorkspaceFolder:()=>folder,
             getConfiguration:()=>({get:(_key,fallback)=>fallback}),
@@ -102,6 +103,67 @@ test('exited terminals are replaced rather than receiving input',async()=>{
     await runProject(vscode);
     assert.equal(calls.created.length,1);
     assert.deepEqual(exited.commands,[]);
+});
+
+test('Run selects the live terminal after saving, rather than an earlier active terminal',async()=>{
+    const {vscode,calls,terminal}=fixture();
+    const earlier=terminal({}),current=terminal({});
+    vscode.window.activeTerminal=earlier;
+    vscode.workspace.saveAll=async()=>{vscode.window.activeTerminal=current;return true;};
+    const result=await runProject(vscode);
+    assert.equal(result,current);
+    assert.deepEqual(earlier.commands,[]);
+    assert.equal(current.commands.length,1);
+    assert.equal(calls.created.length,0);
+});
+
+test('a terminal that exits while saving is replaced',async()=>{
+    const {vscode,calls,terminal}=fixture();
+    const closed=terminal({});vscode.window.activeTerminal=closed;
+    vscode.workspace.saveAll=async()=>{closed.exitStatus={code:0};return true;};
+    const result=await runProject(vscode);
+    assert.equal(result,calls.created[0]);
+    assert.equal(calls.created.length,1);
+    assert.deepEqual(closed.commands,[]);
+});
+
+test('stale active terminals absent from the live collection are replaced',async()=>{
+    const {vscode,calls,terminal}=fixture();
+    const closed=terminal({});vscode.window.activeTerminal=closed;
+    Object.defineProperty(vscode.window,'terminals',{value:[]});
+    const result=await runProject(vscode);
+    assert.equal(result,calls.created[0]);
+    assert.deepEqual(closed.commands,[]);
+});
+
+for (const operation of ['show','sendText']) test(`Run replaces a disposed terminal before ${operation}, while close events are still queued`,async()=>{
+    const {vscode,calls,terminal}=fixture();
+    const closed=terminal({});vscode.window.activeTerminal=closed;
+    closed[operation]=()=>{throw new Error('Terminal has already been disposed');};
+    const result=await runProject(vscode);
+    assert.equal(calls.created.length,1);
+    assert.equal(result,calls.created[0]);
+    assert.deepEqual(closed.commands,[]);
+    assert.deepEqual(result.commands,[{text:'thor run .',newline:true}]);
+});
+
+test('unrelated terminal errors propagate without dispatching a second command',async()=>{
+    const {vscode,calls,terminal}=fixture();
+    const active=terminal({});vscode.window.activeTerminal=active;
+    active.sendText=()=>{throw new Error('unrelated terminal failure');};
+    await assert.rejects(runProject(vscode),/unrelated terminal failure/);
+    assert.equal(calls.created.length,0);
+});
+
+test('a newly created terminal failing to open is not retried',async()=>{
+    const {vscode,calls,terminal}=fixture();
+    vscode.window.createTerminal=options=>{
+        const value=terminal(options);calls.created.push(value);
+        value.show=()=>{throw new Error('Terminal has already been disposed');};
+        return value;
+    };
+    await assert.rejects(runProject(vscode),/Terminal has already been disposed/);
+    assert.equal(calls.created.length,1);
 });
 
 test('an existing terminal can run from its cwd without an open project',async()=>{

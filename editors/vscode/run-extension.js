@@ -41,23 +41,39 @@ function runCommand(vscode, terminal, cwd, compiler='thor') {
 
 async function runProject(vscode) {
     if (!vscode.workspace.isTrusted) throw new Error('Thor execution requires a trusted workspace.');
-    let terminal = vscode.window.activeTerminal;
     const cwd = sourceDirectory(vscode);
     const uri=vscode.window.activeTextEditor?.document.uri;
     const configured=vscode.workspace.getConfiguration('tls',uri).get('compiler.path','');
     const root=findRegisteredToolchain();
     const compiler=configured ? path.resolve(vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath || cwd || '.',configured)
         : (root && findCompiler(root)) || 'thor';
-    const live = terminal && terminal.exitStatus === undefined;
-    if (!cwd && !live) throw new Error('Open a project folder, saved file, or terminal before running Thor.');
     if (!await vscode.workspace.saveAll(false)) throw new Error('Save your changes before running Thor.');
+    // Saving may open a dialog or yield while a terminal exits. Select the
+    // terminal afterwards, and reject stale activeTerminal references.
+    let terminal = vscode.window.activeTerminal;
+    const live = terminal && terminal.exitStatus === undefined && vscode.window.terminals.includes(terminal);
+    if (!cwd && !live) throw new Error('Open a project folder, saved file, or terminal before running Thor.');
     let command = live ? runCommand(vscode, terminal, cwd,compiler) : undefined;
+    const reused = command !== undefined;
     if (command === undefined) {
         terminal = vscode.window.createTerminal({name:'Thor', cwd});
         command = invocation(vscode,terminal,compiler);
     }
-    terminal.show();
-    terminal.sendText(command, true);
+    try {
+        terminal.show();
+        terminal.sendText(command, true);
+    } catch (error) {
+        // Terminal.dispose() marks the API object before the close event updates
+        // activeTerminal/terminals. VS Code has no public isDisposed property.
+        // Retry only its explicit pre-dispatch disposal error, never a command
+        // or shell error that might already have executed the program.
+        if (!reused || error?.message !== 'Terminal has already been disposed') throw error;
+        if (!cwd) throw new Error('Open a project folder, saved file, or terminal before running Thor.');
+        terminal = vscode.window.createTerminal({name:'Thor', cwd});
+        command = invocation(vscode,terminal,compiler);
+        terminal.show();
+        terminal.sendText(command, true);
+    }
     return terminal;
 }
 
