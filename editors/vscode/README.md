@@ -167,8 +167,10 @@ rather than the enclosing workspace root. The terminal's shell environment is
 preserved, and no tasks are scanned or launched. Shell integration supplies the
 current directory when available; otherwise a shell condition checks it before
 calling `cd`. If no live terminal exists, a regular terminal opens directly in
-the file's directory. Repeated runs reuse it. Without a saved file, the workspace
-folder is used, or an existing terminal keeps its directory in an empty window.
+the file's directory. Repeated runs reuse it; closing it causes the next Run to
+open a replacement, including when the close happens while saving. Without a
+saved file, the workspace folder is used, or an existing terminal keeps its
+directory in an empty window.
 It also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
 Thor editors on macOS, and a `thor-lldb` debug adapter using ordinary CodeLLDB.
 Run `thor new my_project` to create a local folder containing `my_project.thor`
