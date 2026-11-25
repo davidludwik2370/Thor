@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import zipfile
 if __package__:
     from .ols_source import stage_source
 else:
@@ -39,12 +40,30 @@ def copy(source, destination):
     shutil.copy2(source, destination)
 
 
+def verify_vsix(path):
+    with zipfile.ZipFile(path) as archive:
+        names=set(archive.namelist())
+        package=json.loads(archive.read('extension/package.json'))
+        if package.get('publisher')!='thor-local' or package.get('name')!='thor-language':
+            raise ValueError('The selected VSIX is not the Thor extension')
+        for name in package.get('dependencies',{}):
+            if f'extension/node_modules/{name}/package.json' not in names:
+                raise ValueError(f'VSIX runtime dependency missing: {name}. Package with npm dependencies enabled.')
+        if 'vscode-languageclient' in package.get('dependencies',{}) and 'extension/node_modules/vscode-languageclient/node.js' not in names:
+            raise ValueError('VSIX language-client entry point is missing')
+
+
 def tree(source, destination):
     # Dereference SDK/library links into independent files. A source tree is an
     # explicit builder input, not an untrusted archive, and is never modified.
     shutil.copytree(source, destination, symlinks=False,
                     ignore=shutil.ignore_patterns('.git', '__pycache__', '.DS_Store',
                                                   '.thor-cache', '.thor-build', '.thor-rust-build'))
+
+
+def sdk_components(sdk,stage):
+    for name in ('base','core','vendor','shared','bin'):
+        if (sdk/name).is_dir():tree(sdk/name,stage/'odin'/name)
 
 
 def verify_sdk(odin, sdk):
@@ -193,6 +212,7 @@ def build(options):
     sdk = Path(capture(odin, 'root').strip()).resolve()
     odin_version = verify_sdk(odin, sdk)
     compiler = options.compiler.resolve(strict=True)
+    verify_vsix(options.vsix)
     if capture(compiler, 'version').strip() != 'Thor '+version:
         raise ValueError('Compiler and release/version differ. Rebuild the selected compiler.')
     system = {'Darwin':'macos', 'Linux':'linux', 'Windows':'windows', 'FreeBSD':'freebsd', 'NetBSD':'netbsd', 'OpenBSD':'openbsd'}[platform.system()]
@@ -219,8 +239,10 @@ def build(options):
             tree(candidates[-1],stage/'odin/clang-resource/lib/darwin')
         tree(ROOT/'tls/builtin', stage/'tls/builtin')
         stage_source(stage/'ols',options.ols_source)
-        for name in ('base','core','vendor','shared'):
-            if (sdk/name).is_dir(): tree(sdk/name, stage/'odin'/name)
+        # Odin invokes helpers relative to its own root (notably radlink on
+        # Windows). The SDK's bin directory is a runtime component, not a
+        # compiler build cache. Preserve helper licenses with the tools.
+        sdk_components(sdk,stage)
         for p in sdk.iterdir():
             native_lib=(system=='windows' and p.suffix.lower()=='.dll' or system=='macos' and p.suffix.lower()=='.dylib' or system=='linux' and '.so' in p.name)
             if p.is_file() and (native_lib or re.match(r'(?i)^(license|copying|notice)',p.name)):

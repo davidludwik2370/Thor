@@ -95,7 +95,7 @@ pub(super) fn lsp(binary:&Path,root:&Path,thor:bool)->Result<()> {
         send(&mut input,&json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri(&file),"languageId":if thor{"thor"}else{"odin"},"version":1,"text":source}}}))?;
         let line=source.lines().nth(2).unwrap_or("");
         let hover=request(&mut input,&rx,2,"textDocument/hover",json!({"textDocument":{"uri":uri(&file)},"position":{"line":2,"character":line.find("record :=").ok_or("invalid hover fixture")?+1}}))?;
-        if hover.is_null(){return Err("language server started but hover returned no type information".into());}
+        if !hover.to_string().contains("Record"){return Err("language server started but hover returned no Record type information".into());}
         let completion=request(&mut input,&rx,3,"textDocument/completion",json!({"textDocument":{"uri":uri(&file)},"position":{"line":2,"character":line.find("record.number").ok_or("invalid completion fixture")?+7},"context":{"triggerKind":1}}))?;
         if !completion.to_string().contains("number"){return Err("language server field completion is missing 'number'".into());}
         send(&mut input,&json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}))?;
@@ -109,7 +109,11 @@ pub(super) fn finish(record:&Value,doctor:bool)->Result<()> {
     let root=Path::new(field(record,"root")?);let bin=Path::new(field(record,"bin")?);
     if !doctor {lifecycle::verify_inventory(root)?;}
     for name in ["thor","odin","thor-install"] {
-        if !bin.join(format!("{name}{}",if cfg!(windows){".cmd"}else{""})).is_file(){return Err(format!("installed command is missing: {name}"));}
+        let launcher=bin.join(format!("{name}{}",if cfg!(windows){".cmd"}else{""}));
+        let target=if name=="odin"{root.join(format!("odin/odin{}",env::consts::EXE_SUFFIX))}else{root.join(format!("{name}{}",env::consts::EXE_SUFFIX))};
+        #[cfg(unix)] let valid=fs::canonicalize(&launcher).ok().zip(fs::canonicalize(&target).ok()).is_some_and(|(a,b)|a==b);
+        #[cfg(windows)] let valid=fs::read_to_string(&launcher).ok().as_deref()==Some(windows_launcher(&target).as_str());
+        if !valid{return Err(format!("installed command is missing or targets another installation: {name}"));}
     }
     println!("PASS: installed Thor/Odin/installer commands");
     if env::split_paths(&env::var_os("PATH").unwrap_or_default()).any(|p|p==bin) {println!("PASS: current process PATH");}

@@ -4,6 +4,7 @@ $checkoutRoot=$PSScriptRoot
 $ThorSourcePython=$null
 $forward = [System.Collections.Generic.List[string]]::new()
 $version = (Get-Content -Raw -LiteralPath (Join-Path $checkoutRoot 'release/version')).Trim()
+$checkoutVersion=$version
 $bundle = ''; $checksum = ''; $base = $env:THOR_RELEASE_BASE
 $sourceBuild=$false; $noDeps=$false; $maintenance=''; $prefix=''; $dry=$false
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -45,6 +46,7 @@ try {
     }
     if ($sourceBuild) {
         if ($bundle -or $checksum) {throw '--from-source cannot use --bundle/--sha256'}
+        if ($version -ne $checkoutVersion) {throw 'A source build uses the checked-out version. Check out the requested release first.'}
         if ($dry) {Write-Output 'Source install plan: pinned tools/Odin, Thor/TLS/editor release builds, inventoried install and verification. No changes made.'; exit 0}
         if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}
         $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
@@ -64,6 +66,7 @@ try {
         try {Invoke-WebRequest -UseBasicParsing -Uri "$base/$name" -OutFile $bundle}
         catch {
             if (!$_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {throw}
+            if ($version -ne $checkoutVersion) {throw 'No binary for this version. Check out that release before building it from source.'}
             if ($dry) {Write-Output 'Source fallback would be used; no changes made.'; exit 0}
             Write-Output 'No release binary for this host; building the checked-out source.'
             if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}

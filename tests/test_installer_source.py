@@ -13,6 +13,11 @@ spec=importlib.util.spec_from_file_location('thor_source_installer',ROOT/'instal
 source=importlib.util.module_from_spec(spec);spec.loader.exec_module(source)
 
 class SourceInstallerTests(unittest.TestCase):
+    def test_explicit_unsupported_llvm_is_rejected_without_silent_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config=Path(temporary)/'llvm-config';config.write_text('fixture')
+            with patch.object(source.subprocess,'check_output',return_value='15.0.0'):
+                with self.assertRaisesRegex(ValueError,'LLVM 17–22'):source.llvm_config({'LLVM_CONFIG':str(config)})
     def test_bsd_source_packaging_does_not_invoke_linux_or_macos_loader_tools(self):
         from tools import build_distribution
         for system in ['FreeBSD','NetBSD','OpenBSD']:
@@ -118,3 +123,31 @@ class SourceNodeArchiveTests(unittest.TestCase):
                 source.ensure_node(Path(temporary),env)
             self.assertEqual((Path(temporary)/name/'bin/node').read_bytes(),b'fixture')
             self.assertTrue(env['PATH'].startswith(str(Path(temporary)/name/'bin')))
+
+class SourceVsixTests(unittest.TestCase):
+    def test_missing_runtime_dependency_is_rejected_before_distribution(self):
+        from tools.build_distribution import verify_vsix
+        import json,zipfile
+        with tempfile.TemporaryDirectory() as temporary:
+            vsix=Path(temporary)/'thor.vsix'
+            package={'publisher':'thor-local','name':'thor-language','dependencies':{'vscode-languageclient':'9.0.1'}}
+            with zipfile.ZipFile(vsix,'w') as archive:archive.writestr('extension/package.json',json.dumps(package))
+            with self.assertRaisesRegex(ValueError,'runtime dependency missing'):verify_vsix(vsix)
+            with zipfile.ZipFile(vsix,'a') as archive:
+                archive.writestr('extension/node_modules/vscode-languageclient/package.json','{}')
+                archive.writestr('extension/node_modules/vscode-languageclient/node.js','fixture')
+            verify_vsix(vsix)
+
+class SourceSdkComponentsTests(unittest.TestCase):
+    def test_runtime_linkers_and_their_licenses_are_staged_without_build_history(self):
+        from tools.build_distribution import sdk_components
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);sdk=root/'sdk';stage=root/'stage'
+            (sdk/'bin').mkdir(parents=True)
+            (sdk/'bin/radlink.exe').write_bytes(b'linker payload')
+            (sdk/'bin/RAD-LICENSE').write_text('runtime helper license')
+            (sdk/'obj').mkdir();(sdk/'obj/debug.pdb').write_bytes(b'not runtime')
+            sdk_components(sdk,stage)
+            self.assertEqual((stage/'odin/bin/radlink.exe').read_bytes(),b'linker payload')
+            self.assertEqual((stage/'odin/bin/RAD-LICENSE').read_text(),'runtime helper license')
+            self.assertFalse((stage/'odin/obj').exists())

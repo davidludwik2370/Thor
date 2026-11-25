@@ -44,8 +44,10 @@ installations are reused; `--code PATH` selects one explicitly. BSD editor
 availability is separate from compiler support: FreeBSD uses its `vscode` port;
 NetBSD/OpenBSD require an available compatible editor and `--code PATH`.
 
-Use `--no-install-deps` on managed/offline systems to disable software acquisition;
-verification still runs and reports missing tools. `--dry-run`, `--doctor` and
+Use `--no-install-deps` on managed systems to disable system/editor prerequisite
+installation; verification still runs and reports missing tools. Source builds
+can still acquire pinned Odin, Cargo/npm packages and temporary Node; use a local
+bundle without `--vscode` for an offline binary installation. `--dry-run`, `--doctor` and
 `--uninstall` never install prerequisites. The bootstrap itself needs a downloader;
 POSIX bootstrap acquisition can install curl/CA certificates using the package
 manager. Windows uses built-in PowerShell HTTPS downloads.

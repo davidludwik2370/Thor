@@ -53,7 +53,7 @@ jobs:
         run: python -m unittest tests.test_installer tests.test_installer_source tests.test_ols_source
       - name: Complete POSIX source installation
         if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
-        run: ./thor-install --from-source --prefix "$RUNNER_TEMP/thor-install" --path
+        run: ./thor-install --from-source --prefix "$RUNNER_TEMP/thor-install" --path --export-bundle "$RUNNER_TEMP/thor-release"
       - name: Complete Windows source installation
         if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         shell: powershell
@@ -65,7 +65,15 @@ jobs:
           $env:PATH=$sentinel+';'+$env:PATH
           . .\install\prerequisites.ps1 -SourceBuild
           if (!(Get-Command thor-prerequisite-sentinel -ErrorAction SilentlyContinue)) {throw 'Prerequisite setup lost the process PATH'}
-          .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-install" --path
+          .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-install" --path --export-bundle "$env:RUNNER_TEMP\thor-release"
+      - name: Retain verified native release bundle
+        if: github.event_name == 'workflow_dispatch' && inputs.source_build
+        uses: actions/upload-artifact@v4
+        with:
+          name: thor-native-${{ matrix.os }}
+          path: ${{ runner.temp }}/thor-release/*
+          if-no-files-found: error
+          retention-days: 3
       - name: POSIX doctor and uninstall
         if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         run: |

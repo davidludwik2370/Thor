@@ -115,7 +115,11 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     for extension in [root.join("editors/thor-language.vsix").to_string_lossy().into_owned(),"DanielGavin.ols".into(),"vadimcn.vscode-lldb".into()] {
         let mut cmd=cli(code,o,&bin,root)?;
         if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
-        cmd.arg("--install-extension").arg(extension);
+        cmd.arg("--install-extension").arg(&extension);
+        // The bundled Thor VSIX is the tested payload even when a previous
+        // installation has the same extension version. Do not force updates
+        // of independently installed OLS/CodeLLDB marketplace extensions.
+        if extension.ends_with(".vsix"){cmd.arg("--force");}
         command(cmd).map_err(|e|format!("Thor CLI is installed, but editor setup is incomplete. Correct the error and rerun the same installer command. {e}"))?;
     }
     println!("Thor, the standard Odin Language Server (OLS), and CodeLLDB extensions installed. Reload the profile's window to activate them, then open a new terminal for Thor's PATH. OLS owns .odin files; TLS owns .thor files. Shortcuts apply only in Thor editors.");
@@ -163,6 +167,14 @@ pub(super) fn verify_editors(record:&Value)->Result<()> {
             if !installed.contains(id){return Err(format!("VS Code reports a missing extension: {id}"));}
         }
         println!("PASS: VS Code profile and Thor/OLS/CodeLLDB extension inventory");
+        let mut locate=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
+        if let Some(profile)=&o.profile {locate.args(["--profile",profile]);}
+        locate.args(["--locate-extension","thor-local.thor-language"]);
+        let output=locate.output().map_err(err)?;
+        if !output.status.success(){return Err("could not locate the installed Thor extension".into());}
+        let extension=PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        verify_node_package(&extension,&extension,&mut BTreeSet::new())?;
+        println!("PASS: installed Thor extension entry point and JavaScript runtime dependencies");
         let directory=if let Some(name)=&o.profile {profiles(&data_dir(&o)?)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
         if let Ok(text)=fs::read_to_string(directory.join("settings.json")) {
             let doc=jsonc::Document::parse(text)?;
@@ -172,4 +184,23 @@ pub(super) fn verify_editors(record:&Value)->Result<()> {
             }else{println!("SKIP: OLS server uses extension-managed download; verify first-use setup in VS Code");}
         }
     }Ok(())
+}
+
+fn verify_node_package(directory:&Path,root:&Path,seen:&mut BTreeSet<PathBuf>)->Result<()> {
+    if !seen.insert(directory.to_path_buf()){return Ok(());}
+    if seen.len()>128 {return Err("editor dependency graph exceeds verification limit".into());}
+    let package=read_json(&directory.join("package.json")).map_err(|e|format!("editor runtime dependency metadata missing at {}: {e}",directory.display()))?;
+    let main=package["main"].as_str().unwrap_or("index.js");let main=main.strip_prefix("./").unwrap_or(main);
+    if !safe_path(Path::new(main)) || !directory.join(main).is_file(){return Err(format!("editor runtime entry point missing: {}",directory.join(main).display()));}
+    if let Some(dependencies)=package["dependencies"].as_object(){for name in dependencies.keys() {
+        if !safe_path(Path::new(name)){return Err("unsafe editor dependency name".into());}
+        let mut current=Some(directory);let mut found=None;
+        while let Some(parent)=current {
+            let path=parent.join("node_modules").join(name);
+            if path.join("package.json").is_file(){found=Some(path);break;}
+            if parent==root{break;}current=parent.parent();
+        }
+        let dependency=found.ok_or_else(||format!("editor runtime dependency missing: {name}"))?;
+        verify_node_package(&dependency,root,seen)?;
+    }}Ok(())
 }

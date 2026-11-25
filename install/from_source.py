@@ -50,15 +50,25 @@ def run(args, *, env, cwd=None, capture=False):
 
 def llvm_config(env):
     explicit = env.get('LLVM_CONFIG')
+    if explicit:
+        explicit=shutil.which(explicit,path=env.get('PATH')) or explicit
+        if not Path(explicit).is_file():raise ValueError('LLVM_CONFIG does not name an installed executable')
     candidates = [explicit] if explicit else []
     for version in range(22, 16, -1):
         candidates.extend([shutil.which(f'llvm-config-{version}'), shutil.which(f'llvm-config{version}'),
-                           f'/usr/local/llvm{version}/bin/llvm-config', f'/usr/lib/llvm-{version}/bin/llvm-config'])
+                           f'/usr/local/llvm{version}/bin/llvm-config', f'/usr/lib/llvm-{version}/bin/llvm-config',
+                           f'/opt/homebrew/opt/llvm@{version}/bin/llvm-config',f'/usr/local/opt/llvm@{version}/bin/llvm-config'])
     candidates += [shutil.which('llvm-config'), '/opt/homebrew/opt/llvm/bin/llvm-config',
                    '/usr/local/opt/llvm/bin/llvm-config', '/usr/pkg/bin/llvm-config']
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
-            return str(Path(candidate).resolve())
+            try:
+                version=int(subprocess.check_output([candidate,'--version'],env=env,text=True).strip().split('.')[0])
+            except (OSError,ValueError,subprocess.CalledProcessError):
+                if candidate==explicit:raise ValueError('LLVM_CONFIG cannot report a usable LLVM version') from None
+                continue
+            if 17<=version<=22:return str(Path(candidate).resolve())
+            if candidate==explicit:raise ValueError('The reviewed Odin compiler requires LLVM 17–22; select another LLVM_CONFIG')
     raise ValueError('LLVM development tools were not found. Set LLVM_CONFIG to a compatible llvm-config executable.')
 
 
@@ -127,7 +137,7 @@ def ensure_node(work, env):
     env['PATH']=str(directory)+os.pathsep+env['PATH']
 
 
-def build(work, forward, odin=None):
+def build(work, forward, odin=None, export_bundle=None):
     target = host()
     env = dict(os.environ)
     paths = [str(Path.home()/'.cargo/bin'), '/usr/local/bin', '/usr/pkg/bin', env.get('PATH', '')]
@@ -182,7 +192,7 @@ def build(work, forward, odin=None):
     npm = 'npm.cmd' if os.name == 'nt' else 'npm'
     run([npm, 'ci', '--no-audit', '--no-fund'], cwd=editor, env=env)
     vsix = work/'thor-language.vsix'
-    run([npm, 'exec', '--', 'vsce', 'package', '--no-dependencies',
+    run([npm, 'exec', '--', 'vsce', 'package',
          '--baseContentUrl', 'https://github.com/davidludwik2370/Thor/blob/main/editors/vscode/',
          '--baseImagesUrl', 'https://raw.githubusercontent.com/davidludwik2370/Thor/main/editors/vscode/',
          '--out', vsix], cwd=editor, env=env)
@@ -193,6 +203,12 @@ def build(work, forward, odin=None):
          '--tls', tls, '--vsix', vsix, '--output', output], env=env)
     bundle = output/f'thor-{version}-{target}.tar.gz'
     run([work/'target/release'/('thor-install'+suffix), '--bundle', bundle, *forward], env=env)
+    if export_bundle:
+        export_bundle=Path(export_bundle).resolve()
+        export_bundle.mkdir(parents=True,exist_ok=True)
+        for file in (bundle,bundle.with_name(bundle.name+'.sha256')):
+            shutil.copy2(file,export_bundle/file.name)
+        print(f'Verified release bundle exported to {export_bundle}',flush=True)
 
 
 def main():
@@ -200,13 +216,14 @@ def main():
         raise ValueError('Source installation requires Python 3.11 or newer. Install it and rerun; binary installation does not require Python.')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--odin', type=Path, help='reuse a reviewed Odin executable instead of building it')
+    parser.add_argument('--export-bundle',type=Path,help='retain the verified native bundle/checksum in this directory (maintainers)')
     options, forward = parser.parse_known_args()
     host()
     if '--dry-run' in forward:
         print('Source install plan: pinned Odin/LLVM, release Rust transpiler/installer, TLS, VSIX; inventoried install and final checks. No changes made.')
         return 0
     with tempfile.TemporaryDirectory(prefix='thor-source-') as temporary:
-        build(Path(temporary), forward, options.odin)
+        build(Path(temporary), forward, options.odin,options.export_bundle)
     return 0
 
 

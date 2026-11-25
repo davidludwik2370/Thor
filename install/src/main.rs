@@ -273,6 +273,9 @@ fn run(o: Options) -> Result<()> {
     if o.uninstall {return lifecycle::uninstall(&o);}
     if o.doctor {
         let record = registered()?; let root = PathBuf::from(field(&record,"root")?);
+        if o.prefix.as_ref().is_some_and(|p|absolute(p).ok().as_ref()!=Some(&PathBuf::from(record["prefix"].as_str().unwrap_or("")))) {
+            return Err("--prefix does not match the registered installation".into());
+        }
         println!("Thor {}: {}",field(&record,"version")?,root.display());
         lifecycle::verify_inventory(&root)?; health(&root)?;
         return verify::finish(&record, true);
@@ -465,11 +468,15 @@ fn activate(prefix: &Path, root: &Path, manifest: &Value) -> Result<()> {
             fs::rename(&temp,bin.join(name)).map_err(err)?;
         }
         #[cfg(windows)] {
-            let text = format!("@rem Managed by thor-install\r\n@echo off\r\nsetlocal DisableDelayedExpansion\r\n\"{}\" %*\r\n",target.to_string_lossy().replace('%',"%%"));
+            let text = windows_launcher(&target);
             atomic_write(&bin.join(format!("{name}.cmd")),text.as_bytes())?;
         }
     }
     atomic_write(&record_path,&serde_json::to_vec_pretty(&record).map_err(err)?)
+}
+#[cfg(windows)]
+fn windows_launcher(target:&Path)->String {
+    format!("@rem Managed by thor-install\r\n@echo off\r\nsetlocal DisableDelayedExpansion\r\n\"{}\" %*\r\n",target.to_string_lossy().replace('%',"%%"))
 }
 #[cfg(unix)]
 fn shell_quote(p: &Path) -> String { format!("'{}'",p.to_string_lossy().replace('\'',"'\\''")) }

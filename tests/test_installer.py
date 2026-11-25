@@ -277,6 +277,9 @@ with log.open('a') as f:f.write(json.dumps(a)+'\\n')
 with (d/'environment.jsonl').open('a') as f:f.write(json.dumps({'PATH':os.environ.get('PATH','')})+'\\n')
 inventory=d/'installed-extensions.json'
 ids=set(json.loads(inventory.read_text()) if inventory.exists() else [])
+extension=d/'thor-local.thor-language'
+if '--locate-extension' in a:
+ print(extension);sys.exit(0)
 if '--list-extensions' in a:
  print('\\n'.join(sorted(ids)));sys.exit(0)
 if '--uninstall-extension' in a:
@@ -286,6 +289,10 @@ if '--install-extension' in a and os.environ.get('FAIL_CODE_EXTENSION')==a[a.ind
 if '--install-extension' in a:
  value=a[a.index('--install-extension')+1]
  ids.add('thor-local.thor-language' if value.endswith('.vsix') else value.lower());inventory.write_text(json.dumps(sorted(ids)))
+ if value.endswith('.vsix'):
+  client=extension/'node_modules/vscode-languageclient';client.mkdir(parents=True,exist_ok=True)
+  (extension/'package.json').write_text(json.dumps({'main':'extension.js','dependencies':{'vscode-languageclient':'9.0.1'}}));(extension/'extension.js').write_text('fixture')
+  (client/'package.json').write_text('{"main":"node.js"}');(client/'node.js').write_text('fixture')
 if '--new-window' in a:
  p=d/'User/globalStorage/storage.json';p.parent.mkdir(parents=True,exist_ok=True)
  p.write_text(json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]}))
@@ -302,7 +309,7 @@ if '--new-window' in a:
         self.assertEqual(settings,expected)
         self.assertEqual((data/'User/settings.json').read_text(),'{"custom":true}')
         commands=[json.loads(s) for s in (data/'commands.jsonl').read_text().splitlines()]
-        self.assertEqual(len([c for c in commands if '--list-extensions' not in c]),4)
+        self.assertEqual(len([c for c in commands if '--list-extensions' not in c and '--locate-extension' not in c]),4)
         installed=[c[c.index('--install-extension')+1] for c in commands if '--install-extension' in c]
         self.assertEqual([Path(installed[0]).name,*installed[1:]],['thor-language.vsix','DanielGavin.ols','vadimcn.vscode-lldb'])
         for command in commands:
@@ -323,7 +330,7 @@ if '--new-window' in a:
             self.assertIn(before['settings.json'].decode().rstrip('}'),(profile/'settings.json').read_text())
             self.assertIn('ols.server.path',(profile/'settings.json').read_text())
         else:self.assertEqual({p.name:p.read_bytes() for p in profile.iterdir()},before)
-        self.assertEqual(len([s for s in (data/'commands.jsonl').read_text().splitlines() if '--list-extensions' not in s]),3)
+        self.assertEqual(len([s for s in (data/'commands.jsonl').read_text().splitlines() if '--list-extensions' not in s and '--locate-extension' not in s]),3)
 
     def test_new_profile_can_disable_colors(self):
         code,data,extensions,profile=self.fake_code()
@@ -339,7 +346,7 @@ if '--new-window' in a:
             self.assertIn('ols.server.path',(data/'User/settings.json').read_text())
         else:self.assertEqual((data/'User/settings.json').read_text(),'{"custom":true}')
         commands=[json.loads(s) for s in (data/'commands.jsonl').read_text().splitlines()]
-        self.assertEqual(len([c for c in commands if '--list-extensions' not in c]),3)
+        self.assertEqual(len([c for c in commands if '--list-extensions' not in c and '--locate-extension' not in c]),3)
         self.assertTrue(all('--profile' not in c for c in commands))
         self.assertTrue(any('DanielGavin.ols' in c for c in commands))
 
@@ -538,6 +545,7 @@ class InstallerLifecycleTests(InstallerTests):
         self.assertEqual(self.registry.read_bytes(),record)
         self.assertEqual((self.home/'.profile').read_bytes(),profile)
         original=self.prefix;self.prefix=self.home/'wrong'
+        self.invoke(None,'--doctor',ok=False)
         self.invoke(None,'--uninstall',ok=False)
         self.prefix=original
         self.assertTrue((self.prefix/'bin/thor').exists())
@@ -569,6 +577,14 @@ class InstallerLifecycleTests(InstallerTests):
         result=self.invoke(None,'--doctor',ok=False)
         self.assertIn('failed verification',result.stderr)
 
+    def test_doctor_detects_commands_retargeted_to_a_previous_installation(self):
+        self.invoke(self.bundle())
+        previous=Path(json.loads(self.registry.read_text())['root'])
+        self.invoke(self.bundle(version='0.41.7'))
+        command=self.prefix/'bin/thor';command.unlink();command.symlink_to(previous/'thor')
+        result=self.invoke(None,'--doctor',ok=False)
+        self.assertIn('targets another installation',result.stderr)
+
     def test_bootstrap_maintenance_finds_custom_prefix_without_repeating_it(self):
         self.invoke(self.bundle())
         result=subprocess.run([str(ROOT/'thor-install'),'--doctor'],env=self.env,capture_output=True,text=True,timeout=30)
@@ -582,6 +598,13 @@ class InstallerLifecycleTests(InstallerTests):
         result=self.invoke(self.bundle(files={'tls/bin/tls':b'#!/bin/sh\nexit 0\n'}),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),ok=False)
         self.assertIn('language server closed',result.stderr)
         self.assertTrue((self.prefix/'bin/thor').exists())
+
+    def test_doctor_rejects_incomplete_editor_javascript_dependencies(self):
+        code,data,extensions,profile=self.fake_code()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        (data/'thor-local.thor-language/node_modules/vscode-languageclient/node.js').unlink()
+        result=self.invoke(None,'--doctor',ok=False)
+        self.assertIn('editor runtime entry point missing',result.stderr)
 
     def test_language_server_deadline_also_cleans_inherited_child_pipes(self):
         code,data,extensions,profile=self.fake_code()

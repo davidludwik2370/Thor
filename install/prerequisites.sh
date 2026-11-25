@@ -48,8 +48,9 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/thor-prerequisites.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 download() { curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' "$1" -o "$2"; }
 if [ "$system" = Darwin ] && ! xcrun --find clang >/dev/null 2>&1; then
+    if [ "${CI:-}" = true ]; then echo 'No usable Apple developer tools in CI. Select a preinstalled Xcode SDK before running setup.' >&2; exit 1; fi
     echo 'Installing Apple Command Line Tools. Complete the Apple installation/license dialog; this command will wait.'
-    xcode-select --install || :
+    if ! xcode-select --install; then echo 'Apple could not start installation. Check xcode-select/DEVELOPER_DIR and rerun.' >&2; exit 1; fi
     while ! xcrun --find clang >/dev/null 2>&1; do sleep 3; done
 fi
 # Compile AND link: a clang executable alone does not establish SDK availability.
@@ -68,6 +69,11 @@ fi
 "$work/check"
 echo 'PASS: native C compiler and linker'
 if $source_build; then
+    supported_llvm() {
+        [ -x "$1" ] || return 1
+        llvm_version=$("$1" --version 2>/dev/null) || return 1
+        case "${llvm_version%%.*}" in 17|18|19|20|21|22) return 0;; *) return 1;; esac
+    }
     # Standard /usr/local paths are not always present in non-login BSD shells.
     PATH="$HOME/.cargo/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
     printf '#include <vector>\nint main() {std::vector<int> x; return (int)x.size();}\n' > "$work/check.cpp"
@@ -92,7 +98,9 @@ if $source_build; then
         fi
         if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then brew install python; fi
         for tool in node npm git; do command -v "$tool" >/dev/null 2>&1 || brew install "$(case "$tool" in npm) echo node;; *) echo "$tool";; esac)"; done
-        if ! command -v llvm-config >/dev/null 2>&1; then brew list llvm >/dev/null 2>&1 || brew install llvm; fi
+        llvm_found=false
+        for candidate in /opt/homebrew/opt/llvm*/bin/llvm-config /usr/local/opt/llvm*/bin/llvm-config; do if supported_llvm "$candidate"; then llvm_found=true; fi; done
+        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then brew list llvm >/dev/null 2>&1 || brew install llvm; fi
     else
         if [ "$system" = Linux ] && ! command -v patchelf >/dev/null 2>&1; then packages patchelf; fi
         if ! command -v python3 >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
@@ -104,8 +112,8 @@ if $source_build; then
             esac
         fi
         llvm_found=false
-        for candidate in /usr/local/llvm*/bin/llvm-config /usr/lib/llvm-*/bin/llvm-config; do [ ! -x "$candidate" ] || llvm_found=true; done
-        if ! command -v llvm-config >/dev/null 2>&1 && ! $llvm_found; then
+        for candidate in /usr/local/llvm*/bin/llvm-config /usr/lib/llvm-*/bin/llvm-config; do if supported_llvm "$candidate"; then llvm_found=true; fi; done
+        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then
             case "$system" in FreeBSD) packages llvm19;; NetBSD) packages llvm;; OpenBSD) packages llvm;;
                 Linux)
                     if command -v apt-get >/dev/null 2>&1; then packages llvm-dev lld
