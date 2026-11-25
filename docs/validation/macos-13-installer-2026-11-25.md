@@ -60,3 +60,44 @@ package and Command Line Tools support.
 Retry from the existing checkout with `git pull --ff-only`, followed by the
 original `./thor-install --vscode --profile Thor --path` command. Already
 installed prerequisites are reused.
+
+## Dependency-chain follow-up
+
+A second installation log exposed a separate issue: installing Node through
+Homebrew on macOS 13 pulled in source builds of LLVM 23, Rust and many other
+packages. This happened before source setup could use its existing official
+Node binary acquisition. The earlier `llvm@22` correction did not prevent that
+transitive dependency chain. The source-install dependency path was revised:
+
+- macOS no longer installs Homebrew packages. Apple's Python 3.9 can run the
+  source installer and distribution builder, avoiding a new Python build.
+- Missing Node/npm and Rust/Cargo use verified private binaries on macOS,
+  Linux and Windows. Compatible existing tools are reused.
+- Missing Mac LLVM uses pinned official LLVM 18.1.8 ARM64 or 19.1.7 Intel
+  packages. Precompiled components are indexed into the archive Odin expects.
+  Only the small zstd C library is compiled, with two jobs; LLVM is not compiled.
+- Optional native VSCE signing/keychain dependencies and npm install scripts
+  are omitted. npm and Node compile caches stay in the disposable workspace.
+- Reusing Odin avoids SDK-only dependency acquisition. Native C/linker checks
+  remain, as do normal checked/unchecked health checks and license inventories.
+
+Official archive SHA-256 values were verified. The Intel LLVM package's actual
+Mach-O minimum was inspected and recorded as **macOS 13.7**, not 13.0. Apple
+Silicon's package targets macOS 11.0; the reported macOS 13.5.1 M1 therefore
+passes the package selection check. This does not replace testing on macOS 13.
+
+Local Mac validation completed a full native source build/install with Apple's
+Python 3.9.6 and a private Rust 1.89.0 toolchain. It took **341.44 seconds**,
+excluding preparing the LLVM inputs. LLVM extraction, zstd build and archive
+indexing took **61.55 seconds**, plus approximately 15 seconds for downloading
+the 800 MiB LLVM package on this connection. Node 22.14.0/npm 10.9.2 binary
+acquisition was tested separately; the complete install reused an existing Node.
+These measurements are specific to the development Mac and network.
+
+The installation's checked and unchecked compile/run health checks passed.
+The installer/OLS/source-tool/assertion-hygiene selection passed **99 tests**,
+and the native installer passed **eight Rust tests**. A Linux source lifecycle
+run passed build, doctor, SDK JSON, checked/unchecked tests and uninstall, then
+exposed Node's default compile cache outside the workspace. That cache is now
+explicitly placed inside the build workspace; cleanup validation is being
+repeated. Cross-platform CI results are recorded with the final validation.

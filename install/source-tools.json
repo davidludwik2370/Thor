@@ -1,0 +1,29 @@
+{
+  "zstd": {
+    "version": "1.5.7",
+    "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+    "sha256": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3",
+    "checksum_source": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sha256",
+    "root": "zstd-1.5.7"
+  },
+  "macos-aarch64": {
+    "version": "18.1.8",
+    "minimum_macos": "11.0",
+    "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang%2Bllvm-18.1.8-arm64-apple-macos11.tar.xz",
+    "sha256": "4573b7f25f46d2a9c8882993f091c52f416c83271db6f5b213c93f0bd0346a10",
+    "checksum_source": "https://discourse.llvm.org/t/18-1-8-has-been-tagged/79726",
+    "license_url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-18.1.8/llvm/LICENSE.TXT",
+    "license_sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+    "root": "clang+llvm-18.1.8-arm64-apple-macos11"
+  },
+  "macos-x86_64": {
+    "version": "19.1.7",
+    "minimum_macos": "13.7",
+    "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-macOS-X64.tar.xz",
+    "sha256": "49405e75fbe7ad6f8139a33f59ec8c5112b75b3027405c7b92d19f4c6f02c78a",
+    "checksum_source": "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-macOS-X64.tar.xz.jsonl",
+    "license_url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/llvm/LICENSE.TXT",
+    "license_sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+    "root": "LLVM-19.1.7-macOS-X64"
+  }
+}

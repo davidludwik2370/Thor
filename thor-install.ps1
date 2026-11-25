@@ -11,6 +11,7 @@ $version = (Get-Content -Raw -LiteralPath (Join-Path $checkoutRoot 'release/vers
 $checkoutVersion=$version
 $bundle = ''; $checksum = ''; $base = $env:THOR_RELEASE_BASE
 $sourceBuild=$false; $noDeps=$false; $maintenance=''; $prefix=''; $dry=$false
+$reuseOdin=$false
 for ($i = 0; $i -lt $args.Count; $i++) {
     $arg = $args[$i]
     if ($arg -in @('--help', '-h')) {
@@ -19,6 +20,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
         exit 0
     }
     if ($arg -eq '--from-source') {$sourceBuild=$true; continue}
+    if ($arg -eq '--odin') {$reuseOdin=$true}
     if ($arg -eq '--no-install-deps') {$noDeps=$true}
     if ($arg -in @('--doctor','--uninstall')) {$maintenance=$arg}
     if ($arg -eq '--dry-run') {$dry=$true}
@@ -52,7 +54,7 @@ try {
         if ($bundle -or $checksum) {throw '--from-source cannot use --bundle/--sha256'}
         if ($version -ne $checkoutVersion) {throw 'A source build uses the checked-out version. Check out the requested release first.'}
         if ($dry) {Write-Output 'Source install plan: pinned tools/Odin, Thor/TLS/editor release builds, inventoried install and verification. No changes made.'; exit 0}
-        if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}
+        if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin}
         $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
         & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
         if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
@@ -73,7 +75,7 @@ try {
             if ($version -ne $checkoutVersion) {throw 'No binary for this version. Check out that release before building it from source.'}
             if ($dry) {Write-Output 'Source fallback would be used; no changes made.'; exit 0}
             Write-Output 'No release binary for this host; building the checked-out source.'
-            if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild}
+            if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin}
             $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
             & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
             if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}

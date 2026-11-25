@@ -3,9 +3,9 @@
 # for binary installation. OS approvals remain with the OS; never run Thor as root.
 set -eu
 PATH="$PATH:/usr/local/bin:/usr/pkg/bin:/usr/local/sbin:/usr/pkg/sbin"; export PATH
-source_build=false; editor=false; plan=false; download_only=false
+source_build=false; editor=false; plan=false; download_only=false; reuse_odin=false
 for arg do
-    case "$arg" in --source) source_build=true;; --vscode) editor=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
+    case "$arg" in --source) source_build=true;; --reuse-odin) reuse_odin=true;; --vscode) editor=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
 done
 system=$(uname -s)
 machine=$(uname -m)
@@ -15,8 +15,7 @@ case "$system:$machine" in
     *) echo "Unsupported Odin host: $system $(uname -m)" >&2; exit 1;;
 esac
 if [ "$system" = Darwin ]; then
-    # A newly installed Homebrew may not be in the current login shell yet.
-    # Reuse it on a retry instead of running Homebrew's installer again.
+    # Reuse existing Homebrew tools without installing or upgrading packages.
     PATH="$PATH:/opt/homebrew/bin"; export PATH
 fi
 if $plan; then
@@ -101,7 +100,7 @@ if $source_build; then
     # Standard /usr/local paths are not always present in non-login BSD shells.
     PATH="$HOME/.cargo/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
     printf '#include <vector>\nint main() {std::vector<int> x; return (int)x.size();}\n' > "$work/check.cpp"
-    if ! clang++ "$work/check.cpp" -o "$work/check-cxx" >/dev/null 2>&1; then
+    if ! $reuse_odin && ! clang++ "$work/check.cpp" -o "$work/check-cxx" >/dev/null 2>&1; then
         case "$system" in
             Linux)
                 if command -v apt-get >/dev/null 2>&1; then packages build-essential
@@ -113,32 +112,25 @@ if $source_build; then
         clang++ "$work/check.cpp" -o "$work/check-cxx"
     fi
     if [ "$system" = Darwin ]; then
-        if ! command -v brew >/dev/null 2>&1; then
-            download https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh "$work/homebrew.sh"
-            /bin/bash "$work/homebrew.sh"
-            for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-                if [ -x "$brew_path" ]; then eval "$("$brew_path" shellenv)"; break; fi
-            done
-        fi
-        if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then brew install python; fi
-        # Apple's /bin/sh is Bash 3.2. A case pattern's closing parenthesis
-        # inside $(...) is misparsed there even though sh -n accepts it.
-        for tool in node npm git; do
-            if ! command -v "$tool" >/dev/null 2>&1; then
-                case "$tool" in npm) formula=node;; *) formula=$tool;; esac
-                brew install "$formula"
-            fi
+        # CLT already supplies Python 3.9, Git and native build tools. Node,
+        # Rust and missing LLVM come from verified private binary downloads in
+        # from_source.py. Never bootstrap Homebrew or compile its tool chains.
+        python_found=false
+        for candidate in python3 python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 /usr/bin/python3; do
+            if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1; then python_found=true; break; fi
         done
-        llvm_found=false
-        for candidate in /opt/homebrew/opt/llvm*/bin/llvm-config /usr/local/opt/llvm*/bin/llvm-config; do if supported_llvm "$candidate"; then llvm_found=true; fi; done
-        # The current unversioned formula may exceed the reviewed Odin's
-        # supported LLVM range. An installed unsupported version is not enough.
-        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then brew install llvm@22; fi
+        if ! $python_found; then echo 'Apple developer tools did not provide Python 3.9+. Install a binary Python from python.org and rerun.' >&2; exit 1; fi
+        if ! $reuse_odin && ! command -v git >/dev/null 2>&1; then echo 'Apple developer tools did not provide Git. Repair Command Line Tools and rerun.' >&2; exit 1; fi
     else
-        if [ "$system" = Linux ] && ! command -v patchelf >/dev/null 2>&1; then packages patchelf; fi
-        if ! command -v python3 >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+        if [ "$system" = Linux ]; then
+            set --
+            for tool in patchelf python3; do command -v "$tool" >/dev/null 2>&1 || set -- "$@" "$tool"; done
+            if ! $reuse_odin; then
+                for tool in git make; do command -v "$tool" >/dev/null 2>&1 || set -- "$@" "$tool"; done
+            fi
+            if [ "$#" -gt 0 ]; then packages "$@"; fi
+        elif ! command -v python3 >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1 || { ! $reuse_odin && { ! command -v git >/dev/null 2>&1 || ! command -v gmake >/dev/null 2>&1; }; }; then
             case "$system" in
-                Linux) packages python3 nodejs npm git make;;
                 FreeBSD) packages python3 node npm git gmake;;
                 NetBSD) packages python312 nodejs npm git gmake;;
                 OpenBSD) packages python3 node npm git gmake;;
@@ -146,19 +138,18 @@ if $source_build; then
         fi
         llvm_found=false
         for candidate in /usr/local/llvm*/bin/llvm-config /usr/lib/llvm-*/bin/llvm-config; do if supported_llvm "$candidate"; then llvm_found=true; fi; done
-        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then
+        if ! $reuse_odin && ! supported_llvm "${LLVM_CONFIG:-$(command -v llvm-config || :)}" && ! $llvm_found; then
             case "$system" in FreeBSD) packages llvm19;; NetBSD) packages llvm;; OpenBSD) packages llvm;;
                 Linux)
-                    if command -v apt-get >/dev/null 2>&1; then packages llvm-dev lld
-                    elif command -v pacman >/dev/null 2>&1; then packages llvm lld
-                    else packages llvm-devel lld; fi;;
+                    if command -v apt-get >/dev/null 2>&1; then packages llvm-dev
+                    elif command -v pacman >/dev/null 2>&1; then packages llvm
+                    else packages llvm-devel; fi;;
             esac
         fi
     fi
     if ! command -v cargo >/dev/null 2>&1; then
         case "$system" in
             FreeBSD|NetBSD|OpenBSD) packages rust;;
-            *) download https://sh.rustup.rs "$work/rustup.sh"; sh "$work/rustup.sh" -y --profile minimal --no-modify-path;;
         esac
     fi
     echo 'PASS: source-build prerequisites'

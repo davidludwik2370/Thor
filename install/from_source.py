@@ -6,7 +6,6 @@ directory and two compiler jobs; neither the checkout nor global build history
 is used for intermediate output. All upstream versions are explicitly pinned.
 """
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,9 +14,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tarfile
-import urllib.request
-import zipfile
+if __package__:
+    from . import source_tools
+else:
+    import source_tools
 
 ROOT = Path(__file__).resolve().parents[1]
 HOSTS = {
@@ -55,10 +55,10 @@ def llvm_config(env):
         if not Path(explicit).is_file():raise ValueError('LLVM_CONFIG does not name an installed executable')
     candidates = [explicit] if explicit else []
     for version in range(22, 16, -1):
-        candidates.extend([shutil.which(f'llvm-config-{version}'), shutil.which(f'llvm-config{version}'),
+        candidates.extend([shutil.which(f'llvm-config-{version}', path=env.get('PATH')), shutil.which(f'llvm-config{version}', path=env.get('PATH')),
                            f'/usr/local/llvm{version}/bin/llvm-config', f'/usr/lib/llvm-{version}/bin/llvm-config',
                            f'/opt/homebrew/opt/llvm@{version}/bin/llvm-config',f'/usr/local/opt/llvm@{version}/bin/llvm-config'])
-    candidates += [shutil.which('llvm-config'), '/opt/homebrew/opt/llvm/bin/llvm-config',
+    candidates += [shutil.which('llvm-config', path=env.get('PATH')), '/opt/homebrew/opt/llvm/bin/llvm-config',
                    '/usr/local/opt/llvm/bin/llvm-config', '/usr/pkg/bin/llvm-config']
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
@@ -72,69 +72,8 @@ def llvm_config(env):
     raise ValueError('LLVM development tools were not found. Set LLVM_CONFIG to a compatible llvm-config executable.')
 
 
-def ensure_rust(env):
-    version=subprocess.check_output(['rustc','--version'],env=env,text=True).split()[1]
-    if tuple(map(int,version.split('-')[0].split('.')[:2])) >= (1,85):
-        return
-    if not shutil.which('rustup',path=env['PATH']):
-        raise ValueError('Source installation requires Rust 1.85+. Update the system Rust package and rerun.')
-    # Install alongside existing toolchains; never change the user's default.
-    run(['rustup','toolchain','install','1.89.0','--profile','minimal'],env=env)
-    env['RUSTUP_TOOLCHAIN']='1.89.0'
-
-
 def ensure_node(work, env):
-    """Older distro Node packages cannot run VSCE. Use a disposable official
-    build rather than replacing a user's existing Node installation."""
-    try:
-        version = subprocess.check_output(['node','--version'],env=env,text=True)
-        if int(version.strip().lstrip('v').split('.')[0]) >= 20:
-            return
-    except (OSError, ValueError, subprocess.CalledProcessError):
-        pass
-    system = {'Darwin':'darwin','Linux':'linux','Windows':'win'}.get(platform.system())
-    if system is None:
-        raise ValueError('Source editor packaging needs Node 20+ from the BSD package manager.')
-    arch = 'arm64' if host().endswith('aarch64') else 'x64'
-    version = 'v22.14.0'
-    name = f'node-{version}-{system}-{arch}'
-    filename = name + ('.zip' if os.name=='nt' else '.tar.gz')
-    base = f'https://nodejs.org/dist/{version}/'
-    with urllib.request.urlopen(base+'SHASUMS256.txt',timeout=60) as response:
-        hashes = response.read(1024*1024).decode()
-    expected = next((line.split()[0] for line in hashes.splitlines() if line.split()[-1]==filename),None)
-    if expected is None:
-        raise ValueError('Official Node checksum inventory lacks this host')
-    archive = work/filename
-    with urllib.request.urlopen(base+filename,timeout=60) as response, archive.open('wb') as output:
-        shutil.copyfileobj(response,output)
-    with archive.open('rb') as stream:
-        actual=hashlib.file_digest(stream,'sha256').hexdigest()
-    if actual!=expected:
-        raise ValueError('Official Node archive checksum mismatch')
-    if os.name=='nt':
-        with zipfile.ZipFile(archive) as incoming:
-            if any(Path(n).is_absolute() or '..' in Path(n).parts for n in incoming.namelist()):
-                raise ValueError('Unsafe Node archive path')
-            incoming.extractall(work)
-        directory = work/name
-    else:
-        # Pinned official archive, verified before extraction. Check paths and
-        # link destinations explicitly for Python 3.11 compatibility.
-        with tarfile.open(archive) as incoming:
-            for member in incoming:
-                p=Path(member.name)
-                if p.is_absolute() or '..' in p.parts or not(member.name==name or member.name.startswith(name+'/')):
-                    raise ValueError('Unsafe Node archive path')
-                if member.issym() and (Path(member.linkname).is_absolute() or '..' in Path(member.linkname).parts):
-                    # Official npm links use ../lib, which remain inside the
-                    # single verified top-level Node directory.
-                    resolved=(work/p.parent/member.linkname).resolve()
-                    if not resolved.is_relative_to(work/name):raise ValueError('Unsafe Node archive link')
-                if not(member.isfile() or member.isdir() or member.issym()):raise ValueError('Unsupported Node archive entry')
-            incoming.extractall(work,filter='data')
-        directory = work/name/'bin'
-    env['PATH']=str(directory)+os.pathsep+env['PATH']
+    source_tools.ensure_node(work, env, host())
 
 
 def build(work, forward, odin=None, export_bundle=None):
@@ -150,15 +89,32 @@ def build(work, forward, odin=None, export_bundle=None):
             executable=shutil.which(tool,path=env['PATH'])
             if executable:directories.append(str(Path(executable).parent))
         env['PATH']=os.pathsep.join(dict.fromkeys(directories))
-    env.update(CARGO_TARGET_DIR=str(work/'target'), CARGO_INCREMENTAL='0', CARGO_BUILD_JOBS='2')
-    ensure_rust(env)
+    # Windows environment keys are case-insensitive; do not leave an inherited
+    # uppercase npm cache alias pointing outside this disposable workspace.
+    for key in list(env):
+        if key.lower() in ('npm_config_cache', 'node_compile_cache'):
+            del env[key]
+    env.update(CARGO_TARGET_DIR=str(work/'target'), CARGO_INCREMENTAL='0', CARGO_BUILD_JOBS='2',
+               npm_config_cache=str(work/'npm-cache'), NODE_COMPILE_CACHE=str(work/'node-compile-cache'))
+    if odin:
+        odin = Path(odin).resolve(strict=True)
+    # Acquire binary build tools before compiling anything. Missing optional
+    # packaging tools must not cause a late failure after expensive builds.
+    source_tools.ensure_rust(work, env, target)
+    ensure_node(work, env)
+    if os.name != 'nt' and not odin:
+        try:
+            env['LLVM_CONFIG'] = llvm_config(env)
+        except ValueError:
+            if env.get('LLVM_CONFIG') or platform.system() != 'Darwin':
+                raise
+            env['LLVM_CONFIG'] = source_tools.acquire_macos_llvm(work, env, target)
+        env['PATH'] = str(Path(env['LLVM_CONFIG']).parent)+os.pathsep+env['PATH']
     profile = json.loads((ROOT/'rust/data'/('noalloc-io-sdk-windows.json' if os.name == 'nt' else 'noalloc-io-sdk.json')).read_text())
     revision = profile.get('revision', profile.get('reviewed_sdk_revision'))
     if revision == '9a69916':
         revision = '9a6991685ddf663956d9836602eb421e141fc443'
-    if odin:
-        odin = Path(odin).resolve(strict=True)
-    else:
+    if not odin:
         checkout = work/'Odin'
         run(['git', 'init', checkout], env=env)
         run(['git', '-C', checkout, 'remote', 'add', 'origin', 'https://github.com/odin-lang/Odin.git'], env=env)
@@ -171,10 +127,9 @@ def build(work, forward, odin=None, export_bundle=None):
             run(['git', '-C', checkout, 'lfs', 'pull'], env=env)
             run(['cmd.exe', '/d', '/c', 'build.bat', 'release'], cwd=checkout, env=env)
         else:
-            env['LLVM_CONFIG'] = llvm_config(env)
-            env['PATH'] = str(Path(env['LLVM_CONFIG']).parent)+os.pathsep+env['PATH']
             make = 'gmake' if platform.system() in ('FreeBSD', 'NetBSD', 'OpenBSD') else 'make'
             run([make, 'release-native'], cwd=checkout, env=env)
+            source_tools.retain_llvm_notices(env['LLVM_CONFIG'], checkout)
         odin = checkout/('odin.exe' if os.name == 'nt' else 'odin')
     # The release builder checks revision AND the SDK file hashes before staging.
     for manifest in ('rust/Cargo.toml', 'install/Cargo.toml'):
@@ -186,13 +141,14 @@ def build(work, forward, odin=None, export_bundle=None):
          f'-collection:thor={ROOT / "frontend"}', '-o:speed', '-thread-count:2',
          f'-define:VERSION=thor-{version}+ols-0c9438f',f'-out:{tls}'], env=env)
     editor = work/'vscode'
-    ensure_node(work,env)
     shutil.copytree(ROOT/'editors/vscode', editor,
                     ignore=shutil.ignore_patterns('node_modules', '*.vsix', '.git'))
     npm = 'npm.cmd' if os.name == 'nt' else 'npm'
-    run([npm, 'ci', '--no-audit', '--no-fund'], cwd=editor, env=env)
+    # VSIX packaging needs JavaScript dependencies, not native keychain/signing
+    # helpers or their post-install downloads and compiler toolchains.
+    run([npm, 'ci', '--no-audit', '--no-fund', '--omit=optional', '--ignore-scripts'], cwd=editor, env=env)
     vsix = work/'thor-language.vsix'
-    run([npm, 'exec', '--', 'vsce', 'package',
+    run([npm, 'exec', '--offline', '--', 'vsce', 'package',
          '--baseContentUrl', 'https://github.com/davidludwik2370/Thor/blob/main/editors/vscode/',
          '--baseImagesUrl', 'https://raw.githubusercontent.com/davidludwik2370/Thor/main/editors/vscode/',
          '--out', vsix], cwd=editor, env=env)
@@ -212,8 +168,8 @@ def build(work, forward, odin=None, export_bundle=None):
 
 
 def main():
-    if sys.version_info < (3,11):
-        raise ValueError('Source installation requires Python 3.11 or newer. Install it and rerun; binary installation does not require Python.')
+    if sys.version_info < (3,9):
+        raise ValueError('Source installation requires Python 3.9 or newer. Install it and rerun; binary installation does not require Python.')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--odin', type=Path, help='reuse a reviewed Odin executable instead of building it')
     parser.add_argument('--export-bundle',type=Path,help='retain the verified native bundle/checksum in this directory (maintainers)')

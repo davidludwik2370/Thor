@@ -23,8 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def sha(path):
+    digest = hashlib.sha256()
     with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def capture(*args):
@@ -148,7 +151,7 @@ def library_notices(source, stage):
     parents = [source.parent, *source.parents]
     found = False
     for parent in parents[:5]:
-        for pattern in ('LICENSE*', 'COPYING*', 'NOTICE*', 'share/doc/llvm/LICENSE*'):
+        for pattern in ('LICENSE*', 'COPYING*', 'NOTICE*', 'share/doc/llvm/LICENSE*', 'share/doc/LLVM/LICENSE*'):
             for notice in parent.glob(pattern):
                 if notice.is_file():
                     copy(notice, stage/'licenses/native'/source.name/notice.name)

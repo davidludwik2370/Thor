@@ -58,7 +58,7 @@ if 'install' in sys.argv:pathlib.Path(os.environ['FIXTURE_READY']).write_text('i
     def test_other_package_failures_are_not_retried(self):
         self.exercise_apt('network')
 
-    def exercise_macos(self, shell, *, missing=(), llvm='22.1.8', brew_off_path=False):
+    def exercise_macos(self, shell, *, missing=(), llvm='22.1.8', brew_off_path=False, no_brew=False, reuse_odin=False):
         with tempfile.TemporaryDirectory(prefix='thor-macos-prerequisites-') as temp:
             directory=Path(temp);bin=directory/'bin';bin.mkdir()
             home=directory/'home';home.mkdir()
@@ -95,6 +95,7 @@ else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
             if brew_off_path:
                 destination=directory/'system/opt/homebrew/bin/brew'
                 destination.parent.mkdir(parents=True);(bin/'brew').rename(destination)
+            if no_brew:(bin/'brew').unlink()
             # Relocate only fixed system search roots into the fixture, so an
             # installed host Node/LLVM cannot hide a missing-tool branch. The
             # prerequisite logic and Apple /bin/sh execution remain unchanged.
@@ -103,28 +104,28 @@ else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
                 text=text.replace(prefix,str(directory/'system'/prefix.lstrip('/')))
             script=directory/'prerequisites.sh';script.write_text(text)
             log=directory/'brew.jsonl'
-            result=subprocess.run([shell,str(script),'--source'],capture_output=True,text=True,timeout=15,
+            options=['--source',*(['--reuse-odin'] if reuse_odin else [])]
+            result=subprocess.run([shell,str(script),*options],capture_output=True,text=True,timeout=15,
                                   env={**os.environ,'PATH':str(bin),'HOME':str(home),'CI':'true','FIXTURE_LOG':str(log)})
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS: source-build prerequisites',result.stdout)
             return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
-    def test_macos_missing_node_npm_and_git_use_literal_formula_names(self):
+    def test_macos_missing_node_npm_and_git_do_not_trigger_homebrew(self):
         # On macOS these are the real Apple Bash 3.2 shells. Merely using -n
         # misses the command-substitution bug; execute the missing-tool paths.
         for shell in ('/bin/sh','/bin/bash'):
             if not Path(shell).is_file():continue
-            for missing, expected in [(('node','npm','git'),['node','git']),
-                                      (('npm',),['node']), (('git',),['git']), ((),[])]:
+            for missing in [('node','npm','git'),('npm',),('node','npm'),()]:
                 with self.subTest(shell=shell,missing=missing):
-                    commands=self.exercise_macos(shell,missing=missing)
-                    self.assertEqual(commands,[['install',name] for name in expected])
+                    commands=self.exercise_macos(shell,missing=missing,reuse_odin='git' in missing)
+                    self.assertEqual(commands,[])
 
-    def test_macos_unsupported_installed_llvm_acquires_reviewed_major(self):
+    def test_macos_unsupported_installed_llvm_does_not_trigger_homebrew(self):
         for llvm in ('16.0.0','23.1.0','invalid'):
             with self.subTest(llvm=llvm):
                 commands=self.exercise_macos('/bin/sh',llvm=llvm)
-                self.assertEqual(commands,[['install','llvm@22']])
+                self.assertEqual(commands,[])
 
     def test_macos_supported_llvm_is_reused(self):
         for llvm in ('17.0.6','18.1.8','22.1.8'):
@@ -134,4 +135,8 @@ else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
 
     def test_macos_existing_homebrew_outside_login_path_is_reused(self):
         commands=self.exercise_macos('/bin/sh',brew_off_path=True)
+        self.assertEqual(commands,[])
+
+    def test_macos_does_not_bootstrap_missing_homebrew(self):
+        commands=self.exercise_macos('/bin/sh',missing=('node','npm'),no_brew=True)
         self.assertEqual(commands,[])

@@ -1,6 +1,6 @@
 # Native Windows host prerequisites. Keep elevation limited to Microsoft's
 # installer; Thor, editor configuration, and source builds run as the user.
-param([switch]$SourceBuild, [switch]$VSCode, [switch]$DryRun)
+param([switch]$SourceBuild, [switch]$VSCode, [switch]$DryRun, [switch]$ReuseOdin)
 $ErrorActionPreference='Stop'
 if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {throw 'Odin currently supports native Windows x64 hosts only.'}
 if ($DryRun) {Write-Output "Prerequisites: Windows x64; source build=$SourceBuild; VS Code=$VSCode. Reuse existing installations."; exit 0}
@@ -50,7 +50,7 @@ function FindSourcePython {
     foreach($file in Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe","$env:ProgramFiles\Python*\python.exe" -ErrorAction SilentlyContinue) {$candidates.Add($file.FullName)}
     foreach($candidate in $candidates) {
         if(Test-Path -LiteralPath $candidate) {
-            & $candidate -c 'import sys; sys.exit(sys.version_info < (3,11))' 2>$null
+            & $candidate -c 'import sys; sys.exit(sys.version_info < (3,9))' 2>$null
             if($LASTEXITCODE -eq 0){return $candidate}
         }
     }
@@ -98,15 +98,16 @@ try {
     Write-Output "PASS: MSVC installation at $vs"
     if ($SourceBuild) {
         # winget is an acquisition helper, not a prerequisite for normal installs.
-        # Official Python/Rust/Node/Git packages have different update mechanisms;
-        # use their registered package identities and never upgrade existing tools.
-        $tools=@(@('python','Python.Python.3.12'),@('node','OpenJS.NodeJS.LTS'),@('git','Git.Git'),@('cargo','Rustlang.Rustup'),@('git-lfs','GitHub.GitLFS'))
+        # Node/Rust are private verified binary tools, not global winget installs.
+        # Reusing Odin also avoids Git/Git LFS acquisition for the SDK checkout.
+        $tools=[System.Collections.Generic.List[object]]::new()
+        $tools.Add(@('python','Python.Python.3.12'))
+        if (!$ReuseOdin) {$tools.Add(@('git','Git.Git')); $tools.Add(@('git-lfs','GitHub.GitLFS'))}
         foreach($tool in $tools) {
             $available=if($tool[0] -eq 'python'){FindSourcePython}else{Get-Command $tool[0] -ErrorAction SilentlyContinue}
             if (!$available) {
                 if (!(Get-Command winget -ErrorAction SilentlyContinue)) {throw "Source builds need $($tool[0]). Install it or install Microsoft App Installer (winget), then rerun. Binary installation does not need winget."}
                 $arguments=@('install','--id',$tool[1],'--exact','--silent','--accept-package-agreements','--accept-source-agreements')
-                if($tool[0] -eq 'cargo') {$arguments+=@('--override','-y --profile minimal --no-modify-path')}
                 InvokeChecked 'winget' $arguments
             }
         }
@@ -114,7 +115,7 @@ try {
         # activated environments and user shell tools).
         $env:PATH=MergeProcessPaths @($env:PATH,[Environment]::GetEnvironmentVariable('Path','User'),[Environment]::GetEnvironmentVariable('Path','Machine'))
         $ThorSourcePython=FindSourcePython
-        if(!$ThorSourcePython){throw 'Python 3.11+ was not found after installation. Restart the terminal and retry.'}
+        if(!$ThorSourcePython){throw 'Python 3.9+ was not found after installation. Restart the terminal and retry.'}
         # Export the selected MSVC environment only into the source-build child.
         # The caller imports this snapshot rather than changing global PATH.
         $dev=Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'

@@ -57,7 +57,7 @@ NetBSD/OpenBSD require an available compatible editor and `--code PATH`.
 
 Use `--no-install-deps` on managed systems to disable system/editor prerequisite
 installation; verification still runs and reports missing tools. Source builds
-can still acquire pinned Odin, Cargo/npm packages and temporary Node; use a local
+can still acquire pinned Odin, private binary build tools and Cargo/npm packages; use a local
 bundle without `--vscode` for an offline binary installation. `--dry-run`, `--doctor` and
 `--uninstall` never install prerequisites. The bootstrap itself needs a downloader;
 POSIX bootstrap acquisition can install curl/CA certificates using the package
@@ -93,30 +93,49 @@ source fallback cannot substitute another version: check out the desired release
 first. Windows uses the same options through `thor-install.cmd`/`.ps1`.
 
 Thor-owned source and tests are in the checkout. Source installation additionally
-acquires Rust/Cargo, Python 3.11+, Node/npm, Git, LLVM development tools, and the
+uses Python 3.9+, Rust/Cargo, Node/npm, Git, LLVM development tools, and the
 pinned reviewed Odin revision. Rust packages use committed Cargo lockfiles; SDK
 files are checked against the reviewed source hashes. A compatible existing Odin
 can be selected explicitly. BSD builds use system Rust packages. Windows source
-prerequisite acquisition uses winget for missing developer tools; if App Installer
+prerequisite acquisition uses winget for missing Python/Git/Git LFS; if App Installer
 is unavailable, it reports which tool to install. Binary setup does not require
 winget, Rust, Python or Node. Windows Rust executables link their C runtime
 statically so the installer can start before developer tools are installed.
 
-Older Linux Node packages are retained; packaging can use a disposable official
-Node 22.14.0 build verified against its official checksum inventory. Build targets,
-Odin source, temporary Node and npm dependencies live in a temporary directory
-and are removed on success or failure. Builds use two Cargo jobs and release
-optimizations. Rust/package-manager caches and installed development tools remain
-available as ordinary development dependencies; they are not removed by Thor
-uninstall. A source install takes longer and uses more temporary space than a
-binary install; it does not inherently improve generated-program performance.
+Compatible existing Rust/Cargo and Node/npm are reused. Otherwise macOS, Linux
+and Windows source builds download verified binary tools into their temporary
+workspace: Node 22.14.0 and a minimal Rust 1.89.0 toolchain. Rust uses private
+Cargo/Rustup homes; Node and Rust setup does not change global tools, shell
+profiles or PATH. Existing older system Node/Rust installations are retained.
 
-macOS source setup works with Apple's built-in Bash 3.2 shell, reuses Homebrew
-even before its shell PATH changes take effect, and installs versioned `llvm@22`
-when no supported LLVM 17–22 is found. Older macOS versions may require lengthy
-Homebrew source builds and an appropriate Command Line Tools release; upstream
-package support still applies. The shell and OS-selection regressions are tested
-on current macOS; this does not constitute a full native macOS 13 validation.
+macOS source setup uses Apple's Command Line Tools Python 3.9 and built-in Bash
+3.2. It does **not install Homebrew or any Homebrew packages**. If no usable
+LLVM is installed, it downloads a pinned official package: LLVM 18.1.8 for Apple
+Silicon (macOS 11+) or LLVM 19.1.7 for Intel (macOS 13.7+). The installer combines
+precompiled LLVM objects into the archive Odin expects; LLVM is never compiled
+from source. It builds only a small pinned zstd C library with two jobs to satisfy
+those packages' compression dependency, retaining the LLVM and zstd notices.
+Intel Macs older than 13.7 need a compatible installed `LLVM_CONFIG` or an OS
+update; incompatible downloads are rejected before acquisition. Version pins,
+checksums and upstream references are recorded in `install/source-tools.json`.
+
+Linux setup no longer installs Node/npm through the OS package manager. BSD
+continues to use native binary packages for Node, Rust and LLVM. Reusing Odin
+with `--odin PATH` skips SDK-only C++/LLVM acquisition, and on Windows also skips
+Git/Git LFS acquisition. The required native C compiler/linker/SDK is still checked.
+Extra cross-target linkers such as `wasm-ld` remain optional prerequisites for
+those targets; native Linux source setup no longer installs LLD unconditionally.
+
+Build targets, downloaded build tools, Odin source and npm cache/dependencies
+live in a temporary directory and are removed on success or failure. VSIX
+packaging omits optional native keychain/signing packages, disables npm lifecycle
+scripts, and runs VSCE without an additional network installation. Cargo builds
+use two jobs and release optimizations. Tools that were already installed remain
+untouched. A source install takes longer and uses more temporary space than a
+binary install; it does not add a runtime layer to generated programs.
+
+The reduced dependency path has been exercised on current macOS with Apple's
+Python 3.9; a complete native macOS 13 installation still needs confirmation.
 
 The installation includes representative health checks, not the compiler's full
 regression suite. A clone already contains that suite; maintainers can run

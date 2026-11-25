@@ -1,9 +1,9 @@
 name: Installer
 on:
   push:
-    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
   pull_request:
-    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
   workflow_dispatch:
     inputs:
       source_build:
@@ -14,6 +14,11 @@ on:
         description: Limit a source-install retry to the Windows host
         type: boolean
         default: false
+      platform:
+        description: Select one native validation host (all by default)
+        type: choice
+        options: [all, ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+        default: all
 permissions:
   contents: read
 jobs:
@@ -21,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.windows_only && '["windows-2025"]' || '["ubuntu-24.04","ubuntu-24.04-arm","macos-15","macos-15-intel","windows-2025"]') }}
+        os: ${{ fromJSON(inputs.windows_only && '["windows-2025"]' || inputs.platform && inputs.platform != 'all' && format('["{0}"]', inputs.platform) || '["ubuntu-24.04","ubuntu-24.04-arm","macos-15","macos-15-intel","windows-2025"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -50,7 +55,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) {throw 'Could not inspect installer dependencies'}
           if (($imports -join "`n") -match '(?im)^\s*(VCRUNTIME|MSVCP)[^\s]*\.dll\s*$') {throw 'Installer requires an external VC runtime before prerequisite installation'}
       - name: Installer regression tests
-        run: python -m unittest tests.test_installer tests.test_installer_source tests.test_installer_prerequisites tests.test_ols_source
+        run: python -m unittest tests.test_installer tests.test_installer_source tests.test_installer_prerequisites tests.test_source_tools tests.test_ols_source
+      - name: Verify pinned Mac binary LLVM with Apple's Python
+        if: runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.source_build
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from install.from_source import host
+          from install.source_tools import acquire_macos_llvm
+          work=Path(os.environ['RUNNER_TEMP'])/'thor-binary-build-inputs'
+          work.mkdir()
+          env=dict(os.environ)
+          config=acquire_macos_llvm(work,env,host())
+          with open(os.environ['GITHUB_ENV'],'a') as output:
+              output.write('LLVM_CONFIG='+config+'\n')
+              output.write('LDFLAGS='+env['LDFLAGS']+'\n')
+          PY
       - name: Complete POSIX source installation
         if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
         run: ./thor-install --from-source --prefix "$RUNNER_TEMP/thor-install" --path --export-bundle "$RUNNER_TEMP/thor-release"

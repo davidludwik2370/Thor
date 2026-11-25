@@ -1,5 +1,4 @@
 """Source-install platform dispatch and no-change bootstrap paths."""
-import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -10,8 +9,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location('thor_source_installer',ROOT/'install/from_source.py')
-source=importlib.util.module_from_spec(spec);spec.loader.exec_module(source)
+from install import from_source as source
 
 class SourceInstallerTests(unittest.TestCase):
     def test_explicit_unsupported_llvm_is_rejected_without_silent_replacement(self):
@@ -52,7 +50,8 @@ class SourceInstallerTests(unittest.TestCase):
             calls=[]
             def run(args,**kwargs):
                 calls.append((list(map(str,args)),kwargs))
-            with patch.object(source,'run',side_effect=run):source.build(work,[],odin)
+            with patch.dict(os.environ,{'NPM_CONFIG_CACHE':'/user/cache','NODE_COMPILE_CACHE':'/user/node-cache'}),patch.object(source,'run',side_effect=run),patch.object(source.source_tools,'ensure_rust'),patch.object(source,'ensure_node'),patch.object(source,'llvm_config',side_effect=AssertionError('reused Odin does not need LLVM')):
+                source.build(work,[],odin)
             cargo=[(a,k) for a,k in calls if a[0]=='cargo']
             self.assertEqual(len(cargo),2)
             for args,kwargs in cargo:
@@ -60,8 +59,14 @@ class SourceInstallerTests(unittest.TestCase):
                 self.assertEqual(args[-2:],['-j','2'])
                 self.assertEqual(kwargs['env']['CARGO_TARGET_DIR'],str(work/'target'))
                 self.assertEqual(kwargs['env']['CARGO_INCREMENTAL'],'0')
+                self.assertEqual(kwargs['env']['NODE_COMPILE_CACHE'],str(work/'node-compile-cache'))
+                self.assertNotIn('NPM_CONFIG_CACHE',kwargs['env'])
             self.assertTrue(any('build_distribution.py' in ' '.join(a) for a,k in calls))
             self.assertEqual(calls[-1][0][-2],'--bundle')
+            npm_ci=next(a for a,k in calls if a[0] in ('npm','npm.cmd') and a[1]=='ci')
+            self.assertIn('--omit=optional',npm_ci);self.assertIn('--ignore-scripts',npm_ci)
+            npm_exec=next(a for a,k in calls if a[0] in ('npm','npm.cmd') and a[1]=='exec')
+            self.assertIn('--offline',npm_exec)
 
     @unittest.skipIf(os.name=='nt','POSIX bootstrap; Windows bootstrap is covered by native CI source installation')
     def test_maintenance_never_downloads_or_requires_build_tools(self):
@@ -78,6 +83,27 @@ class SourceInstallerTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         for option in ['--from-source','--uninstall','--doctor','--no-install-deps']:
             self.assertIn(option,result.stdout)
+
+    @unittest.skipIf(os.name=='nt','POSIX source bootstrap')
+    def test_reusing_odin_skips_sdk_prerequisite_acquisition(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'release').mkdir();(root/'install').mkdir()
+            shutil.copy2(ROOT/'thor-install',root/'thor-install')
+            shutil.copy2(ROOT/'release/version',root/'release/version')
+            (root/'install/prerequisites.sh').write_text('#!/bin/sh\nprintf "PREREQUISITES %s %s\\n" "$1" "$2"\n')
+            (root/'install/from_source.py').write_text('import sys; print("FORWARDED",repr(sys.argv[1:]))')
+            result=subprocess.run([str(root/'thor-install'),'--from-source','--odin','/selected/odin'],
+                                  text=True,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PREREQUISITES --source --reuse-odin',result.stdout)
+            self.assertIn("'--odin', '/selected/odin'",result.stdout)
+
+    @unittest.skipUnless(sys.platform=='darwin','Apple Python bootstrap')
+    def test_apple_python_can_run_source_installer_without_new_python(self):
+        result=subprocess.run(['/usr/bin/python3',str(ROOT/'install/from_source.py'),'--dry-run'],
+                              text=True,capture_output=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('No changes made',result.stdout)
 
 @unittest.skipIf(os.name=='nt','POSIX source fallback bootstrap')
 class SourceFallbackTests(unittest.TestCase):
@@ -177,10 +203,13 @@ class SourceNodeArchiveTests(unittest.TestCase):
         hashes=hashlib.sha256(data).hexdigest()+'  '+name+'.tar.gz\n'
         with tempfile.TemporaryDirectory() as temporary:
             env={'PATH':'/usr/bin'}
-            with patch.object(source.platform,'system',return_value='Linux'),patch.object(source,'host',return_value='linux-aarch64'),patch.object(source.subprocess,'check_output',side_effect=FileNotFoundError),patch.object(source.urllib.request,'urlopen',side_effect=[io.BytesIO(hashes.encode()),io.BytesIO(data)]):
+            def download(url,path,expected):
+                self.assertEqual(expected,hashlib.sha256(data).hexdigest())
+                path.write_bytes(data)
+            with patch.object(source,'host',return_value='linux-aarch64'),patch.object(source.subprocess,'check_output',side_effect=[FileNotFoundError(), 'v22.14.0', '10.9.2']),patch.object(source.source_tools,'official_hash',return_value=hashlib.sha256(data).hexdigest()),patch.object(source.source_tools,'download',side_effect=download):
                 source.ensure_node(Path(temporary),env)
-            self.assertEqual((Path(temporary)/name/'bin/node').read_bytes(),b'fixture')
-            self.assertTrue(env['PATH'].startswith(str(Path(temporary)/name/'bin')))
+            self.assertEqual((Path(temporary)/'node'/name/'bin/node').read_bytes(),b'fixture')
+            self.assertTrue(env['PATH'].startswith(str(Path(temporary).resolve()/'node'/name/'bin')))
 
 class SourceVsixTests(unittest.TestCase):
     def test_missing_runtime_dependency_is_rejected_before_distribution(self):
