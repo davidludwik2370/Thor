@@ -11,6 +11,11 @@ After cloning, run the native installer from the repository root:
 ./thor-install --vscode --profile Thor --path
 ```
 
+Missing build prerequisites and VS Code are installed automatically where supported.
+Use `./thor-install --from-source` for a local release build, `./thor-install --doctor`
+to verify an installation, and `./thor-install --uninstall` to remove Thor while
+retaining VS Code, developer tools and projects.
+
 Use `./thor-install` for the toolchain only, or `--vscode` without `--profile`
 to keep your normal editor profile/theme. Existing editor preferences and
 project configurations are preserved. Windows uses `thor-install.cmd`.
@@ -18,9 +23,9 @@ Editor setup includes Thor tools, the standard Odin Language Server (OLS) extens
 extension makes installed Thor commands available in new VS Code terminals;
 reload the window after updates and relaunch terminals with a stale environment.
 The [installation guide](docs/installing.md) covers prerequisites, optional Thor
-colors and development builds. **Until GitHub releases are published, supply a
-locally built native bundle with `--bundle FILE`; cloning alone does not provide
-a compiled release.**
+colors, source builds, verification and uninstall. Native bundles are downloaded
+automatically when available; otherwise supported hosts build from the checkout.
+Use `--bundle FILE` for an offline or locally prepared distribution.
 
 Thor-owned code uses [0BSD](LICENSE). Incorporated code retains its original
 licenses; see [NOTICE](NOTICE).

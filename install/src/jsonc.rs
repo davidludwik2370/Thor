@@ -5,6 +5,39 @@ struct Token {start:usize,end:usize,kind:u8}
 pub(super) struct Document {pub value:Value,text:String,tokens:Vec<Token>}
 
 impl Document {
+    fn edit(&self,key:&str,value:Option<&Value>)->Result<String> {
+        let mut depth=0;let mut found=Vec::new();
+        for (i,t) in self.tokens.iter().enumerate() {
+            if depth==1 && t.kind==b'"' && self.tokens.get(i+1).is_some_and(|t|t.kind==b':') &&
+                serde_json::from_str::<String>(&self.text[t.start..t.end]).map_err(err)?==key {
+                let mut j=i+2;let mut nested=0;
+                while j<self.tokens.len() {
+                    let k=self.tokens[j].kind;
+                    if nested==0 && (k==b','||k==b'}'){break;}
+                    match k {b'{'|b'['=>nested+=1,b'}'|b']'=>nested-=1,_=>{}}j+=1;
+                }
+                if j<=i+2 {return Err("missing setting value".into());}
+                found.push((i,j));
+            }
+            match t.kind {b'{'|b'['=>depth+=1,b'}'|b']'=>depth-=1,_=>{}}
+        }
+        if found.len()>1 {return Err("duplicate settings; preserved".into());}
+        if let Some((i,j))=found.first().copied() {
+            let (start,end,replacement)=if let Some(v)=value {
+                (self.tokens[i+2].start,self.tokens[j-1].end,serde_json::to_string(v).map_err(err)?)
+            } else {
+                let next=self.tokens.get(j).is_some_and(|t|t.kind==b',');
+                let start=if !next && i>0 && self.tokens[i-1].kind==b',' {self.tokens[i-1].start}else{self.tokens[i].start};
+                (start,if next {self.tokens[j].end}else{self.tokens[j-1].end},String::new())
+            };
+            return Ok(format!("{}{}{}",&self.text[..start],replacement,&self.text[end..]));
+        }
+        if let Some(v)=value {
+            let end=self.tokens.last().ok_or("missing object")?.start;
+            let comma=if self.value.as_object().unwrap().is_empty()||self.tokens[self.tokens.len()-2].kind==b','{""}else{","};
+            return Ok(format!("{}{comma}\n{}:{}\n{}",&self.text[..end],serde_json::to_string(key).map_err(err)?,serde_json::to_string(v).map_err(err)?,&self.text[end..]));
+        }Ok(self.text.clone())
+    }
     pub fn parse(text:String)->Result<Self> {
         if text.len()>4*1024*1024 {return Err("editor settings exceed 4 MiB; left unchanged".into());}
         let b=text.as_bytes();let mut i=0;let mut tokens=Vec::new();let mut clean=String::new();
@@ -66,9 +99,38 @@ impl Document {
     }
 }
 
+/// Reverse only keys still equal to the installer's value; preserve subsequent
+/// user edits, comments, formatting, and unrelated nested settings.
+pub(super) fn restore_managed(current:&str,before:&str,after:&str)->Result<String> {
+    let before=Document::parse(before.into())?;let after=Document::parse(after.into())?;
+    let mut result=current.to_owned();
+    let keys:BTreeSet<_>=before.value.as_object().unwrap().keys().chain(after.value.as_object().unwrap().keys()).collect();
+    for key in keys {
+        if before.value.get(key)==after.value.get(key){continue;}
+        let doc=Document::parse(result.clone())?;
+        if doc.value.get(key)==after.value.get(key){result=doc.edit(key,before.value.get(key))?;}
+    }Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn restores_only_unchanged_managed_keys_and_keeps_comments() {
+        let before="{\"theme\":\"mine\",\"old\":{\"nested\":[1,2]}}";
+        let after="{\"theme\":\"Thor\",\"old\":{\"nested\":[3]},\"thor\":true}";
+        let current="{ // user\n\"theme\":\"Thor\",\"old\":{\"nested\":[9]},\"thor\":true,\"new\":1,}";
+        let text=restore_managed(current,before,after).unwrap();
+        let value=Document::parse(text.clone()).unwrap().value;
+        assert_eq!(value,json!({"theme":"mine","old":{"nested":[9]},"new":1}));
+        assert!(text.contains("// user"));
+    }
+    #[test] fn removing_first_last_and_only_key_retains_valid_jsonc() {
+        for current in ["{\"a\":1}","{\"a\":1,\"keep\":2}","{\"keep\":2,\"a\":1}","{\"keep\":2,\"a\":1,}"] {
+            let result=restore_managed(current,"{}","{\"a\":1}").unwrap();
+            let value=Document::parse(result).unwrap().value;
+            assert!(value.get("a").is_none());
+        }
+    }
     #[test] fn preserves_jsonc_and_unicode() {
         for text in ["{}","\u{feff}{ // hi\n \"theme\": \"café\", /*keep*/\n}","{\"nested\":{\"ols.server.path\":\"keep\",},\"list\":[1,],}"] {
             let doc=Document::parse(text.into()).unwrap();let edit=doc.set_string("ols.server.path","/a café/ols").unwrap();

@@ -1,0 +1,48 @@
+name: Installer
+on:
+  push:
+    paths: ['install/**', 'thor-install*', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+  pull_request:
+    paths: ['install/**', 'thor-install*', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+  workflow_dispatch:
+    inputs:
+      source_build:
+        description: Build and install the complete toolchain from pinned source
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  native-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installer tests
+        run: cargo test --locked --manifest-path install/Cargo.toml -j 2
+      - name: Build installer fixture executable
+        run: cargo build --release --locked --manifest-path install/Cargo.toml -j 2
+      - name: Installer regression tests
+        run: python -m unittest tests.test_installer tests.test_installer_source tests.test_ols_source
+      - name: Complete POSIX source installation
+        if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
+        run: ./thor-install --from-source --prefix "$RUNNER_TEMP/thor-install" --path
+      - name: Complete Windows source installation
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
+        shell: powershell
+        run: .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-install" --path
+      - name: POSIX doctor and uninstall
+        if: runner.os != 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
+        run: |
+          ./thor-install --doctor --prefix "$RUNNER_TEMP/thor-install"
+          ./thor-install --uninstall --prefix "$RUNNER_TEMP/thor-install"
+      - name: Windows doctor and uninstall
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.source_build
+        shell: powershell
+        run: |
+          .\thor-install.ps1 --doctor --prefix "$env:RUNNER_TEMP\thor-install"
+          .\thor-install.ps1 --uninstall --prefix "$env:RUNNER_TEMP\thor-install"

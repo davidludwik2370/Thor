@@ -15,7 +15,7 @@ import threading
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-NATIVE_OLS=platform.system()=='Linux' and platform.machine() in ('arm64','aarch64')
+NATIVE_OLS=True
 INSTALLER=Path(os.environ.get('THOR_TEST_INSTALLER',ROOT/'install/target/release'/('thor-install.exe' if os.name=='nt' else 'thor-install')))
 
 
@@ -36,9 +36,31 @@ class InstallerTests(unittest.TestCase):
         self.env.pop('THOR_ROOT',None)
         self.env.pop('THOR_ODIN',None)
         self.env.pop('ODIN',None)
+        self.env['XDG_CACHE_HOME']=str(self.home/'.cache')
         self.env['OLS_TEST_BUILD_LOG']=str(self.root/'ols-builds')
         self.env['OLS_TEST_SERVER_LOG']=str(self.root/'ols-server-starts')
+        lsp=self.root/'fake-lsp';lsp.write_bytes(self.fake_lsp());lsp.chmod(0o755)
+        self.env['OLS_TEST_LSP']=str(lsp)
         self.registry=(self.home/'Library/Application Support/Thor/installation.json' if platform.system()=='Darwin' else self.home/'.config/thor/installation.json')
+
+    @staticmethod
+    def fake_lsp():
+        return b'''#!/usr/bin/env python3
+import json,sys
+while True:
+ h={}
+ while True:
+  line=sys.stdin.buffer.readline()
+  if not line:sys.exit(0)
+  if line.strip()==b'':break
+  k,v=line.decode().split(':',1);h[k.lower()]=v.strip()
+ m=json.loads(sys.stdin.buffer.read(int(h['content-length'])))
+ if m.get('method')=='exit':sys.exit(0)
+ if 'id' not in m:continue
+ r={'capabilities':{}} if m['method']=='initialize' else {'contents':'Record'} if m['method']=='textDocument/hover' else [{'label':'number'}] if m['method']=='textDocument/completion' else None
+ b=json.dumps({'jsonrpc':'2.0','id':m['id'],'result':r}).encode()
+ sys.stdout.buffer.write(('Content-Length: %d\\r\\n\\r\\n'%len(b)).encode()+b);sys.stdout.buffer.flush()
+'''
 
     @staticmethod
     def fake_odin():
@@ -49,7 +71,7 @@ if [ "$1" = build ]; then
     for arg do
         case "$arg" in -out:*) output=${arg#-out:};; esac
     done
-    printf '%s\\n' '#!/bin/sh' 'if [ -n "$OLS_TEST_SERVER_LOG" ]; then echo invoked >> "$OLS_TEST_SERVER_LOG"; fi' 'exit 0' > "$output"
+    cp "$OLS_TEST_LSP" "$output"
     chmod +x "$output"
     if [ -n "$OLS_TEST_EDIT_SETTINGS" ]; then printf '{"user_edit":true}' > "$OLS_TEST_EDIT_SETTINGS"; fi
 else
@@ -62,7 +84,7 @@ fi
             'thor':b'#!/bin/sh\ncase "$1" in version) echo "Thor 0.41.6";; run) echo "Thor installation OK: 42";; esac\n',
             'thor-install':INSTALLER.read_bytes(),
             'odin/odin':self.fake_odin(),
-            'tls/bin/tls':b'#!/bin/sh\nexit 0\n',
+            'tls/bin/tls':self.fake_lsp(),
             'frontend/main.odin':b'package main\n',
             'runtime/basic/basic.thor':b'package basic\n',
             'templates/main.thor':b'package main\n',
@@ -92,7 +114,7 @@ fi
     def invoke(self,bundle=None,*args,ok=True,bootstrap=False):
         command=[str(ROOT/'thor-install' if bootstrap else INSTALLER)]
         if bundle:command+=['--bundle',str(bundle)]
-        command+=['--prefix',str(self.prefix),*args]
+        command+=['--prefix',str(self.prefix),'--no-install-deps',*args]
         result=subprocess.run(command,cwd=self.root,env=self.env,capture_output=True,text=True,timeout=30)
         if ok:self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         else:self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
@@ -253,7 +275,16 @@ from pathlib import Path
 a=sys.argv[1:];d=Path(a[a.index('--user-data-dir')+1]);log=d/'commands.jsonl'
 with log.open('a') as f:f.write(json.dumps(a)+'\\n')
 with (d/'environment.jsonl').open('a') as f:f.write(json.dumps({'PATH':os.environ.get('PATH','')})+'\\n')
+inventory=d/'installed-extensions.json'
+ids=set(json.loads(inventory.read_text()) if inventory.exists() else [])
+if '--list-extensions' in a:
+ print('\\n'.join(sorted(ids)));sys.exit(0)
+if '--uninstall-extension' in a:
+ ids.discard(a[a.index('--uninstall-extension')+1].lower());inventory.write_text(json.dumps(sorted(ids)));sys.exit(0)
 if '--install-extension' in a and os.environ.get('FAIL_CODE_EXTENSION')==a[a.index('--install-extension')+1]:sys.exit(37)
+if '--install-extension' in a:
+ value=a[a.index('--install-extension')+1]
+ ids.add('thor-local.thor-language' if value.endswith('.vsix') else value.lower());inventory.write_text(json.dumps(sorted(ids)))
 if '--new-window' in a:
  p=d/'User/globalStorage/storage.json';p.parent.mkdir(parents=True,exist_ok=True)
  p.write_text(json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]}))
@@ -270,7 +301,7 @@ if '--new-window' in a:
         self.assertEqual(settings,expected)
         self.assertEqual((data/'User/settings.json').read_text(),'{"custom":true}')
         commands=[json.loads(s) for s in (data/'commands.jsonl').read_text().splitlines()]
-        self.assertEqual(len(commands),4)
+        self.assertEqual(len([c for c in commands if '--list-extensions' not in c]),4)
         installed=[c[c.index('--install-extension')+1] for c in commands if '--install-extension' in c]
         self.assertEqual([Path(installed[0]).name,*installed[1:]],['thor-language.vsix','DanielGavin.ols','vadimcn.vscode-lldb'])
         for command in commands:
@@ -291,7 +322,7 @@ if '--new-window' in a:
             self.assertIn(before['settings.json'].decode().rstrip('}'),(profile/'settings.json').read_text())
             self.assertIn('ols.server.path',(profile/'settings.json').read_text())
         else:self.assertEqual({p.name:p.read_bytes() for p in profile.iterdir()},before)
-        self.assertEqual(len((data/'commands.jsonl').read_text().splitlines()),3)
+        self.assertEqual(len([s for s in (data/'commands.jsonl').read_text().splitlines() if '--list-extensions' not in s]),3)
 
     def test_new_profile_can_disable_colors(self):
         code,data,extensions,profile=self.fake_code()
@@ -307,7 +338,7 @@ if '--new-window' in a:
             self.assertIn('ols.server.path',(data/'User/settings.json').read_text())
         else:self.assertEqual((data/'User/settings.json').read_text(),'{"custom":true}')
         commands=[json.loads(s) for s in (data/'commands.jsonl').read_text().splitlines()]
-        self.assertEqual(len(commands),3)
+        self.assertEqual(len([c for c in commands if '--list-extensions' not in c]),3)
         self.assertTrue(all('--profile' not in c for c in commands))
         self.assertTrue(any('DanielGavin.ols' in c for c in commands))
 
@@ -318,7 +349,8 @@ if '--new-window' in a:
         result=self.invoke(self.bundle(),*flags,ok=False)
         self.assertIn('editor setup is incomplete',result.stderr)
         self.assertTrue((self.prefix/'bin/thor').is_file())
-        self.invoke(None,'--doctor')
+        incomplete=self.invoke(None,'--doctor',ok=False)
+        self.assertIn('missing extension',incomplete.stderr)
         before=(profile/'settings.json').read_bytes()
         self.env.pop('FAIL_CODE_EXTENSION')
         self.invoke(None,*flags)
@@ -330,7 +362,7 @@ if '--new-window' in a:
         self.env['PATH']=str(self.prefix/'bin')+os.pathsep+original
         self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
         environments=[json.loads(s) for s in (data/'environment.jsonl').read_text().splitlines()]
-        self.assertEqual(len(environments),3)
+        self.assertGreaterEqual(len(environments),3)
         self.assertTrue(all(e['PATH']==self.env['PATH'] for e in environments))
 
     def test_editor_setup_can_be_added_to_an_existing_install_without_reacquiring_bundle(self):
@@ -374,7 +406,7 @@ if '--new-window' in a:
         self.assertIn('Native OLS build failed',result.stderr)
         self.assertEqual((profile/'settings.json').read_bytes(),before)
         self.assertFalse(list((self.prefix/'editor/ols').glob('.stage-*')))
-        self.invoke(None,'--doctor');self.env.pop('OLS_TEST_BUILD_FAIL')
+        self.invoke(None,'--doctor',ok=False);self.env.pop('OLS_TEST_BUILD_FAIL')
         self.invoke(None,*flags)
         self.assertIn('ols.server.path',(profile/'settings.json').read_text())
 
@@ -445,7 +477,7 @@ if '--new-window' in a:
         with tarfile.open(bundle) as source:
             target=json.load(source.extractfile('THOR-DISTRIBUTION.json'))['target']
         releases=self.root/'releases';releases.mkdir()
-        name='thor-0.41.6-'+target+'.tar.gz'
+        name='thor-'+(ROOT/'release/version').read_text().strip()+'-'+target+'.tar.gz'
         shutil.copy2(bundle,releases/name)
         shutil.copy2(bundle.with_name(bundle.name+'.sha256'),releases/(name+'.sha256'))
         class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -466,3 +498,119 @@ if '--new-window' in a:
 
 
 if __name__=='__main__':unittest.main()
+
+class InstallerLifecycleTests(InstallerTests):
+    # Inherit the same process-level fixtures, without rerunning the entire
+    # parent inventory a second time in unittest discovery.
+    def test_uninstall_restores_path_removes_owned_files_and_keeps_projects(self):
+        profile=self.home/'.profile';profile.write_text('# mine\n')
+        project=self.home/'project';project.mkdir();(project/'main.thor').write_text('my source')
+        self.invoke(self.bundle(),'--path')
+        self.invoke(None,'--uninstall',bootstrap=True)
+        self.assertEqual(profile.read_text(),'# mine\n')
+        self.assertEqual((project/'main.thor').read_text(),'my source')
+        self.assertFalse(self.registry.exists())
+        self.assertFalse((self.prefix/'bin/thor').exists())
+        self.invoke(None,'--uninstall',bootstrap=True)
+
+    def test_uninstall_preserves_user_edits_unknown_files_and_symlink_targets(self):
+        self.invoke(self.bundle(),'--path')
+        root=Path(json.loads(self.registry.read_text())['root'])
+        (root/'templates/main.thor').write_text('custom template')
+        (root/'notes.txt').write_text('keep')
+        external=self.root/'external';external.mkdir();(external/'keep').write_text('keep')
+        (root/'linked').symlink_to(external,target_is_directory=True)
+        profile=self.home/'.profile';profile.write_text(profile.read_text()+'# later\n')
+        self.invoke(None,'--uninstall')
+        self.assertEqual((root/'templates/main.thor').read_text(),'custom template')
+        self.assertEqual((root/'notes.txt').read_text(),'keep')
+        self.assertEqual((external/'keep').read_text(),'keep')
+        self.assertIn('# later',profile.read_text())
+        self.assertNotIn('export PATH=',profile.read_text())
+
+    def test_uninstall_dry_run_and_wrong_prefix_do_not_remove_installation(self):
+        self.invoke(self.bundle(),'--path')
+        record=self.registry.read_bytes();profile=(self.home/'.profile').read_bytes()
+        self.invoke(None,'--uninstall','--dry-run')
+        self.assertEqual(self.registry.read_bytes(),record)
+        self.assertEqual((self.home/'.profile').read_bytes(),profile)
+        original=self.prefix;self.prefix=self.home/'wrong'
+        self.invoke(None,'--uninstall',ok=False)
+        self.prefix=original
+        self.assertTrue((self.prefix/'bin/thor').exists())
+
+    def test_uninstall_preserves_preexisting_extensions_and_user_settings(self):
+        code,data,extensions,profile=self.fake_code(existing=True)
+        (data/'installed-extensions.json').write_text(json.dumps(['danielgavin.ols','other.publisher']))
+        before=(profile/'settings.json').read_text()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.invoke(None,'--uninstall')
+        self.assertEqual(json.loads((data/'installed-extensions.json').read_text()),['danielgavin.ols','other.publisher'])
+        self.assertEqual((profile/'settings.json').read_text(),before)
+        self.assertTrue(code.exists())
+
+    def test_uninstall_new_profile_removes_only_unchanged_settings(self):
+        code,data,extensions,profile=self.fake_code()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        settings=profile/'settings.json';value=json.loads(settings.read_text());value['my.setting']={'keep':[1,2]}
+        settings.write_text('// user notes\n'+json.dumps(value))
+        self.invoke(None,'--uninstall')
+        self.assertIn('// user notes',settings.read_text())
+        self.assertNotIn('thor.colors.recommended',settings.read_text())
+        self.assertIn('my.setting',settings.read_text())
+
+    def test_doctor_detects_tampering_and_editor_startup_failure(self):
+        self.invoke(self.bundle())
+        root=Path(json.loads(self.registry.read_text())['root'])
+        (root/'templates/main.thor').write_text('changed')
+        result=self.invoke(None,'--doctor',ok=False)
+        self.assertIn('failed verification',result.stderr)
+
+    def test_bootstrap_maintenance_finds_custom_prefix_without_repeating_it(self):
+        self.invoke(self.bundle())
+        result=subprocess.run([str(ROOT/'thor-install'),'--doctor'],env=self.env,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        result=subprocess.run([str(ROOT/'thor-install'),'--uninstall'],env=self.env,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertFalse(self.registry.exists())
+
+    def test_editor_handshake_failure_is_reported_and_does_not_hang(self):
+        code,data,extensions,profile=self.fake_code()
+        result=self.invoke(self.bundle(files={'tls/bin/tls':b'#!/bin/sh\nexit 0\n'}),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),ok=False)
+        self.assertIn('language server closed',result.stderr)
+        self.assertTrue((self.prefix/'bin/thor').exists())
+
+    def test_editor_upgrade_does_not_adopt_intervening_user_settings(self):
+        code,data,extensions,profile=self.fake_code()
+        flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.invoke(self.bundle(),*flags)
+        settings=profile/'settings.json';value=json.loads(settings.read_text());value['my.setting']={'keep':42}
+        settings.write_text('// later user comment\n'+json.dumps(value))
+        self.invoke(self.bundle(version='0.41.7'),*flags)
+        self.invoke(None,'--uninstall')
+        text=settings.read_text()
+        self.assertIn('// later user comment',text)
+        self.assertIn('my.setting',text)
+        self.assertNotIn('ols.server.path',text)
+        self.assertNotIn('thor.colors.recommended',text)
+
+    def test_uninstall_removes_known_shared_cache_entries_and_keeps_unknown_files(self):
+        self.invoke(self.bundle())
+        cache=(self.home/'Library/Caches/Thor' if platform.system()=='Darwin' else self.home/'.cache/thor')/'store-v2/a'
+        cache.mkdir(parents=True)
+        entry=cache/('sdk-'+'a'*64+'.bin');entry.write_bytes(b'cache')
+        (cache/'notes.txt').write_text('keep')
+        self.invoke(None,'--uninstall')
+        self.assertFalse(entry.exists())
+        self.assertEqual((cache/'notes.txt').read_text(),'keep')
+
+    def test_uninstall_recognizes_legacy_managed_path_without_ownership_journal(self):
+        self.invoke(self.bundle(),'--path')
+        (self.prefix/'setup-state.json').unlink()
+        self.invoke(None,'--uninstall')
+        self.assertNotIn('thor-install PATH',(self.home/'.profile').read_text())
+
+# Avoid inherited test duplication while retaining the fixture methods.
+for _name in list(InstallerTests.__dict__):
+    if _name.startswith('test_') and _name not in InstallerLifecycleTests.__dict__:
+        setattr(InstallerLifecycleTests,_name,None)

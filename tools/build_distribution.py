@@ -98,17 +98,33 @@ def rust_licenses(stage):
 
 
 def library_notices(source, stage):
+    # Repackaging a tested installed toolchain must retain its original notices;
+    # copied LLVM libraries no longer have a system package ownership record.
+    for parent in list(source.parents)[:4]:
+        notices=parent/'licenses/native'
+        if (parent/'THOR-DISTRIBUTION.json').is_file() and notices.is_dir():
+            for notice in notices.rglob('*'):
+                if notice.is_file():copy(notice,stage/'licenses/native'/notice.relative_to(notices))
+            return
     if platform.system() == 'Linux':
         # Keep the distribution's actual copyright/license inventory with every
         # copied LLVM support library; core system libraries are not bundled.
-        result = subprocess.run(['dpkg-query', '-S', str(source)], capture_output=True, text=True)
-        if result.returncode == 0:
+        result = subprocess.run(['dpkg-query', '-S', str(source)], capture_output=True, text=True) if shutil.which('dpkg-query') else None
+        if result is not None and result.returncode == 0:
             package = result.stdout.split(': ', 1)[0].split(':', 1)[0]
             notice = Path('/usr/share/doc')/package/'copyright'
             if notice.is_file():
                 copy(notice, stage/'licenses/native'/package/'copyright')
                 return
-        raise ValueError(f'No redistribution notice found for {source}; provide a release-builder image with package copyright metadata.')
+        # RPM/Arch systems keep the same upstream notices outside Debian's doc
+        # layout. Never silently omit native-library redistribution notices.
+        for directory in (Path('/usr/share/licenses/llvm'), Path('/usr/share/licenses/llvm-libs'),
+                          *Path('/usr/share/licenses').glob('llvm*'), *Path('/usr/share/doc').glob('llvm*')):
+            candidates = [p for p in directory.rglob('*') if p.is_file() and re.match(r'(?i)^(license|copyright|copying|notice)',p.name)] if directory.is_dir() else []
+            if candidates:
+                for notice in candidates: copy(notice,stage/'licenses/native'/directory.name/notice.name)
+                return
+        raise ValueError(f'No redistribution notice found for {source}; install the LLVM license/copyright package.')
     # Homebrew bottles preserve their formula's licenses under the Cellar root.
     parents = [source.parent, *source.parents]
     found = False
@@ -174,8 +190,8 @@ def build(options):
     compiler = options.compiler.resolve(strict=True)
     if capture(compiler, 'version').strip() != 'Thor '+version:
         raise ValueError('Compiler and release/version differ. Rebuild the selected compiler.')
-    system = {'Darwin':'macos', 'Linux':'linux', 'Windows':'windows'}[platform.system()]
-    arch = {'arm64':'aarch64', 'aarch64':'aarch64', 'AMD64':'x86_64', 'x86_64':'x86_64'}[platform.machine()]
+    system = {'Darwin':'macos', 'Linux':'linux', 'Windows':'windows', 'FreeBSD':'freebsd', 'NetBSD':'netbsd', 'OpenBSD':'openbsd'}[platform.system()]
+    arch = {'arm64':'aarch64', 'aarch64':'aarch64', 'AMD64':'x86_64', 'amd64':'x86_64', 'evbarm':'aarch64', 'x86_64':'x86_64'}[platform.machine()]
     options.output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='thor-distribution-') as temporary:
         stage = Path(temporary)
@@ -197,8 +213,7 @@ def build(options):
             if not candidates:raise ValueError('LLVM must include the macOS compiler-rt sanitizer runtime.')
             tree(candidates[-1],stage/'odin/clang-resource/lib/darwin')
         tree(ROOT/'tls/builtin', stage/'tls/builtin')
-        if system=='linux' and arch=='aarch64':
-            stage_source(stage/'ols',options.ols_source)
+        stage_source(stage/'ols',options.ols_source)
         for name in ('base','core','vendor','shared'):
             if (sdk/name).is_dir(): tree(sdk/name, stage/'odin'/name)
         for p in sdk.iterdir():
@@ -242,7 +257,7 @@ def main():
     parser.add_argument('--installer',type=Path,default=ROOT/'install/target/release'/('thor-install'+suffix))
     parser.add_argument('--tls',type=Path,default=ROOT/'tls/bin'/('tls'+suffix))
     parser.add_argument('--vsix',type=Path,default=ROOT/'editors/vscode/thor-language.vsix')
-    parser.add_argument('--ols-source',type=Path,help='Pinned upstream OLS checkout (ARM64 Linux only; otherwise download and verify pinned source)')
+    parser.add_argument('--ols-source',type=Path,help='Pinned upstream OLS checkout (otherwise download and verify pinned source)')
     parser.add_argument('--output',type=Path,default=ROOT/'dist')
     options=parser.parse_args()
     try:build(options)

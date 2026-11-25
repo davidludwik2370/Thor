@@ -2,6 +2,8 @@
 mod vscode;
 mod jsonc;
 mod ols;
+mod lifecycle;
+mod verify;
 
 use flate2::read::GzDecoder;
 use serde_json::{json, Value};
@@ -27,11 +29,13 @@ Usage: thor-install [options]
   --path                  Add the command directory to user PATH
   --dry-run               Validate the bundle and print the plan without changes
   --doctor                Check the registered installation without installing
+  --uninstall             Remove installer-owned Thor files and configuration
+  --no-install-deps       Check prerequisites without installing missing software
   --help                  Show this help
 
 Named profiles start with Dark Modern and optional Thor-only colors.
 Existing profiles/keybindings/projects and unrelated settings are preserved.
-On ARM64 Linux, --vscode builds native OLS and configures ols.server.path unless
+--vscode builds pinned native upstream OLS and configures ols.server.path unless
 a custom server is already selected. Without --profile, use the default profile.
 The repository bootstrap also accepts --release-base URL and --version VERSION.
 ";
@@ -41,6 +45,7 @@ struct Options {
     bundle: Option<PathBuf>, checksum: Option<String>, prefix: Option<PathBuf>,
     vscode: bool, profile: Option<String>, colors: Option<bool>, code: Option<PathBuf>,
     code_data: Option<PathBuf>, extensions: Option<PathBuf>, path: bool, dry: bool, doctor: bool,
+    uninstall: bool, no_deps: bool,
 }
 
 fn parse(args: Vec<String>) -> Result<Options> {
@@ -59,6 +64,7 @@ fn parse(args: Vec<String>) -> Result<Options> {
             "--code-user-data" => o.code_data = Some(value()?.into()),
             "--extensions-dir" => o.extensions = Some(value()?.into()),
             "--path" => o.path = true, "--dry-run" => o.dry = true, "--doctor" => o.doctor = true,
+            "--uninstall" => o.uninstall = true, "--no-install-deps" => o.no_deps = true,
             _ => return Err(format!("unknown option: {arg}\nRun thor-install --help.")),
         }
     }
@@ -71,6 +77,7 @@ fn parse(args: Vec<String>) -> Result<Options> {
     }
     if o.profile.as_deref()==Some("Default") {return Err("use --vscode without --profile to target the Default profile".into());}
     if o.doctor && (o.dry || o.vscode || o.path || o.bundle.is_some()) {return Err("--doctor cannot be combined with installation options".into());}
+    if o.uninstall && (o.doctor || o.vscode || o.path || o.bundle.is_some() || o.profile.is_some()) {return Err("--uninstall cannot be combined with installation options".into());}
     Ok(o)
 }
 
@@ -239,7 +246,14 @@ fn health(root: &Path) -> Result<()> {
     let mut cmd = Command::new(root.join(format!("thor{}",env::consts::EXE_SUFFIX)));
     cmd.args(["run",".","-thread-count:2"]).current_dir(&temp)
         .env_remove("THOR_ROOT").env_remove("THOR_ODIN").env_remove("ODIN_ROOT").env_remove("THOR_FRONTEND_ODIN").env_remove("THOR_CACHE_DIR");
-    command(cmd).map_err(|e| format!("installation build/run check failed. Check platform prerequisites (macOS developer tools; Linux clang; Windows MSVC + SDK). {e}"))
+    command(cmd).map_err(|e| format!("installation build/run check failed. Check platform prerequisites (macOS developer tools; Unix clang; Windows MSVC + SDK). {e}"))?;
+    println!("PASS: checked Thor compile-time and runtime execution");
+    let mut cmd = Command::new(root.join(format!("thor{}",env::consts::EXE_SUFFIX)));
+    cmd.args(["run",".","-thread-count:2","-o:speed","-disable-assert","-no-bounds-check","-no-type-assert"]).current_dir(&temp)
+        .env_remove("THOR_ROOT").env_remove("THOR_ODIN").env_remove("ODIN_ROOT").env_remove("THOR_FRONTEND_ODIN").env_remove("THOR_CACHE_DIR");
+    command(cmd)?;
+    println!("PASS: unchecked release compilation and execution");
+    Ok(())
 }
 fn registered() -> Result<Value> {
     let value = read_json(&registry()?)?;
@@ -247,9 +261,21 @@ fn registered() -> Result<Value> {
     Ok(value)
 }
 fn run(o: Options) -> Result<()> {
+    #[cfg(windows)]
+    if o.uninstall && env::var_os("THOR_UNINSTALL_COPY").is_none() {
+        // Windows cannot unlink a running .exe. A short-lived copy lives outside
+        // the installation and is removed by this parent after its child exits.
+        let temp=env::temp_dir().join(format!("thor-uninstall-{}",unique()));fs::create_dir(&temp).map_err(err)?;let _guard=RemoveDir(temp.clone());
+        let copy=temp.join("thor-install.exe");fs::copy(env::current_exe().map_err(err)?,&copy).map_err(err)?;
+        let status=Command::new(copy).args(env::args().skip(1)).env("THOR_UNINSTALL_COPY","1").status().map_err(err)?;
+        if !status.success(){return Err("uninstall did not complete; retained files are reported above".into());}return Ok(());
+    }
+    if o.uninstall {return lifecycle::uninstall(&o);}
     if o.doctor {
         let record = registered()?; let root = PathBuf::from(field(&record,"root")?);
-        println!("Thor {}: {}",field(&record,"version")?,root.display()); return health(&root);
+        println!("Thor {}: {}",field(&record,"version")?,root.display());
+        lifecycle::verify_inventory(&root)?; health(&root)?;
+        return verify::finish(&record, true);
     }
     if o.bundle.is_none() && (o.vscode || o.path) {
         let record=registered()?;
@@ -258,9 +284,10 @@ fn run(o: Options) -> Result<()> {
         }
         let root=PathBuf::from(field(&record,"root")?);
         if o.dry {println!("Dry run: use installed Thor at {}; no settings changed.",root.display());return Ok(());}
+        lifecycle::prerequisites(&o)?;
         if o.path {add_path(Path::new(field(&record,"bin")?))?;}
         if o.vscode {vscode::setup(&o,&vscode::find_code(&o)?,&root)?;}
-        return Ok(());
+        health(&root)?; return verify::finish(&record, false);
     }
     let bundle = absolute(o.bundle.as_deref().ok_or("provide --bundle FILE, or use the repository's ./thor-install bootstrap")?)?;
     check_checksum(&bundle,o.checksum.as_deref())?;
@@ -271,10 +298,11 @@ fn run(o: Options) -> Result<()> {
     if prefix.to_string_lossy().chars().any(|c| illegal.contains(c) && !(cfg!(windows) && matches!(c,'\\'|':'))) {
         return Err("Odin cannot build inside this installation path (quotes or shell punctuation). Choose --prefix with a supported path; spaces and Unicode are supported.".into());
     }
-    let code = if o.vscode { Some(vscode::find_code(&o)?) } else { None };
     println!("Install Thor {} ({}) into {}",field(&manifest,"version")?,field(&manifest,"target")?,prefix.display());
     if o.vscode { println!("VS Code profile: {}",o.profile.as_deref().unwrap_or("Default (settings preserved)")); }
     if o.dry { println!("Dry run: bundle verified; no files or settings changed."); return Ok(()); }
+    lifecycle::prerequisites(&o)?;
+    let code = if o.vscode { Some(vscode::find_code(&o)?) } else { None };
     if prefix.exists() && !prefix.join(MARKER).exists() && fs::read_dir(&prefix).map_err(err)?.next().is_some() {
         return Err(format!("{} is not an installer-owned directory; choose an empty --prefix",prefix.display()));
     }
@@ -301,6 +329,7 @@ fn run(o: Options) -> Result<()> {
     if o.path { add_path(&prefix.join("bin"))?; }
     if let Some(code) = code { vscode::setup(&o,&code,&root)?; }
     retire_versions(&prefix,&root);
+    verify::finish(&registered()?, false)?;
     println!("Thor is ready: {}",prefix.join("bin").display());
     if !env::split_paths(&env::var_os("PATH").unwrap_or_default()).any(|p| p == prefix.join("bin")) {
         println!("Reload your shell profile or sign out and back in after PATH setup, or invoke {} directly.",root.join(format!("thor{}",env::consts::EXE_SUFFIX)).display());
@@ -452,21 +481,31 @@ fn add_path(bin: &Path) -> Result<()> {
         if shell.ends_with("fish") { return Err(format!("PATH was not edited. In fish, run: fish_add_path {}",shell_quote(bin))); }
         let file = home()?.join(if shell.ends_with("zsh") {".zprofile"} else {".profile"});
         let start = "# >>> thor-install PATH >>>"; let end = "# <<< thor-install PATH <<<";
+        let existed=file.exists();
         let text = match fs::read_to_string(&file) { Ok(s) => s, Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(), Err(e) => return Err(err(e)) };
         let block = format!("{start}\nexport PATH={}:\"$PATH\"\n{end}",shell_quote(bin));
         if text.contains(start) {
             if !text.contains(&block) { return Err(format!("existing managed PATH block preserved in {}; update it manually for this prefix",file.display())); }
         } else {
-            if file.exists() { let backup=file.with_file_name(format!("{}.thor-backup-{}",file.file_name().unwrap().to_string_lossy(),unique())); fs::copy(&file,backup).map_err(err)?; }
+            if file.exists() { let backup=file.with_file_name(format!("{}.thor-backup-{}",file.file_name().unwrap().to_string_lossy(),unique())); fs::copy(&file,&backup).map_err(err)?;
+                lifecycle::track_artifact(Path::new(field(&registered()?,"prefix")?),&backup)?; }
             let mut output=fs::OpenOptions::new().create(true).append(true).open(&file).map_err(err)?;
             writeln!(output,"\n{block}\n").map_err(err)?;
+            drop(output);
+            lifecycle::track_file(Path::new(field(&registered()?,"prefix")?),&file,
+                if existed {Some(text)}else{None},&fs::read_to_string(&file).map_err(err)?)?;
         }
         println!("PATH configured in {} (existing content retained).",file.display());
     }
     #[cfg(windows)] {
         let value=bin.to_string_lossy().replace('\'',"''");
-        let script=format!("$p=[Environment]::GetEnvironmentVariable('Path','User'); $b='{value}'; if (($p -split ';') -notcontains $b) {{ [Environment]::SetEnvironmentVariable('Path',($b+';'+$p),'User') }}");
-        let mut cmd=Command::new("powershell.exe");cmd.args(["-NoProfile","-NonInteractive","-Command",&script]);command(cmd)?;
+        let script=format!("$p=[Environment]::GetEnvironmentVariable('Path','User'); $b='{value}'; if (($p -split ';') -notcontains $b) {{ [Environment]::SetEnvironmentVariable('Path',($b+';'+$p),'User'); Write-Output added }}");
+        let result=Command::new("powershell.exe").args(["-NoProfile","-NonInteractive","-Command",&script]).output().map_err(err)?;
+        if !result.status.success(){return Err("could not update user PATH".into());}
+        if String::from_utf8_lossy(&result.stdout).trim()=="added" {
+            let prefix=PathBuf::from(field(&registered()?,"prefix")?);let mut state=lifecycle::state(&prefix)?;
+            state["windows_path_added"]=json!(true);lifecycle::save(&prefix,&state)?;
+        }
     }
     Ok(())
 }

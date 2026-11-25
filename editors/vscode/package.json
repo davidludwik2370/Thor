@@ -346,5 +346,10 @@
     "@vscode/vsce": "^3.2.1",
     "vscode-textmate": "^9.0.0",
     "vscode-oniguruma": "^2.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidludwik2370/Thor.git",
+    "directory": "editors/vscode"
   }
 }

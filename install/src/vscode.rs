@@ -12,7 +12,8 @@ pub(super) fn find_code(o: &Options) -> Result<PathBuf> {
     let paths = if cfg!(target_os="macos") {
         vec![PathBuf::from("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"),home()?.join("Applications/Visual Studio Code.app/Contents/Resources/app/bin/code")]
     } else if cfg!(windows) {
-        vec![home()?.join("AppData/Local/Programs/Microsoft VS Code/bin/code.cmd")]
+        vec![home()?.join("AppData/Local/Programs/Microsoft VS Code/bin/code.cmd"),
+            env::var_os("ProgramFiles").map(PathBuf::from).unwrap_or_else(||PathBuf::from("C:/Program Files")).join("Microsoft VS Code/bin/code.cmd")]
     } else { vec![PathBuf::from("/usr/share/code/bin/code")] };
     paths.into_iter().find(|p| p.is_file()).ok_or_else(|| "VS Code was not found. Install it from https://code.visualstudio.com/, or specify --code PATH. Then rerun --vscode; an existing Thor installation is reusable.".into())
 }
@@ -22,7 +23,7 @@ fn data_dir(o: &Options) -> Result<PathBuf> {
     else if cfg!(windows) { env::var_os("APPDATA").map(PathBuf::from).unwrap_or(home()?.join("AppData/Roaming")).join("Code") }
     else { env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or(home()?.join(".config")).join("Code") })
 }
-fn cli(code: &Path,o: &Options,bin: &Path,root:&Path) -> Result<Command> {
+pub(super) fn cli(code: &Path,o: &Options,bin: &Path,root:&Path) -> Result<Command> {
     let mut cmd=Command::new(code);
     // Writing a shell profile does not update this process's environment. The
     // first profile window may be launched here, before the user opens Code.
@@ -56,7 +57,9 @@ fn profiles(data: &Path) -> Result<Vec<(String,PathBuf)>> {
 }
 pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     let data=data_dir(o)?;
-    let bin=PathBuf::from(field(&registered()?,"bin")?);
+    let record=registered()?;
+    let bin=PathBuf::from(field(&record,"bin")?);
+    let prefix=PathBuf::from(field(&record,"prefix")?);
     if let Some(name)=&o.profile {
         let existing=profiles(&data)?.into_iter().find(|(n,_)|n==name);
         if existing.is_none() {
@@ -77,13 +80,33 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
             // A setting written during profile creation wins, even on first run.
             // create_new makes this safe against concurrent edits by the editor.
             match fs::OpenOptions::new().create_new(true).write(true).open(&file) {
-                Ok(mut f)=>f.write_all(&serde_json::to_vec_pretty(&settings).map_err(err)?).map_err(err)?,
+                Ok(mut f)=>{
+                    let text=serde_json::to_string_pretty(&settings).map_err(err)?;
+                    f.write_all(text.as_bytes()).map_err(err)?;
+                    lifecycle::track_file(&prefix,&file,None,&text)?;
+                },
                 Err(e) if e.kind()==std::io::ErrorKind::AlreadyExists=>println!("Profile settings already exist and were preserved. Enable Thor colors with the extension command if desired."),
                 Err(e)=>return Err(err(e)),
             }
         } else { println!("Existing profile {name}: settings and keybindings preserved."); }
     }
-    if cfg!(all(target_os="linux",target_arch="aarch64")) {
+    let mut state=lifecycle::state(&prefix)?;
+    let mut listing=cli(code,o,&bin,root)?;
+    if let Some(profile)=&o.profile {listing.args(["--profile",profile]);}
+    listing.arg("--list-extensions");
+    let output=listing.output().map_err(err)?;
+    if !output.status.success(){return Err(format!("could not inventory existing editor extensions: {}",String::from_utf8_lossy(&output.stderr)));}
+    let existing_extensions=String::from_utf8_lossy(&output.stdout).lines().map(|s|s.to_ascii_lowercase()).collect::<BTreeSet<_>>();
+    let identity=json!({"code":code,"profile":o.profile,"data":o.code_data,"extensions":o.extensions});
+    let entries=state["editors"].as_array_mut().ok_or("invalid editor ownership inventory")?;
+    let index=if let Some(i)=entries.iter().position(|v|v["identity"]==identity){i}else{entries.push(json!({"identity":identity,"owned":[]}));entries.len()-1};
+    for id in ["thor-local.thor-language","danielgavin.ols","vadimcn.vscode-lldb"] {
+        if !existing_extensions.contains(id) && !entries[index]["owned"].as_array().unwrap().iter().any(|v|v==id) {
+            entries[index]["owned"].as_array_mut().unwrap().push(json!(id));
+        }
+    }
+    lifecycle::save(&prefix,&state)?;
+    {
         let directory=if let Some(name)=&o.profile {
             profiles(&data)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile not found")?
         } else {data.join("User")};
@@ -96,6 +119,49 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
         command(cmd).map_err(|e|format!("Thor CLI is installed, but editor setup is incomplete. Correct the error and rerun the same installer command. {e}"))?;
     }
     println!("Thor, the standard Odin Language Server (OLS), and CodeLLDB extensions installed. Reload the profile's window to activate them, then open a new terminal for Thor's PATH. OLS owns .odin files; TLS owns .thor files. Shortcuts apply only in Thor editors.");
-    if !cfg!(all(target_os="linux",target_arch="aarch64")) {println!("On first use, OLS may ask to download its server and create an ols.json configuration.");}
     Ok(())
+}
+
+pub(super) fn editor_options(identity:&Value)->Options {
+    Options{profile:identity["profile"].as_str().map(str::to_owned),
+        code_data:identity["data"].as_str().map(PathBuf::from),extensions:identity["extensions"].as_str().map(PathBuf::from),..Options::default()}
+}
+pub(super) fn uninstall(state:&Value,record:&Value,dry:bool)->Result<()> {
+    if let Some(editors)=state["editors"].as_array() {for editor in editors {
+        let identity=&editor["identity"];let o=editor_options(identity);
+        let code=Path::new(field(identity,"code")?);
+        for id in editor["owned"].as_array().ok_or("invalid owned extensions")? {
+            println!("Remove installer-added extension {} from {}",id,o.profile.as_deref().unwrap_or("Default"));
+            if dry {continue;}
+            if !code.is_file(){return Err("VS Code launcher is missing. Restore it and retry uninstall so extensions can be removed safely.".into());}
+            let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
+            if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
+            cmd.args(["--uninstall-extension",id.as_str().ok_or("invalid extension ID")?]);command(cmd)?;
+        }
+        if o.profile.is_some(){println!("RETAINED: VS Code profile registration (delete through VS Code if desired). Installer-owned settings are restored.");}
+    }}Ok(())
+}
+pub(super) fn verify_editors(record:&Value)->Result<()> {
+    let prefix=Path::new(field(record,"prefix")?);let state=lifecycle::state(prefix)?;
+    for editor in state["editors"].as_array().ok_or("invalid editor inventory")? {
+        let identity=&editor["identity"];let o=editor_options(identity);
+        let code=Path::new(field(identity,"code")?);
+        let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
+        if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
+        cmd.arg("--list-extensions");let output=cmd.output().map_err(err)?;
+        if !output.status.success(){return Err("VS Code extension verification failed".into());}
+        let installed=String::from_utf8_lossy(&output.stdout).lines().map(|s|s.to_ascii_lowercase()).collect::<BTreeSet<_>>();
+        for id in ["thor-local.thor-language","danielgavin.ols","vadimcn.vscode-lldb"] {
+            if !installed.contains(id){return Err(format!("VS Code reports a missing extension: {id}"));}
+        }
+        println!("PASS: VS Code profile and Thor/OLS/CodeLLDB extension inventory");
+        let directory=if let Some(name)=&o.profile {profiles(&data_dir(&o)?)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
+        if let Ok(text)=fs::read_to_string(directory.join("settings.json")) {
+            let doc=jsonc::Document::parse(text)?;
+            if let Some(server)=doc.value["ols.server.path"].as_str().filter(|s|!s.is_empty()) {
+                if Path::new(server).starts_with(prefix) {verify::lsp(Path::new(server),Path::new(field(record,"root")?),false)?;}
+                else{println!("SKIP: custom OLS server is user-managed");}
+            }else{println!("SKIP: OLS server uses extension-managed download; verify first-use setup in VS Code");}
+        }
+    }Ok(())
 }

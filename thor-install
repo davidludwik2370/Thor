@@ -4,6 +4,11 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 version=$(cat "$root/release/version")
 bundle=
+from_source=false
+no_deps=false
+maintenance=
+prefix=
+dry=false
 checksum=
 base=${THOR_RELEASE_BASE:-}
 forward=$(mktemp -d "${TMPDIR:-/tmp}/thor-bootstrap.XXXXXXXX")
@@ -27,10 +32,15 @@ Usage: ./thor-install [--vscode [--profile NAME]] [options]
   --code-user-data DIR   Use separate editor user data
   --extensions-dir DIR   Use separate extension storage
   --path                 Add a managed user PATH entry
+  --from-source          Build pinned sources locally (requires build tools)
+  --odin PATH            Reuse a reviewed Odin for a source build
+  --uninstall            Remove Thor; retain VS Code and developer tools
+  --doctor               Verify the installed toolchain and editor services
+  --no-install-deps      Do not install missing system prerequisites
   --dry-run              Verify the distribution without installing
   --help                 Show this overview
 Existing editor settings, profiles and project configurations are preserved.
-ARM64 Linux --vscode builds native OLS and adds its managed server setting.
+--vscode builds pinned native upstream OLS and adds its managed server setting.
 Without a published GitHub release, use --bundle or --release-base.
 HELP
         exit 0;; esac
@@ -41,6 +51,11 @@ done
 while [ "$#" -gt 0 ]; do
     arg=$1; shift
     case "$arg" in
+        --from-source) from_source=true;;
+        --no-install-deps) no_deps=true; printf '%s\n' "$arg" >> "$forward/args";;
+        --uninstall|--doctor) maintenance=$arg; printf '%s\n' "$arg" >> "$forward/args";;
+        --dry-run) dry=true; printf '%s\n' "$arg" >> "$forward/args";;
+        --prefix) [ "$#" -gt 0 ] || { echo '--prefix requires a value' >&2; exit 1; }; prefix=$1; printf '%s\n%s\n' "$arg" "$1" >> "$forward/args"; shift;;
         --release-base|--version|--bundle|--sha256)
             [ "$#" -gt 0 ] || { echo "thor-install: $arg requires a value" >&2; exit 1; }
             case "$arg" in --release-base) base=$1;; --version) version=$1;; --bundle) bundle=$1;; --sha256) checksum=$1;; esac
@@ -51,9 +66,50 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 case "$version" in ''|*[!a-zA-Z0-9._-]*) echo 'thor-install: invalid version' >&2; exit 1;; esac
-case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; *) echo 'thor-install: use thor-install.cmd on Windows' >&2; exit 1;; esac
-case "$(uname -m)" in arm64|aarch64) arch=aarch64;; x86_64|amd64) arch=x86_64;; *) echo 'thor-install: unsupported architecture' >&2; exit 1;; esac
+case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; FreeBSD) os=freebsd;; NetBSD) os=netbsd;; OpenBSD) os=openbsd;; *) echo 'thor-install: use thor-install.cmd on Windows' >&2; exit 1;; esac
+machine=$(uname -m)
+if [ "$machine" = evbarm ]; then machine=$(uname -p); fi
+case "$machine" in arm64|aarch64) arch=aarch64;; x86_64|amd64) arch=x86_64;; *) echo 'thor-install: unsupported architecture' >&2; exit 1;; esac
+# Maintenance uses the installed native installer, copied away from files that
+# uninstall will remove. It never downloads a release or provisions software.
+if [ -n "$maintenance" ]; then
+    $from_source && { echo '--from-source cannot be used with maintenance' >&2; exit 1; }
+    [ -z "$bundle$checksum" ] || { echo 'Maintenance cannot use --bundle/--sha256' >&2; exit 1; }
+    if [ -z "$prefix" ]; then
+        case "$os" in macos) prefix="$HOME/Library/Application Support/Thor";; *) prefix="${XDG_DATA_HOME:-$HOME/.local/share}/thor";; esac
+        case "$os" in macos) record="$HOME/Library/Application Support/Thor/installation.json";; *) record="${XDG_CONFIG_HOME:-$HOME/.config}/thor/installation.json";; esac
+        if [ -f "$record" ]; then
+            # Native records use pretty JSON and installation paths reject
+            # quotes/backslashes/control characters. No eval or shell expansion.
+            installed_root=$(sed -n 's/^ *"root": "\([^"]*\)",\{0,1\}$/\1/p' "$record")
+            if [ -n "$installed_root" ] && [ -f "$installed_root/thor-install" ]; then
+                cp "$installed_root/thor-install" "$forward/installed-installer"; chmod 700 "$forward/installed-installer"
+                set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+                "$forward/installed-installer" "$@"; exit $?
+            fi
+        fi
+    fi
+    native="$prefix/bin/thor-install"
+    if [ ! -f "$native" ]; then
+        if [ "$maintenance" = --uninstall ]; then echo 'Thor is not installed at this prefix.'; exit 0; fi
+        echo "No installed Thor at $prefix" >&2; exit 1
+    fi
+    cp "$native" "$forward/installed-installer"; chmod 700 "$forward/installed-installer"
+    set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+    "$forward/installed-installer" "$@"; exit $?
+fi
+if $from_source; then
+    [ -z "$bundle$checksum" ] || { echo '--from-source cannot use --bundle/--sha256' >&2; exit 1; }
+    [ "$version" = "$(cat "$root/release/version")" ] || { echo 'A source build uses the checked-out version. Check out the requested release first.' >&2; exit 1; }
+    # --dry-run must not install Python/Rust or change the checkout.
+    if $dry; then echo 'Source install plan: acquire pinned build tools/Odin, build Thor/TLS/editor, verify and install; no changes made.'; exit 0; fi
+    if ! $no_deps; then sh "$root/install/prerequisites.sh" --source; fi
+    PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
+    set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+    python3 "$root/install/from_source.py" "$@"; exit $?
+fi
 if [ -z "$bundle" ]; then
+    if ! $no_deps && ! $dry; then sh "$root/install/prerequisites.sh" --download-only; fi
     if [ -z "$base" ]; then
         origin=$(git -C "$root" remote get-url origin 2>/dev/null || :)
         case "$origin" in https://github.com/*) slug=${origin#https://github.com/};; git@github.com:*) slug=${origin#git@github.com:};; *) slug=;; esac
@@ -63,7 +119,17 @@ if [ -z "$bundle" ]; then
     case "$base" in https://*) ;; http://localhost:*|http://127.0.0.1:*|http://\[::1\]:*) ;; *) echo 'thor-install: release URLs must use HTTPS (localhost HTTP is supported for testing)' >&2; exit 1;; esac
     command -v curl >/dev/null 2>&1 || { echo 'thor-install: install curl and CA certificates first' >&2; exit 1; }
     bundle="$forward/thor-$version-$os-$arch.tar.gz"
-    curl --fail --location --proto '=https,http' --proto-redir '=https' "$base/$(basename "$bundle")" -o "$bundle"
+    status=$(curl --location --proto '=https,http' --proto-redir '=https' --write-out '%{http_code}' "$base/$(basename "$bundle")" -o "$bundle")
+    if [ "$status" = 404 ]; then
+        [ "$version" = "$(cat "$root/release/version")" ] || { echo 'No binary for this version. Check out that release before building it from source.' >&2; exit 1; }
+        if $dry; then echo 'No prebuilt release: source-build fallback would be used; no changes made.'; exit 0; fi
+        echo 'No release binary exists for this host; building the checked-out source.'
+        if ! $no_deps; then sh "$root/install/prerequisites.sh" --source; fi
+        PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/pkg/bin:$PATH"; export PATH
+        set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
+        python3 "$root/install/from_source.py" "$@"; exit $?
+    fi
+    case "$status" in 2??) ;; *) echo "Release download failed (HTTP $status); no source fallback on transport errors." >&2; exit 1;; esac
     if [ -z "$checksum" ]; then
         curl --fail --location --proto '=https,http' --proto-redir '=https' "$base/$(basename "$bundle").sha256" -o "$bundle.sha256"
     fi
