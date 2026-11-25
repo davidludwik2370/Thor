@@ -35,12 +35,13 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--odin',default='odin')
     args=parser.parse_args()
+    odin=shutil.which(args.odin) or str(Path(args.odin).resolve(strict=True))
     with tempfile.TemporaryDirectory(prefix='thor-ols-json-') as temp:
         directory=Path(temp)
         shutil.copyfile(ROOT/'install/ols-json-compat.odin',directory/'compat.odin')
         (directory/'main.odin').write_text(SOURCE,encoding='utf-8')
         for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
-            subprocess.run([args.odin,'run',str(directory),'-thread-count:2',*flags],check=True)
+            subprocess.run([odin,'run',str(directory),'-thread-count:2',*flags],cwd=directory,check=True)
     print('PASS: OLS JSON escaping and IO error propagation, checked and unchecked')
 
 if __name__=='__main__':main()
