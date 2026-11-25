@@ -25,11 +25,28 @@ elevate() {
     elif command -v doas >/dev/null 2>&1; then doas "$@"
     else echo "Installing system prerequisites requires sudo/doas. Install the reported packages as administrator and rerun." >&2; exit 1; fi
 }
+apt_update() {
+    # apt's dpkg timeout covers installation locks, but not its package-list
+    # lock. Retry only lock contention, preserving other update failures.
+    apt_log=$(mktemp "${TMPDIR:-/tmp}/thor-apt.XXXXXXXX")
+    apt_deadline=$(($(date +%s) + 300))
+    while :; do
+        if elevate env LC_ALL=C apt-get -o DPkg::Lock::Timeout=300 update >"$apt_log" 2>&1; then
+            cat "$apt_log"; rm -f "$apt_log"; return 0
+        else apt_status=$?; fi
+        cat "$apt_log"
+        if [ "$apt_status" -ne 100 ] || ! grep -Eq 'Could not get lock|Unable to lock directory' "$apt_log" || [ "$(date +%s)" -ge "$apt_deadline" ]; then
+            rm -f "$apt_log"; return "$apt_status"
+        fi
+        echo 'Waiting for the system package-list lock...'
+        sleep 2
+    done
+}
 packages() {
     case "$system" in
         Linux)
             if command -v apt-get >/dev/null 2>&1; then
-                elevate apt-get -o DPkg::Lock::Timeout=300 update
+                apt_update
                 # Fresh Ubuntu desktops often run unattended upgrades at login.
                 # Let apt wait for the frontend lock instead of failing setup.
                 elevate env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends "$@"
