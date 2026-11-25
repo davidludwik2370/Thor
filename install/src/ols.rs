@@ -2,6 +2,17 @@
 use super::*;
 
 pub(super) const REVISION:&str="0c9438faeba846232caaa22fe9f22b30c302dba2";
+const JSON_COMPAT:&str=include_str!("../ols-json-compat.odin");
+
+fn compatible_marshal(source:&str)->Result<String> {
+    let mut text=source.to_owned();
+    for (before,after) in [("io.write_quoted_string(w, s, '\"', nil, true)","thor_installer_marshal_json_string(w, s)"),
+                           ("io.write_quoted_string(w, string(s), '\"', nil, true)","thor_installer_marshal_json_string(w, string(s))")] {
+        if text.matches(before).count()!=1 {return Err("Pinned OLS JSON writer differs from the reviewed SDK compatibility patch".into());}
+        text=text.replace(before,after);
+    }
+    Ok(text)
+}
 
 fn copy_tree(from:&Path,to:&Path)->Result<()> {
     fs::create_dir_all(to).map_err(err)?;
@@ -19,7 +30,8 @@ pub(super) fn prepare(root:&Path,prefix:&Path)->Result<PathBuf> {
     let manifest=read_json(&root.join(MANIFEST))?;
     let inputs:serde_json::Map<String,Value>=manifest["files"].as_object().ok_or("missing bundle inventory")?.iter()
         .filter(|(k,_)|k.starts_with("ols/")||k.starts_with("odin/")).map(|(k,v)|(k.clone(),v.clone())).collect();
-    let key=hex(Sha256::digest(serde_json::to_vec(&json!({"inputs":inputs,"root":root,"build":"checked-speed-threads2-v1"})).map_err(err)?));
+    let build=if cfg!(windows){"checked-speed-threads2-json-sdk-v2"}else{"checked-speed-threads2-v1"};
+    let key=hex(Sha256::digest(serde_json::to_vec(&json!({"inputs":inputs,"root":root,"build":build})).map_err(err)?));
     let cache=prefix.join("editor/ols");fs::create_dir_all(&cache).map_err(err)?;
     let directory=cache.join(&key[..16]);
     if directory.exists() {
@@ -35,12 +47,23 @@ pub(super) fn prepare(root:&Path,prefix:&Path)->Result<PathBuf> {
     let lock=cache.join(".build-lock");fs::create_dir(&lock).map_err(|e|format!("Could not lock native OLS build: {e}. Another installer may be running; retry when it finishes."))?;
     let _lock=RemoveDir(lock);
     let stage=cache.join(format!(".stage-{}",unique()));fs::create_dir(&stage).map_err(err)?;let _stage=RemoveDir(stage.clone());
+    // The Windows SDK moved JSON escaping to encoding/json. Keep the bundled
+    // upstream source hash-identical; adapt only a disposable build copy.
+    let source=if cfg!(windows) {
+        let source=stage.join("source");copy_tree(&root.join("ols/src"),&source)?;
+        let file=source.join("server/marshal.odin");
+        let patched=compatible_marshal(&fs::read_to_string(&file).map_err(err)?)?;
+        fs::write(&file,patched).map_err(err)?;
+        fs::write(source.join("server/thor_installer_json_compat.odin"),JSON_COMPAT).map_err(err)?;
+        source
+    }else{root.join("ols/src")};
     println!("Building native upstream OLS for this host (two compiler threads)...");
     let mut cmd=Command::new(root.join(format!("odin/odin{}",env::consts::EXE_SUFFIX)));
-    cmd.arg("build").arg(root.join("ols/src")).arg(format!("-collection:src={}",root.join("ols/src").display()))
+    cmd.arg("build").arg(&source).arg(format!("-collection:src={}",source.display()))
         .args(["-o:speed","-thread-count:2"]).arg("-define:VERSION=upstream-0c9438f")
         .arg(format!("-out:{}",stage.join(format!("ols{}",env::consts::EXE_SUFFIX)).display())).env_remove("ODIN_ROOT");
     command(cmd).map_err(|e|format!("Native OLS build failed. Install the platform's Clang/linker prerequisites, then rerun --vscode. The Thor CLI is available. {e}"))?;
+    if cfg!(windows) {fs::remove_dir_all(&source).map_err(err)?;}
     // This upstream revision does not implement --version: it starts its LSP
     // read loop instead. Never launch it as a synchronous installer probe.
     if !stage.join(format!("ols{}",env::consts::EXE_SUFFIX)).is_file() || fs::metadata(stage.join(format!("ols{}",env::consts::EXE_SUFFIX))).map_err(err)?.len()==0 {
@@ -61,6 +84,22 @@ pub(super) fn prepare(root:&Path,prefix:&Path)->Result<PathBuf> {
     inventory(&stage,&stage,&mut files)?;
     atomic_write(&stage.join("THOR-OLS.json"),&serde_json::to_vec_pretty(&json!({"key":key,"files":files})).map_err(err)?)?;
     fs::rename(&stage,&directory).map_err(err)?;Ok(directory.join(format!("ols{}",env::consts::EXE_SUFFIX)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn compatibility_patch_is_narrow_and_requires_reviewed_input() {
+        let source="io.write_quoted_string(w, s, '\"', nil, true)\nio.write_quoted_string(w, string(s), '\"', nil, true)\nio.write_quoted_string(w, name)";
+        let patched=compatible_marshal(source).unwrap();
+        assert!(patched.contains("thor_installer_marshal_json_string(w, string(s))"));
+        assert!(patched.ends_with("io.write_quoted_string(w, name)"));
+        let reapplied=compatible_marshal(&patched);
+        let duplicate=compatible_marshal(&(source.to_owned()+source));
+        assert!(reapplied.is_err());
+        assert!(duplicate.is_err());
+    }
 }
 
 pub(super) fn configure(root:&Path,prefix:&Path,settings:&Path)->Result<()> {

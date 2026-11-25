@@ -35,6 +35,8 @@ jobs:
           New-Item -ItemType Directory -Force $root | Out-Null
           tar -xzf $bundle.FullName -C $root
           if ($LASTEXITCODE -ne 0) {throw 'Could not extract source artifact'}
+          python tools/test_ols_json_compat.py --odin "$root\odin\odin.exe"
+          if ($LASTEXITCODE -ne 0) {throw 'OLS SDK JSON compatibility checks failed'}
           python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler "$root\thor.exe" --installer install/target/release/thor-install.exe --tls "$root\tls\bin\tls.exe" --vsix "$root\editors\thor-language.vsix" --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
           if ($LASTEXITCODE -ne 0) {throw 'Could not package current installer'}
           $release=(Get-ChildItem "$env:RUNNER_TEMP\verified-release\*.tar.gz" | Select-Object -First 1).FullName

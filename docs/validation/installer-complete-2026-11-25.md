@@ -46,9 +46,16 @@ editor data directory and extensions directory, leaving the user's editor alone.
 
 The same installed-VSIX test passes in the Ubuntu ARM64 Fusion desktop, including
 native OLS, TLS, Run, a mapped source breakpoint and debugger exit. Local final
-regressions pass: 67 installer/source/OLS cases, 7 Rust installer tests, 186 editor
+regressions pass: 67 installer/source/OLS cases, 8 Rust installer tests, 186 editor
 unit tests and 7 assertion-hygiene tests. The Windows x64 complete pinned-source
 build, checked/unchecked execution, doctor and uninstall pass in GitHub Actions.
+
+Windows editor verification additionally exposed Odin's changed JSON-writer API
+in pinned OLS. A narrow adapter is applied only to a disposable Windows build
+copy, with exact-input guards and checked/unchecked JSON escaping and I/O-error
+tests. Bundled upstream sources remain unchanged, and OLS retains its standard
+Odin language behavior. Windows downloads suppress expensive PowerShell progress
+rendering without changing the caller's preference.
 
 ## Scope and limits
 

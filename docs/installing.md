@@ -164,12 +164,18 @@ preserve explicit customizations and leave the selected theme/other languages
 alone. Rules edited afterward become user-owned. A new profile's Dark Modern
 selection applies to its entire window, with extra colors only in Thor code.
 
-`--vscode` automatically builds unmodified, pinned upstream OLS
+`--vscode` automatically builds pinned upstream OLS
 using the bundled Odin compiler and the system Clang/linker prerequisites. No
 Git, Python, Cargo, separate Odin installation or manual server build is needed.
 The release includes hash-verified upstream source, builtins, provenance and its
 license. The release builder acquires source; the end-user installer does not
 fetch or build an unpinned upstream checkout.
+
+For the reviewed Windows SDK, a small JSON-writer compatibility adapter is
+applied to a disposable build copy. It accommodates Odin's changed JSON escaping
+API; Odin syntax, language services and highlighting remain standard OLS. The
+bundled upstream files stay hash-identical. The adapter is tested in checked and
+unchecked builds, including escaping and I/O error propagation.
 
 The build uses two compiler threads and lives in an installer cache under
 `PREFIX/editor/ols`. Reinstalling the same toolchain reuses the verified build.
