@@ -38,7 +38,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='thor-ols-json-') as temp:
         directory=Path(temp)
         shutil.copyfile(ROOT/'install/ols-json-compat.odin',directory/'compat.odin')
-        (directory/'main.odin').write_text(SOURCE)
+        (directory/'main.odin').write_text(SOURCE,encoding='utf-8')
         for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
             subprocess.run([args.odin,'run',str(directory),'-thread-count:2',*flags],check=True)
     print('PASS: OLS JSON escaping and IO error propagation, checked and unchecked')
