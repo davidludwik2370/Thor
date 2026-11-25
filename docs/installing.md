@@ -1,7 +1,7 @@
 # Installing Thor
 
-`thor-install` installs a versioned, per-user native toolchain. Users do not need
-Rust, Python, Node or npm. From a cloned repository, choose one:
+`thor-install` installs a versioned, per-user native toolchain. Binary installation
+does not need Rust, Python, Node or npm. From a cloned repository, choose one:
 
 ```sh
 ./thor-install
@@ -26,6 +26,13 @@ The repository contains the installer launchers, not generated binaries.
 directory; `--version VERSION` selects a version. Otherwise the bootstrap derives
 `https://github.com/OWNER/REPO/releases/download/vVERSION` from the clone's GitHub
 origin. No command uploads or publishes anything.
+
+The current published macOS bundle requires **macOS 15 or newer** because of
+its bundled Odin/LLVM libraries. This is distinct from Thor's CPU support: M1
+is supported. On older macOS versions, the default repository command selects a
+native source build before downloading that incompatible bundle. A custom
+`--bundle` or `--release-base` must supply software compatible with that Mac.
+The official bundle's minimum is recorded in `release/macos-minimum`.
 
 ## Automatic prerequisites and supported hosts
 
@@ -103,6 +110,13 @@ optimizations. Rust/package-manager caches and installed development tools remai
 available as ordinary development dependencies; they are not removed by Thor
 uninstall. A source install takes longer and uses more temporary space than a
 binary install; it does not inherently improve generated-program performance.
+
+macOS source setup works with Apple's built-in Bash 3.2 shell, reuses Homebrew
+even before its shell PATH changes take effect, and installs versioned `llvm@22`
+when no supported LLVM 17–22 is found. Older macOS versions may require lengthy
+Homebrew source builds and an appropriate Command Line Tools release; upstream
+package support still applies. The shell and OS-selection regressions are tested
+on current macOS; this does not constitute a full native macOS 13 validation.
 
 The installation includes representative health checks, not the compiler's full
 regression suite. A clone already contains that suite; maintainers can run

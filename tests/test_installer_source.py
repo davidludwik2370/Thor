@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -80,6 +81,63 @@ class SourceInstallerTests(unittest.TestCase):
 
 @unittest.skipIf(os.name=='nt','POSIX source fallback bootstrap')
 class SourceFallbackTests(unittest.TestCase):
+    def exercise_macos_bootstrap(self, version, *options, minimum=None):
+        with tempfile.TemporaryDirectory(prefix='thor-bootstrap-macos-') as temporary:
+            root=Path(temporary);(root/'release').mkdir();(root/'install').mkdir()
+            shutil.copy2(ROOT/'thor-install',root/'thor-install')
+            shutil.copy2(ROOT/'release/version',root/'release/version')
+            (root/'release/macos-minimum').write_text(minimum or (ROOT/'release/macos-minimum').read_text())
+            (root/'install/from_source.py').write_text('import sys; print("SOURCE-FALLBACK",repr(sys.argv[1:]))')
+            bin=root/'bin';bin.mkdir()
+            for name,body in {
+                'uname':'case "$1" in -s) echo Darwin;; -m) echo arm64;; esac',
+                'sw_vers':f'echo {version}',
+                'git':'echo https://github.com/davidludwik2370/Thor.git',
+                'curl':f'touch "{root}/download-called"; printf 404',
+            }.items():
+                path=bin/name;path.write_text('#!/bin/sh\n'+body+'\n');path.chmod(0o755)
+            (bin/'python3').symlink_to(sys.executable)
+            home=root/'home';home.mkdir()
+            result=subprocess.run([str(root/'thor-install'),'--no-install-deps',*options],capture_output=True,text=True,timeout=15,
+                                  env={**os.environ,'PATH':str(bin)+os.pathsep+os.environ['PATH'],'HOME':str(home),'THOR_RELEASE_BASE':''})
+            self.assertEqual(list(home.iterdir()),[])
+            return result,(root/'download-called').exists()
+
+    def test_older_macos_uses_source_without_downloading_incompatible_sdk(self):
+        result,downloaded=self.exercise_macos_bootstrap('13.5.1','--vscode','--profile','Thor','--path')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertFalse(downloaded)
+        self.assertIn('this Mac: 13.5.1',result.stdout)
+        self.assertIn('SOURCE-FALLBACK',result.stdout)
+        for option in ('--vscode','--profile','Thor','--path'):self.assertIn(repr(option),result.stdout)
+
+    def test_macos_release_floor_uses_numeric_versions_and_dry_run_is_inert(self):
+        for current,minimum,downloaded in [('14.9','15.0',False),('15.0','15.0',True),
+                                           ('15.0.1','15.0',True),('26.0','15.0',True),
+                                           ('15.9','15.10',False),('15.10','15.9',True)]:
+            with self.subTest(current=current,minimum=minimum):
+                result,actual=self.exercise_macos_bootstrap(current,'--dry-run',minimum=minimum)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(actual,downloaded)
+                self.assertIn('no changes made',result.stdout.lower())
+
+    def test_custom_release_and_maintenance_bypass_official_macos_floor(self):
+        result,downloaded=self.exercise_macos_bootstrap('13.5.1','--release-base','http://localhost:1/releases','--dry-run')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertTrue(downloaded)
+        self.assertNotIn('Published macOS bundles require',result.stdout)
+        result,downloaded=self.exercise_macos_bootstrap('13.5.1','--uninstall')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertFalse(downloaded)
+        self.assertIn('not installed',result.stdout)
+
+    def test_macos_floor_does_not_replace_an_explicitly_selected_release(self):
+        result,downloaded=self.exercise_macos_bootstrap('13.5.1','--version','0.0.0')
+        self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertTrue(downloaded)
+        self.assertIn('Check out that release',result.stderr)
+        self.assertNotIn('SOURCE-FALLBACK',result.stdout)
+
     def test_only_confirmed_missing_assets_trigger_source_fallback(self):
         import functools
         import http.server

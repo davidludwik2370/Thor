@@ -14,6 +14,11 @@ case "$system:$machine" in
     Darwin:arm64|Darwin:x86_64|Linux:aarch64|Linux:arm64|Linux:x86_64|FreeBSD:amd64|FreeBSD:arm64|FreeBSD:aarch64|NetBSD:amd64|NetBSD:x86_64|NetBSD:aarch64|OpenBSD:amd64|OpenBSD:x86_64) ;;
     *) echo "Unsupported Odin host: $system $(uname -m)" >&2; exit 1;;
 esac
+if [ "$system" = Darwin ]; then
+    # A newly installed Homebrew may not be in the current login shell yet.
+    # Reuse it on a retry instead of running Homebrew's installer again.
+    PATH="$PATH:/opt/homebrew/bin"; export PATH
+fi
 if $plan; then
     echo "Prerequisites: $system; source build=$source_build; VS Code=$editor. Reuse working tools; install missing tools using the system package manager."
     exit 0
@@ -116,10 +121,19 @@ if $source_build; then
             done
         fi
         if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then brew install python; fi
-        for tool in node npm git; do command -v "$tool" >/dev/null 2>&1 || brew install "$(case "$tool" in npm) echo node;; *) echo "$tool";; esac)"; done
+        # Apple's /bin/sh is Bash 3.2. A case pattern's closing parenthesis
+        # inside $(...) is misparsed there even though sh -n accepts it.
+        for tool in node npm git; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                case "$tool" in npm) formula=node;; *) formula=$tool;; esac
+                brew install "$formula"
+            fi
+        done
         llvm_found=false
         for candidate in /opt/homebrew/opt/llvm*/bin/llvm-config /usr/local/opt/llvm*/bin/llvm-config; do if supported_llvm "$candidate"; then llvm_found=true; fi; done
-        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then brew list llvm >/dev/null 2>&1 || brew install llvm; fi
+        # The current unversioned formula may exceed the reviewed Odin's
+        # supported LLVM range. An installed unsupported version is not enough.
+        if ! supported_llvm "$(command -v llvm-config || :)" && ! $llvm_found; then brew install llvm@22; fi
     else
         if [ "$system" = Linux ] && ! command -v patchelf >/dev/null 2>&1; then packages patchelf; fi
         if ! command -v python3 >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then

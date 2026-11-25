@@ -1,9 +1,9 @@
 name: Installer
 on:
   push:
-    paths: ['install/**', 'thor-install*', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
   pull_request:
-    paths: ['install/**', 'thor-install*', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'tools/build_distribution.py', 'tests/test_installer*', '.github/workflows/installer.yml']
   workflow_dispatch:
     inputs:
       source_build:

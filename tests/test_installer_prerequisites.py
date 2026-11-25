@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import sys
 import tempfile
 import unittest
 
@@ -55,3 +57,81 @@ if 'install' in sys.argv:pathlib.Path(os.environ['FIXTURE_READY']).write_text('i
 
     def test_other_package_failures_are_not_retried(self):
         self.exercise_apt('network')
+
+    def exercise_macos(self, shell, *, missing=(), llvm='22.1.8', brew_off_path=False):
+        with tempfile.TemporaryDirectory(prefix='thor-macos-prerequisites-') as temp:
+            directory=Path(temp);bin=directory/'bin';bin.mkdir()
+            home=directory/'home';home.mkdir()
+            def executable(name, text):
+                path=bin/name;path.write_text(text);path.chmod(0o755)
+            for name in ('mktemp','rm'):
+                (bin/name).symlink_to(shutil.which(name))
+            executable('uname','#!/bin/sh\ncase "$1" in -s) echo Darwin;; -m) echo arm64;; esac\n')
+            executable('xcrun','#!/bin/sh\nexit 0\n')
+            executable('curl','#!/bin/sh\necho "Unexpected download" >&2; exit 99\n')
+            executable('python3','#!/bin/sh\nexit 0\n')
+            executable('cargo','#!/bin/sh\nexit 0\n')
+            executable('llvm-config',f'#!/bin/sh\nprintf "%s\\n" "{llvm}"\n')
+            for name in ('node','npm','git'):
+                if name not in missing:executable(name,'#!/bin/sh\nexit 0\n')
+            compiler=f'''#!{sys.executable}
+import pathlib,sys
+p=pathlib.Path(sys.argv[sys.argv.index('-o')+1])
+p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
+'''
+            executable('clang',compiler);executable('clang++',compiler)
+            executable('brew',f'''#!{sys.executable}
+import json,os,pathlib,sys
+with open(os.environ['FIXTURE_LOG'],'a') as output:
+ output.write(json.dumps(sys.argv[1:])+'\\n')
+if sys.argv[1:]==['install','node']:
+ for name in ('node','npm'):
+  p=pathlib.Path(__file__).parent/name;p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
+elif sys.argv[1:]==['install','git']:
+ p=pathlib.Path(__file__).parent/'git';p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
+elif sys.argv[1:]==['install','llvm@22']:pass
+else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
+''')
+            if brew_off_path:
+                destination=directory/'system/opt/homebrew/bin/brew'
+                destination.parent.mkdir(parents=True);(bin/'brew').rename(destination)
+            # Relocate only fixed system search roots into the fixture, so an
+            # installed host Node/LLVM cannot hide a missing-tool branch. The
+            # prerequisite logic and Apple /bin/sh execution remain unchanged.
+            text=(ROOT/'install/prerequisites.sh').read_text()
+            for prefix in ('/usr/local','/usr/pkg','/opt/homebrew'):
+                text=text.replace(prefix,str(directory/'system'/prefix.lstrip('/')))
+            script=directory/'prerequisites.sh';script.write_text(text)
+            log=directory/'brew.jsonl'
+            result=subprocess.run([shell,str(script),'--source'],capture_output=True,text=True,timeout=15,
+                                  env={**os.environ,'PATH':str(bin),'HOME':str(home),'CI':'true','FIXTURE_LOG':str(log)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS: source-build prerequisites',result.stdout)
+            return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_macos_missing_node_npm_and_git_use_literal_formula_names(self):
+        # On macOS these are the real Apple Bash 3.2 shells. Merely using -n
+        # misses the command-substitution bug; execute the missing-tool paths.
+        for shell in ('/bin/sh','/bin/bash'):
+            if not Path(shell).is_file():continue
+            for missing, expected in [(('node','npm','git'),['node','git']),
+                                      (('npm',),['node']), (('git',),['git']), ((),[])]:
+                with self.subTest(shell=shell,missing=missing):
+                    commands=self.exercise_macos(shell,missing=missing)
+                    self.assertEqual(commands,[['install',name] for name in expected])
+
+    def test_macos_unsupported_installed_llvm_acquires_reviewed_major(self):
+        for llvm in ('16.0.0','23.1.0','invalid'):
+            with self.subTest(llvm=llvm):
+                commands=self.exercise_macos('/bin/sh',llvm=llvm)
+                self.assertEqual(commands,[['install','llvm@22']])
+
+    def test_macos_supported_llvm_is_reused(self):
+        for llvm in ('17.0.6','18.1.8','22.1.8'):
+            with self.subTest(llvm=llvm):
+                commands=self.exercise_macos('/bin/sh',llvm=llvm)
+                self.assertEqual(commands,[])
+
+    def test_macos_existing_homebrew_outside_login_path_is_reused(self):
+        commands=self.exercise_macos('/bin/sh',brew_off_path=True)
+        self.assertEqual(commands,[])

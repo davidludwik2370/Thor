@@ -1,5 +1,5 @@
 #!/bin/sh
-# Native bootstrap only. End-user installation needs neither Python nor Cargo.
+# Native bootstrap only. Binary installation needs neither Python nor Cargo.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 version=$(cat "$root/release/version")
@@ -42,6 +42,7 @@ Usage: ./thor-install [--vscode [--profile NAME]] [options]
 Existing editor settings, profiles and project configurations are preserved.
 --vscode builds pinned native upstream OLS and adds its managed server setting.
 Without a published GitHub release, use --bundle or --release-base.
+Older macOS versions use a native source build when the published SDK is too new.
 HELP
         exit 0;; esac
 done
@@ -108,6 +109,25 @@ if [ -n "$maintenance" ]; then
     set --; while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
     "$forward/installed-installer" "$@"; exit $?
 fi
+# The published SDK includes LLVM libraries whose deployment target can be
+# newer than Thor's Rust executables. Select a native source build before
+# downloading that SDK. A custom release base or local bundle has its own
+# compatibility policy; --from-source also bypasses this release-only floor.
+if ! $from_source && [ "$os" = macos ] && [ -z "$base$bundle" ] && [ "$version" = "$(cat "$root/release/version")" ]; then
+    minimum=$(cat "$root/release/macos-minimum")
+    current=$(sw_vers -productVersion)
+    if ! awk -v current="$current" -v minimum="$minimum" 'BEGIN {
+        split(current, a, "."); split(minimum, b, ".");
+        for (i=1; i<=3; i++) {
+            if (a[i]+0 > b[i]+0) exit 0;
+            if (a[i]+0 < b[i]+0) exit 1;
+        }
+        exit 0;
+    }'; then
+        echo "Published macOS bundles require macOS $minimum or newer (this Mac: $current); using a native source build."
+        from_source=true
+    fi
+fi
 if $from_source; then
     [ -z "$bundle$checksum" ] || { echo '--from-source cannot use --bundle/--sha256' >&2; exit 1; }
     [ "$version" = "$(cat "$root/release/version")" ] || { echo 'A source build uses the checked-out version. Check out the requested release first.' >&2; exit 1; }
@@ -127,6 +147,7 @@ if [ -z "$bundle" ]; then
     case "$base" in https://*) ;; http://localhost:*|http://127.0.0.1:*|http://\[::1\]:*) ;; *) echo 'thor-install: release URLs must use HTTPS (localhost HTTP is supported for testing)' >&2; exit 1;; esac
     command -v curl >/dev/null 2>&1 || { echo 'thor-install: install curl and CA certificates first' >&2; exit 1; }
     bundle="$forward/thor-$version-$os-$arch.tar.gz"
+    echo "Downloading $base/$(basename "$bundle")"
     status=$(curl --location --proto '=https,http' --proto-redir '=https' --write-out '%{http_code}' "$base/$(basename "$bundle")" -o "$bundle")
     if [ "$status" = 404 ]; then
         [ "$version" = "$(cat "$root/release/version")" ] || { echo 'No binary for this version. Check out that release before building it from source.' >&2; exit 1; }
