@@ -2,6 +2,10 @@
 $ErrorActionPreference = 'Stop'
 $checkoutRoot=$PSScriptRoot
 $ThorSourcePython=$null
+function InvokeThorDownload($uri,$file) {
+    $ProgressPreference='SilentlyContinue'
+    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $file
+}
 $forward = [System.Collections.Generic.List[string]]::new()
 $version = (Get-Content -Raw -LiteralPath (Join-Path $checkoutRoot 'release/version')).Trim()
 $checkoutVersion=$version
@@ -63,7 +67,7 @@ try {
         if ($base -notmatch '^https://' -and $base -notmatch '^http://(localhost|127\.0\.0\.1):') { throw 'Release URLs must use HTTPS (localhost HTTP is supported for testing).' }
         $name = "thor-$version-windows-x86_64.tar.gz"
         $bundle = Join-Path $temporary $name
-        try {Invoke-WebRequest -UseBasicParsing -Uri "$base/$name" -OutFile $bundle}
+        try {InvokeThorDownload "$base/$name" $bundle}
         catch {
             if (!$_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {throw}
             if ($version -ne $checkoutVersion) {throw 'No binary for this version. Check out that release before building it from source.'}
@@ -75,7 +79,7 @@ try {
             if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
             exit 0
         }
-        if (!$checksum) { Invoke-WebRequest -UseBasicParsing -Uri "$base/$name.sha256" -OutFile "$bundle.sha256" }
+        if (!$checksum) { InvokeThorDownload "$base/$name.sha256" "$bundle.sha256" }
     }
     $bundle = (Resolve-Path -LiteralPath $bundle).Path
     if (!$checksum) { $checksum=((Get-Content -Raw -LiteralPath "$bundle.sha256").Trim() -split '\s+')[0] }

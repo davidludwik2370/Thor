@@ -4,7 +4,12 @@ param([switch]$SourceBuild, [switch]$VSCode, [switch]$DryRun)
 $ErrorActionPreference='Stop'
 if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {throw 'Odin currently supports native Windows x64 hosts only.'}
 if ($DryRun) {Write-Output "Prerequisites: Windows x64; source build=$SourceBuild; VS Code=$VSCode. Reuse existing installations."; exit 0}
-function Download($uri,$file) {Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $file}
+function Download($uri,$file) {
+    # Windows PowerShell's per-chunk progress rendering can dominate large
+    # downloads. Keep this preference local to the download, not the caller.
+    $ProgressPreference='SilentlyContinue'
+    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $file
+}
 function SignedInstaller($file) {
     $signature=Get-AuthenticodeSignature -LiteralPath $file
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {throw "Microsoft installer signature verification failed: $file"}
