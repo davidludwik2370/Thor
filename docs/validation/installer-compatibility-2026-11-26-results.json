@@ -398,9 +398,13 @@
       "seconds": 98.04
     },
     "macos_13_5_1_m1": {
-      "success": false,
-      "pending": "OS Developer Tools Access approval for debugger; all preceding editor and runtime checks passed",
+      "success": true,
+      "platform": "darwin",
       "checks": [
+        "install-reinstall-doctor",
+        "ordinary-login-and-interactive-shell-path",
+        "checked-and-unchecked-execution",
+        "original-installation-record-restored",
         "installed-extension-activation",
         "native-odin-fixture-present",
         "native-odin-document-opened",
@@ -411,8 +415,16 @@
         "tls-field-completion",
         "profile-theme-and-thor-only-colors",
         "optional-color-enable-and-restore",
-        "run-without-shell-path"
-      ]
+        "run-without-shell-path",
+        "codelldb-source-breakpoint",
+        "debug-clean-exit",
+        "default-profile-preserved",
+        "repeated-uninstall-project-preserved"
+      ],
+      "seconds": 123.64,
+      "launch_context": "Aqua",
+      "no_bundle_override": true,
+      "actual_release_verified": "0.41.11"
     },
     "fusion_ubuntu_24_arm64": {
       "success": true,
@@ -571,6 +583,7 @@
     "completed_local_container_and_ubuntu_image_removed": true,
     "fusion_private_validation_files_removed": true,
     "user_projects_and_installations_preserved": true,
-    "physical_pc_staging_cleanup_deferred_to_avoid_gui_interference": true
+    "physical_pc_staging_cleanup_deferred_to_avoid_gui_interference": true,
+    "air_private_validation_files_and_temporary_gui_job_removed": true
   }
 }

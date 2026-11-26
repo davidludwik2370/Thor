@@ -62,7 +62,7 @@ No required setup, cleanup or runtime operation is hidden inside an assertion.
 | Existing desktop | Result | Cycle time |
 | --- | --- | ---: |
 | macOS 15.6 ARM64, primary Mac | All desktop checks passed | 98.04 s |
-| macOS 13.5.1 ARM64, M1 MacBook Air | CLI, PATH, OLS/TLS hover/completion, colors and Run passed; repeated debugger check waiting for OS authorization | Pending |
+| macOS 13.5.1 ARM64, M1 MacBook Air | All public-install desktop checks passed | 123.64 s |
 | Ubuntu 24.04 ARM64, Fusion | All desktop checks passed | 105.82 s |
 | Windows 11 x64, build 26200 | All desktop checks passed | 146.11 s |
 | Ubuntu 24.04 x64, WSL2 | All desktop checks passed | 109.65 s |
@@ -70,6 +70,15 @@ No required setup, cleanup or runtime operation is hidden inside an assertion.
 Windows and WSL desktop checks finished before the user's fullscreen restriction.
 Further physical-PC GUI runs are deferred until the user lifts that restriction.
 These are isolated checks on provisioned desktops, not clean OS installations.
+
+The Air’s repeat debugger check exposed a test-orchestration issue: direct SSH
+children ran in the `Background` launchd/audit session. macOS rejected debugging
+as non-interactive even though VS Code could open windows. Starting the same
+validator through a temporary LaunchAgent in the logged-in user’s `gui/<uid>`
+domain produced an `Aqua` session and passed the source breakpoint and clean
+exit checks. This required no Thor code or OS security-policy change. The
+public-release cycle also verified record restoration, default-profile
+preservation and repeated uninstall. The temporary job was removed afterward.
 
 A separate real upgrade installed 0.41.10, verified it, installed 0.41.11 into the
 same prefix and verified it, then uninstalled twice. The project survived and

@@ -171,8 +171,11 @@ with `--code PATH --output DIR` and optionally `--bundle ARCHIVE`. This uses an
 isolated installer state/editor profile and closes only its own test windows.
 On macOS, GUI processes use the real account home for Keychain access; the
 original installation discovery record is backed up and restored after the
-isolated editor check. On Windows, run it in the logged-in desktop session,
-rather than directly inside SSH.
+isolated editor check. On macOS, start this validator from a desktop Terminal; SSH orchestration must
+start its temporary worker in the logged-in user’s `gui/<uid>` launchd domain.
+A direct SSH `Background` session can open editor windows yet fail debugger
+authorization. Remove the temporary job after it exits. On Windows, run the
+validator in the logged-in desktop session, rather than directly inside SSH.
 
 Linux setup no longer installs Node/npm through the OS package manager. BSD
 continues to use native binary packages for Node, Rust and LLVM. Reusing Odin
