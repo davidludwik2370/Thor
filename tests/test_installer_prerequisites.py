@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipIf(os.name=='nt','POSIX prerequisite script')
 class PrerequisiteTests(unittest.TestCase):
-    def exercise_linux_editor_ssl(self, present=False, editor=True):
+    def exercise_linux_editor_ssl(self, present=False, editor=True, runtime_only=False):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);bin=root/'bin';bin.mkdir()
             def executable(name,text):
@@ -25,7 +25,7 @@ class PrerequisiteTests(unittest.TestCase):
 import pathlib,sys
 p=pathlib.Path(sys.argv[sys.argv.index('-o')+1]);p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
 ''')
-            executable('code','#!/bin/sh\necho 1.148.0\n')
+            executable('code','#!/bin/sh\nexit 53\n' if runtime_only else '#!/bin/sh\necho 1.148.0\n')
             executable('ldconfig','#!/bin/sh\necho "libssl.so.4 (libc6,AArch64) => /lib64/libssl.so.4"\nif [ -f "$FIXTURE_SSL_READY" ]; then echo "libssl.so.3 (libc6,AArch64) => /lib64/libssl.so.3"; fi\n')
             executable('dnf',f'''#!{sys.executable}
 import json,os,pathlib,sys
@@ -36,7 +36,7 @@ pathlib.Path(os.environ['FIXTURE_SSL_READY']).write_text('installed')
             script=root/'prerequisites.sh';script.write_text((ROOT/'install/prerequisites.sh').read_text())
             ready=root/'ssl-ready';log=root/'dnf.jsonl'
             if present:ready.write_text('already installed')
-            value=subprocess.run(['/bin/sh',str(script),*(['--vscode'] if editor else [])],capture_output=True,text=True,timeout=20,
+            value=subprocess.run(['/bin/sh',str(script),*(['--editor-runtime'] if runtime_only else ['--vscode'] if editor else [])],capture_output=True,text=True,timeout=20,
                 env={**os.environ,'PATH':str(bin),'HOME':str(root),'FIXTURE_SSL_READY':str(ready),'FIXTURE_LOG':str(log)})
             calls=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
             return value,calls
@@ -50,6 +50,11 @@ pathlib.Path(os.environ['FIXTURE_SSL_READY']).write_text('installed')
     def test_existing_ssl3_is_reused_without_package_changes(self):
         value,calls=self.exercise_linux_editor_ssl(present=True)
         self.assertEqual(value.returncode,0,value.stdout+value.stderr);self.assertEqual(calls,[])
+
+    def test_explicit_editor_gets_runtime_dependencies_without_editor_acquisition(self):
+        value,calls=self.exercise_linux_editor_ssl(editor=False,runtime_only=True)
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr)
+        self.assertEqual(calls,[['install','-y','libssl.so.3()(64bit)']])
 
     def test_toolchain_only_install_does_not_add_editor_crypto_dependencies(self):
         value,calls=self.exercise_linux_editor_ssl(editor=False)

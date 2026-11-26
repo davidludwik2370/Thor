@@ -3,10 +3,10 @@
 # for binary installation. OS approvals remain with the OS; never run Thor as root.
 set -eu
 PATH="$PATH:/usr/local/bin:/usr/pkg/bin:/usr/local/sbin:/usr/pkg/sbin"; export PATH
-source_build=false; editor=false; plan=false; download_only=false; reuse_odin=false
+source_build=false; editor=false; editor_runtime=false; plan=false; download_only=false; reuse_odin=false
 portable_bundle=false
 for arg do
-    case "$arg" in --source) source_build=true;; --portable-bundle) portable_bundle=true;; --reuse-odin) reuse_odin=true;; --vscode) editor=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
+    case "$arg" in --source) source_build=true;; --portable-bundle) portable_bundle=true;; --reuse-odin) reuse_odin=true;; --vscode) editor=true; editor_runtime=true;; --editor-runtime) editor_runtime=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
 done
 system=$(uname -s)
 machine=$(uname -m)
@@ -179,10 +179,7 @@ if $source_build; then
         fi
     fi
 fi
-if $editor; then
-    script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-    minimum_code=$(cat "$script_dir/vscode-minimum")
-    if [ "$system" = Linux ] && command -v dnf >/dev/null 2>&1; then
+if $editor_runtime && [ "$system" = Linux ] && command -v dnf >/dev/null 2>&1; then
         # Fedora 45's default is OpenSSL 4, while VS Code's extension signature
         # verifier still loads libssl.so.3. Install the maintained side-by-side
         # provider; leave the system OpenSSL and signature verification intact.
@@ -194,7 +191,10 @@ if $editor; then
             has_ssl3 || { echo 'VS Code extension verification requires libssl.so.3; install its distribution provider and rerun.' >&2; exit 1; }
         fi
         echo 'PASS: VS Code extension signature-verification runtime'
-    fi
+fi
+if $editor; then
+    script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    minimum_code=$(cat "$script_dir/vscode-minimum")
     version_at_least() {
         awk -v current="$1" -v minimum="$2" 'BEGIN {
             sub(/-.*/, "", current);

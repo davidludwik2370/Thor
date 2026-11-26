@@ -22,7 +22,6 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BASE_SOURCE: ${{ inputs.base_source }}
-      CARGO_TARGET_DIR: ${{ runner.temp }}/thor-installer-target
       CARGO_INCREMENTAL: '0'
       CARGO_BUILD_JOBS: '2'
     steps:
@@ -48,6 +47,7 @@ jobs:
           PY
       - name: Install the verified base and rebuild only the native installer
         run: |
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/thor-installer-target"
           case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=aarch64;; *) exit 1;; esac
           version=$(cat release/version)
           mkdir -p "$RUNNER_TEMP/thor-previous"

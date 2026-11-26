@@ -1,10 +1,12 @@
 import tempfile
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 from tools import build_distribution as distribution
 
 
+@unittest.skipIf(os.name=='nt','Linux SDK relocation uses POSIX executables')
 class RepackTests(unittest.TestCase):
     def test_installed_sdk_dependencies_are_resolved_at_the_original_location(self):
         with tempfile.TemporaryDirectory() as temporary:

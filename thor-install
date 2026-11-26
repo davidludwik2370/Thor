@@ -93,7 +93,9 @@ source_prerequisites() {
     set -- --source
     if $reuse_odin; then set -- "$@" --reuse-odin; fi
     if $portable_bundle; then set -- "$@" --portable-bundle; fi
-    if $editor && ! $custom_code; then set -- "$@" --vscode; fi
+    if $editor; then
+        if $custom_code; then set -- "$@" --editor-runtime; else set -- "$@" --vscode; fi
+    fi
     sh "$root/install/prerequisites.sh" "$@"
 }
 # Maintenance uses the installed native installer, copied away from files that
@@ -201,10 +203,10 @@ expected=$(printf '%s' "$checksum" | tr 'A-F' 'a-f')
 # arbitrary archive paths before the native installer validates the inventory.
 tar -xOzf "$bundle" thor-install > "$forward/thor-install"
 chmod 700 "$forward/thor-install"
-if $editor && ! $custom_code && ! $no_deps && ! $dry && [ -f "$root/install/prerequisites.sh" ] && [ -f "$root/install/vscode-minimum" ]; then
+if $editor && ! $no_deps && ! $dry && [ -f "$root/install/prerequisites.sh" ] && [ -f "$root/install/vscode-minimum" ]; then
     # The checkout may contain newer prerequisite fixes than a published native
     # bundle. Validate/upgrade the editor before handing off to that bundle.
-    sh "$root/install/prerequisites.sh" --vscode
+    if $custom_code; then sh "$root/install/prerequisites.sh" --editor-runtime; else sh "$root/install/prerequisites.sh" --vscode; fi
 fi
 set --
 while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"

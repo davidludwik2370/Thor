@@ -16,7 +16,7 @@ pub(super) fn prerequisites(o:&Options)->Result<()> {
     } else {
         let file=temp.join("prerequisites.sh");fs::write(&file,include_str!("../prerequisites.sh")).map_err(err)?;
         cmd=Command::new("sh");cmd.arg(file);
-        if o.vscode && o.code.is_none() {cmd.arg("--vscode");}
+        if o.vscode {cmd.arg(if o.code.is_none(){"--vscode"}else{"--editor-runtime"});}
     }
     command(cmd)
 }
