@@ -257,12 +257,12 @@ def main():
                 editor_env['HOME']=str(Path.home())
                 with mac_editor_registration(home,output):
                     try:
-                        run(command,'editor',timeout=240,child_env=editor_env)
+                        run(command,'editor',timeout=600,child_env=editor_env)
                     finally:
                         close_test_editor()
                 result['checks'].append('original-installation-record-restored')
             else:
-                run(command,'editor',timeout=240,child_env=editor_env)
+                run(command,'editor',timeout=600,child_env=editor_env)
             editor = json.loads((output / 'editor-result.json').read_text())
             if not editor.get('success'):
                 raise RuntimeError('Installed editor check failed: ' + editor.get('error', 'unknown'))

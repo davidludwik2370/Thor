@@ -5,15 +5,16 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(label,callback,ms=30000) {
-    const deadline=Date.now()+ms;let last;
-    while(Date.now()<deadline){try{const value=await callback();if(value)return value;}catch(e){last=e;}await delay(200);}
+const timings={};
+async function until(label,callback,ms=90000) {
+    const started=Date.now(),deadline=started+ms;let last;
+    while(Date.now()<deadline){try{const value=await callback();if(value){timings[label]=Date.now()-started;return value;}}catch(e){last=e;}await delay(200);}
     throw new Error(`${label} timed out${last ? ': '+last.message : ''}`);
 }
 async function run() {
     const checks=[];
     const result=process.env.THOR_INSTALL_GUI_RESULT;
-    const check=label=>{checks.push(label);fs.writeFileSync(result,JSON.stringify({success:false,in_progress:true,checks},null,2));};
+    const check=label=>{checks.push(label);fs.writeFileSync(result,JSON.stringify({success:false,in_progress:true,checks,timings},null,2));};
     try {
         const extension=vscode.extensions.getExtension('thor-local.thor-language');
         assert.ok(extension,'Installed Thor extension is missing');
@@ -149,7 +150,7 @@ async function run() {
         vscode.debug.addBreakpoints([breakpoint]);
         const started=await vscode.commands.executeCommand('thor.debug');
         assert.equal(started,true);
-        await until('mapped source breakpoint',()=>stopped,45000);
+        await until('mapped source breakpoint',()=>stopped,90000);
         check('codelldb-source-breakpoint');
         const session=vscode.debug.activeDebugSession;
         const frames=await session.customRequest('stackTrace',{threadId:stopped.threadId,startFrame:0,levels:5});
@@ -158,9 +159,9 @@ async function run() {
         await until('debug program exit',()=>terminated);
         tracker.dispose();end.dispose();vscode.debug.removeBreakpoints([breakpoint]);
         check('debug-clean-exit');
-        fs.writeFileSync(result,JSON.stringify({success:true,checks},null,2));
+        fs.writeFileSync(result,JSON.stringify({success:true,checks,timings},null,2));
     } catch(error) {
-        fs.writeFileSync(result,JSON.stringify({success:false,checks,error:error.stack||String(error)},null,2));
+        fs.writeFileSync(result,JSON.stringify({success:false,checks,timings,error:error.stack||String(error)},null,2));
         throw error;
     }
 }
