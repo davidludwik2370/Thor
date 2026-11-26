@@ -5,6 +5,10 @@ bootstrap selects a matching OS/architecture bundle. Until releases are publishe
 use `--bundle PATH` with its adjacent `.sha256` file, or `--release-base URL`.
 The latter names a directory containing the same artifacts, not a script to run.
 
+`repository` names the GitHub release repository for source ZIPs, which have no
+Git metadata. Clones and worktrees use their own origin; explicit release bases
+take precedence. This keeps ordinary binary installation independent of Git.
+
 Build instructions and clean Ubuntu validation are documented in
 [`docs/installing.md`](../docs/installing.md). Thor's own code and bundled third-party
 components keep their respective licenses. A release must include the licensing

@@ -134,7 +134,7 @@ case " $* " in *" --vscode "*) echo 'Editor version is too old' >&2; exit 37;; e
 class SourceFallbackTests(unittest.TestCase):
     def exercise_macos_bootstrap(self, version, *options, minimum=None):
         with tempfile.TemporaryDirectory(prefix='thor-bootstrap-macos-') as temporary:
-            root=Path(temporary);(root/'release').mkdir();(root/'install').mkdir()
+            root=Path(temporary);(root/'release').mkdir();(root/'install').mkdir();(root/'.git').mkdir()
             shutil.copy2(ROOT/'thor-install',root/'thor-install')
             shutil.copy2(ROOT/'release/version',root/'release/version')
             (root/'release/macos-minimum').write_text(minimum or (ROOT/'release/macos-minimum').read_text())
@@ -278,7 +278,7 @@ class SourceSdkComponentsTests(unittest.TestCase):
 class LinuxBaselineTests(unittest.TestCase):
     def exercise(self,libc,*args):
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);(root/'release').mkdir();(root/'install').mkdir();bin=root/'bin';bin.mkdir()
+            root=Path(temp);(root/'release').mkdir();(root/'install').mkdir();(root/'.git').mkdir();bin=root/'bin';bin.mkdir()
             shutil.copy2(ROOT/'thor-install',root/'thor-install')
             for name in ['version','linux-compatibility.json']:shutil.copy2(ROOT/'release'/name,root/'release'/name)
             (root/'install/from_source.py').write_text('print("source fallback")')
@@ -348,3 +348,98 @@ class SourceSDKAcquisitionTests(unittest.TestCase):
         pull=next((a,k) for a,k in calls if 'lfs' in a and 'pull' in a)
         self.assertIn('lfs.concurrenttransfers=2',pull[0]);self.assertEqual(pull[1]['env']['GIT_LFS_SKIP_SMUDGE'],'0')
         self.assertFalse(any('--global' in a for a,k in calls))
+
+
+class BootstrapRepositoryTests(unittest.TestCase):
+    """Archive downloads must work without Git and must not borrow a parent remote."""
+    def resolve(self, metadata='davidludwik2370/Thor', *, checkout=False,
+                origin='https://github.com/fixture/Fork.git', parent=False,
+                worktree=False, base=None):
+        with tempfile.TemporaryDirectory(prefix='thor-release-origin-') as temporary:
+            directory=Path(temporary);root=directory/'archive';root.mkdir()
+            (root/'release').mkdir();(directory/'home').mkdir();(directory/'temp').mkdir()
+            for name in ('version','macos-minimum','linux-compatibility.json'):
+                shutil.copy2(ROOT/'release'/name,root/'release'/name)
+            if metadata is not None:(root/'release/repository').write_text(metadata+'\n')
+            if checkout:
+                if worktree:(root/'.git').write_text('gitdir: /fixture/worktree\n')
+                else:(root/'.git').mkdir()
+            if parent:(directory/'.git').mkdir()
+            binary=directory/'bin';binary.mkdir();capture=directory/'url';called=directory/'git-called'
+            env={**os.environ,'HOME':str(directory/'home'),'THOR_RELEASE_BASE':'',
+                 'THOR_TEST_URL':str(capture),'THOR_TEST_GIT_CALLED':str(called),
+                 'THOR_TEST_ORIGIN':origin,'TEMP':str(directory/'temp'),'TMP':str(directory/'temp')}
+            options=['--dry-run','--no-install-deps']
+            if base:options+=['--release-base',base]
+            if os.name=='nt':
+                bootstrap=root/'thor-install.ps1';shutil.copy2(ROOT/'thor-install.ps1',bootstrap)
+                (binary/'git.cmd').write_text('@echo off\necho called>"%THOR_TEST_GIT_CALLED%"\necho %THOR_TEST_ORIGIN%\n')
+                env['PATH']=str(binary)+os.pathsep+str(Path(os.environ['SystemRoot'])/'System32')
+                quote=lambda value:"'"+str(value).replace("'","''")+"'"
+                script="""function Invoke-WebRequest {
+param([switch]$UseBasicParsing,[string]$Uri,[string]$OutFile)
+[IO.File]::WriteAllText($env:THOR_TEST_URL,$Uri)
+throw 'STOP_AFTER_RELEASE_RESOLUTION'
+}
+try { & """+quote(bootstrap)+' '+ ' '.join(map(quote,options))+" } catch {Write-Output $_.Exception.Message; exit 41}\nexit 90"
+                command=[str(Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'),
+                         '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command',script]
+            else:
+                bootstrap=root/'thor-install';shutil.copy2(ROOT/'thor-install',bootstrap)
+                scripts={'git':'printf called > "$THOR_TEST_GIT_CALLED"; printf "%s\\n" "$THOR_TEST_ORIGIN"',
+                         'curl':'printf "%s\\n" "$@" > "$THOR_TEST_URL"; exit 42'}
+                for name,body in scripts.items():
+                    file=binary/name;file.write_text('#!/bin/sh\n'+body+'\n');file.chmod(0o755)
+                env['PATH']=str(binary)+os.pathsep+os.environ['PATH']
+                command=[str(bootstrap),*options]
+            result=subprocess.run(command,env=env,capture_output=True,text=True,timeout=20)
+            return result,capture.read_text() if capture.exists() else '',called.exists()
+
+    def test_archive_release_resolution_does_not_run_git(self):
+        result,url,git=self.resolve()
+        self.assertIn('https://github.com/davidludwik2370/Thor/releases/download/v',url,result.stdout+result.stderr)
+        self.assertFalse(git)
+        self.assertNotEqual(result.returncode,0)  # Download is deliberately intercepted.
+
+    def test_shipped_archive_metadata_resolves_to_its_declared_repository(self):
+        repository=(ROOT/'release/repository').read_text().strip()
+        result,url,git=self.resolve(repository)
+        self.assertIn('https://github.com/'+repository+'/releases/download/v',url,result.stdout+result.stderr)
+        self.assertFalse(git)
+
+    def test_archive_does_not_inherit_an_unrelated_parent_git_remote(self):
+        result,url,git=self.resolve(parent=True)
+        self.assertIn('https://github.com/davidludwik2370/Thor/releases/download/v',url,result.stdout+result.stderr)
+        self.assertNotIn('fixture/Fork',url);self.assertFalse(git)
+
+    def test_checkout_origin_overrides_archive_metadata(self):
+        for repository in ('Fork','.Thor','_Thor','-Thor'):
+            for origin in ('https://github.com/fixture/'+repository+'.git','git@github.com:fixture/'+repository+'.git'):
+                with self.subTest(origin=origin):
+                    result,url,git=self.resolve(checkout=True,origin=origin)
+                    self.assertIn('https://github.com/fixture/'+repository+'/releases/download/v',url,result.stdout+result.stderr)
+                    self.assertTrue(git)
+
+    def test_worktree_git_file_uses_its_own_remote(self):
+        result,url,git=self.resolve(checkout=True,worktree=True)
+        self.assertIn('https://github.com/fixture/Fork/releases/download/v',url,result.stdout+result.stderr)
+        self.assertTrue(git)
+
+    def test_invalid_metadata_is_rejected_before_download(self):
+        for metadata in (None,'','../repo','owner/.','owner/..','owner/repo/extra','owner/repo\njunk',
+                         'https://github.com/owner/repo','owner/repo?x','owner/repo;echo bad'):
+            with self.subTest(metadata=metadata):
+                result,url,git=self.resolve(metadata)
+                self.assertFalse(url);self.assertFalse(git)
+                self.assertIn('release location',result.stdout+result.stderr)
+
+    def test_unknown_checkout_remote_does_not_silently_use_archive_metadata(self):
+        result,url,git=self.resolve(checkout=True,origin='https://example.invalid/fixture/Fork.git')
+        self.assertFalse(url);self.assertTrue(git)
+        self.assertIn('release location',result.stdout+result.stderr)
+
+    def test_explicit_release_base_does_not_need_git_or_metadata(self):
+        base='https://releases.example.invalid/Thor'
+        result,url,git=self.resolve(None,checkout=True,base=base)
+        self.assertIn(base+'/thor-',url,result.stdout+result.stderr)
+        self.assertFalse(git)

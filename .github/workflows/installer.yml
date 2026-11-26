@@ -1,9 +1,9 @@
 name: Installer
 on:
   push:
-    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'release/linux-compatibility.json', 'tools/release_compatibility.py', 'tests/test_release_compatibility.py', 'tests/test_llvm_apt.py', 'tests/test_portable_vendor.py', 'tools/build_portable_vendor.py', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/repository', 'release/macos-minimum', 'release/linux-compatibility.json', 'tools/release_compatibility.py', 'tests/test_release_compatibility.py', 'tests/test_llvm_apt.py', 'tests/test_portable_vendor.py', 'tools/build_portable_vendor.py', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
   pull_request:
-    paths: ['install/**', 'thor-install*', 'release/macos-minimum', 'release/linux-compatibility.json', 'tools/release_compatibility.py', 'tests/test_release_compatibility.py', 'tests/test_llvm_apt.py', 'tests/test_portable_vendor.py', 'tools/build_portable_vendor.py', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
+    paths: ['install/**', 'thor-install*', 'release/repository', 'release/macos-minimum', 'release/linux-compatibility.json', 'tools/release_compatibility.py', 'tests/test_release_compatibility.py', 'tests/test_llvm_apt.py', 'tests/test_portable_vendor.py', 'tools/build_portable_vendor.py', 'tools/build_distribution.py', 'tests/test_installer*', 'tests/test_source_tools.py', '.github/workflows/installer.yml']
   workflow_dispatch:
     inputs:
       source_build:

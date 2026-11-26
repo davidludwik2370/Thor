@@ -1,7 +1,8 @@
 # Installing Thor
 
 `thor-install` installs a versioned, per-user native toolchain. Binary installation
-does not need Rust, Python, Node or npm. From a cloned repository, choose one:
+does not need Git, Rust, Python, Node or npm. From a cloned repository or an
+extracted GitHub source ZIP, choose one:
 
 ```sh
 ./thor-install
@@ -25,7 +26,10 @@ The repository contains the installer launchers, not generated binaries.
 `--release-base https://host/path` (or `THOR_RELEASE_BASE`) selects an artifact
 directory; `--version VERSION` selects a version. Otherwise the bootstrap derives
 `https://github.com/OWNER/REPO/releases/download/vVERSION` from the clone's GitHub
-origin. No command uploads or publishes anything.
+origin. Source ZIPs use the validated `release/repository` metadata, without
+searching parent directories for a Git remote. A checkout with an unsupported
+origin must still supply an explicit release base. No command uploads or
+publishes anything.
 
 The current published macOS bundle requires **macOS 13 or newer** because of
 its bundled Odin/LLVM libraries. This is distinct from Thor's CPU support: M1
@@ -171,7 +175,8 @@ with `--code PATH --output DIR` and optionally `--bundle ARCHIVE`. This uses an
 isolated installer state/editor profile and closes only its own test windows.
 On macOS, GUI processes use the real account home for Keychain access; the
 original installation discovery record is backed up and restored after the
-isolated editor check. On macOS, start this validator from a desktop Terminal; SSH orchestration must
+isolated editor check. Start this validator from a desktop Terminal; SSH
+orchestration must
 start its temporary worker in the logged-in user’s `gui/<uid>` launchd domain.
 A direct SSH `Background` session can open editor windows yet fail debugger
 authorization. Remove the temporary job after it exits. On Windows, run the

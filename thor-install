@@ -171,10 +171,20 @@ fi
 if [ -z "$bundle" ]; then
     if ! $no_deps && ! $dry; then sh "$root/install/prerequisites.sh" --download-only; fi
     if [ -z "$base" ]; then
-        origin=$(git -C "$root" remote get-url origin 2>/dev/null || :)
-        case "$origin" in https://github.com/*) slug=${origin#https://github.com/};; git@github.com:*) slug=${origin#git@github.com:};; *) slug=;; esac
-        slug=${slug%.git}
-        case "$slug" in */*) base="https://github.com/$slug/releases/download/v$version";; *) echo 'thor-install: no release location is configured. Use --bundle FILE or --release-base URL until GitHub releases are published.' >&2; exit 1;; esac
+        slug=
+        if [ -e "$root/.git" ]; then
+            origin=$(git -C "$root" remote get-url origin 2>/dev/null || :)
+            case "$origin" in https://github.com/*) slug=${origin#https://github.com/};; git@github.com:*) slug=${origin#git@github.com:};; esac
+            slug=${slug%.git}
+        elif [ -f "$root/release/repository" ]; then
+            slug=$(tr -d '\r' < "$root/release/repository")
+        fi
+        case "$slug" in *[!A-Za-z0-9_./-]*|*/.|*/..) slug=;; esac
+        if printf '%s\n' "$slug" | LC_ALL=C grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+$'; then
+            base="https://github.com/$slug/releases/download/v$version"
+        else
+            echo 'thor-install: no release location is configured. Use --bundle FILE or --release-base URL.' >&2; exit 1
+        fi
     fi
     case "$base" in https://*) ;; http://localhost:*|http://127.0.0.1:*|http://\[::1\]:*) ;; *) echo 'thor-install: release URLs must use HTTPS (localhost HTTP is supported for testing)' >&2; exit 1;; esac
     command -v curl >/dev/null 2>&1 || { echo 'thor-install: install curl and CA certificates first' >&2; exit 1; }

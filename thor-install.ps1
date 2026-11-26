@@ -65,9 +65,21 @@ try {
     }
     if (!$bundle) {
         if (!$base) {
-            $origin = (& git -C $checkoutRoot remote get-url origin 2>$null)
-            if ($origin -match '^(https://github.com/|git@github.com:)([^/]+/[^/]+?)(\.git)?$') { $base="https://github.com/$($Matches[2])/releases/download/v$version" }
-            else { throw 'No release location configured. Use --bundle FILE or --release-base URL until releases are published.' }
+            $slug=''
+            if (Test-Path -LiteralPath (Join-Path $checkoutRoot '.git')) {
+                $git=Get-Command git -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($git) {
+                    $origin=(& $git.Source -C $checkoutRoot remote get-url origin 2>$null)
+                    if ($origin -match '^(https://github.com/|git@github.com:)([^/]+/[^/]+?)(\.git)?$') {$slug=$Matches[2]}
+                }
+            } else {
+                # GitHub source ZIPs carry the release repository explicitly.
+                # Do not discover an unrelated parent checkout's remote.
+                $repository=Join-Path $checkoutRoot 'release/repository'
+                if (Test-Path -LiteralPath $repository) {$slug=(Get-Content -Raw -LiteralPath $repository).Trim()}
+            }
+            if ($slug -match '^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+$' -and $slug -notmatch '/\.{1,2}$') {$base="https://github.com/$slug/releases/download/v$version"}
+            else {throw 'No release location configured. Use --bundle FILE or --release-base URL.'}
         }
         if ($base -notmatch '^https://' -and $base -notmatch '^http://(localhost|127\.0\.0\.1):') { throw 'Release URLs must use HTTPS (localhost HTTP is supported for testing).' }
         $name = "thor-$version-windows-x86_64.tar.gz"
