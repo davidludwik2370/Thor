@@ -88,8 +88,9 @@ class CacheTests(unittest.TestCase):
 
     def again(self,root,*,flags=(),fail=None):
         compiler=getattr(self,'compiler',base.THOR)
+        cache_flags=['--cache-dir',str(self.cache)] if hasattr(self,'cache') else []
         result=subprocess.run([str(compiler),'run',str(root/'input'),'--output-dir',str(root/'output'),
-                               '--cache-report','--cache-dir',str(self.cache),*base.runtime_flags(flags)],capture_output=True,text=True,timeout=45)
+                               '--cache-report',*cache_flags,*base.runtime_flags(flags)],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result
