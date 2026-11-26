@@ -10,7 +10,13 @@ extracted GitHub source ZIP, choose one:
 ./thor-install --vscode --profile Thor --path
 ```
 
-Windows uses `.\thor-install.cmd` or `thor-install.ps1`. The toolchain includes
+Windows uses `.\thor-install.cmd` or `thor-install.ps1`. On an unconfigured
+Windows client, the `.cmd` launcher selects `RemoteSigned` for its child process
+only; it leaves explicit execution policies and organization Group Policy alone.
+Unsigned scripts marked as downloaded from the internet remain subject to
+Windows' signature policy; use a Git checkout or review and unblock a trusted
+source ZIP before extracting it. No permanent PowerShell policy is changed.
+The toolchain includes
 Thor, runtime libraries, parser sources, templates, TLS/builtin definitions and a
 tested private Odin compiler/SDK. Existing Odin installations are not replaced.
 Explicit `--odin`/`THOR_ODIN` selections retain precedence.

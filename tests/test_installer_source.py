@@ -350,6 +350,52 @@ class SourceSDKAcquisitionTests(unittest.TestCase):
         self.assertFalse(any('--global' in a for a,k in calls))
 
 
+@unittest.skipUnless(os.name == 'nt', 'Native Windows launcher checks')
+class WindowsLauncherPolicyTests(unittest.TestCase):
+    def launch(self, policy, *, downloaded=False):
+        with tempfile.TemporaryDirectory(prefix='thor launcher ') as temporary:
+            root=Path(temporary)
+            shutil.copy2(ROOT/'thor-install.cmd',root/'thor-install.cmd')
+            script=root/'thor-install.ps1'
+            script.write_text("Write-Output ('EXECUTED: '+($args -join '|')); exit 17\n")
+            if downloaded:
+                Path(str(script)+':Zone.Identifier').write_text('[ZoneTransfer]\nZoneId=3\n')
+            env=dict(os.environ)
+            env.pop('PSExecutionPolicyPreference',None)
+            if policy is not None:env['PSExecutionPolicyPreference']=policy
+            command=subprocess.list2cmdline([str(root/'thor-install.cmd'),'--prefix',str(root/'space path'),'--path'])
+            return subprocess.run(command,shell=True,env=env,capture_output=True,text=True,timeout=30)
+
+    def test_local_script_and_quoted_arguments_with_remote_signed(self):
+        result=self.launch('RemoteSigned')
+        self.assertEqual(result.returncode,17,result.stdout+result.stderr)
+        self.assertIn('EXECUTED: --prefix|',result.stdout)
+        self.assertIn('space path|--path',result.stdout)
+
+    def test_explicit_restricted_policy_is_preserved(self):
+        result=self.launch('Restricted')
+        self.assertNotEqual(result.returncode,17)
+        self.assertNotIn('EXECUTED:',result.stdout)
+
+    def test_explicit_all_signed_policy_is_preserved(self):
+        result=self.launch('AllSigned')
+        self.assertNotEqual(result.returncode,17)
+        self.assertNotIn('EXECUTED:',result.stdout)
+
+    def test_downloaded_unsigned_script_remains_blocked(self):
+        result=self.launch('RemoteSigned',downloaded=True)
+        self.assertNotEqual(result.returncode,17)
+        self.assertNotIn('EXECUTED:',result.stdout)
+
+    def test_unconfigured_windows_client_can_run_local_checkout(self):
+        env=dict(os.environ);env.pop('PSExecutionPolicyPreference',None)
+        configured=subprocess.check_output(['powershell.exe','-NoProfile','-Command',
+            "@((Get-ExecutionPolicy -List).ExecutionPolicy -ne 'Undefined').Count"],env=env,text=True).strip()
+        if configured!='0':self.skipTest('Host already has an explicit execution policy')
+        result=self.launch(None)
+        self.assertEqual(result.returncode,17,result.stdout+result.stderr)
+
+
 class BootstrapRepositoryTests(unittest.TestCase):
     """Archive downloads must work without Git and must not borrow a parent remote."""
     def resolve(self, metadata='davidludwik2370/Thor', *, checkout=False,
