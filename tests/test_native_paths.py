@@ -6,9 +6,25 @@ import subprocess
 import tempfile
 from tests.native_paths import ROOT, file_uri_key, file_uri_path, normalize_lsp_uris, rust_binary, thor_launcher
 from tests.native_paths import native_test_compiler
+from tests.native_paths import directory_aliases,directory_alias,remove_directory_alias,is_directory_alias,file_reference
 
 
 class NativePathTests(unittest.TestCase):
+    def test_directory_alias_fixtures_retarget_without_touching_targets(self):
+        with tempfile.TemporaryDirectory(prefix='Thor SDK Ω & files ') as temporary:
+            root=Path(temporary).resolve();first=root/'first';second=root/'second';first.mkdir();second.mkdir()
+            (first/'asset').write_text('first');(second/'asset').write_text('second')
+            alias=root/'alias';other=root/'other';directory_aliases([(alias,first),(other,second)])
+            self.assertTrue(is_directory_alias(alias));self.assertEqual((alias/'asset').read_text(),'first')
+            remove_directory_alias(alias);directory_alias(alias,second)
+            self.assertEqual((alias/'asset').read_text(),'second')
+            remove_directory_alias(alias);remove_directory_alias(other)
+            self.assertEqual((first/'asset').read_text(),'first');self.assertEqual((second/'asset').read_text(),'second')
+            with self.assertRaisesRegex(ValueError,'ordinary directory'):remove_directory_alias(first)
+            reference=root/'reference';file_reference(reference,first/'asset')
+            self.assertEqual(reference.read_text(),'first');reference.unlink()
+            self.assertEqual((first/'asset').read_text(),'first')
+
     def test_diagnostic_uri_identity_only_normalizes_the_windows_drive(self):
         self.assertEqual(file_uri_key('file:///C%3A/h%C3%A9llo/Name.thor',platform='nt'),
                          file_uri_key('file:///c:/h%C3%A9llo/Name.thor',platform='nt'))

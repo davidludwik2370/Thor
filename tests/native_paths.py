@@ -8,6 +8,52 @@ ROOT = Path(__file__).resolve().parents[1]
 EXE_SUFFIX = '.exe' if os.name == 'nt' else ''
 
 
+def directory_aliases(pairs):
+    """Create real directory aliases under an ordinary Windows account too."""
+    pairs=[(Path(link),Path(target)) for link,target in pairs]
+    if os.name!='nt':
+        for link,target in pairs:link.symlink_to(target,target_is_directory=True)
+        return
+    import json
+    import subprocess
+    records=[]
+    for link,target in pairs:
+        target=(target if target.is_absolute() else link.parent/target).resolve()
+        if not target.is_dir():raise ValueError('Directory alias target is not a directory: '+str(target))
+        records.append({'link':str(link.absolute()),'target':str(target)})
+    # Values travel as JSON on stdin, never as interpolated shell source.
+    script="$ErrorActionPreference='Stop'; $thorAliasItems=ConvertFrom-Json ([Console]::In.ReadToEnd()); foreach ($thorAliasItem in $thorAliasItems) {New-Item -ItemType Junction -Path $thorAliasItem.link -Target $thorAliasItem.target | Out-Null}"
+    subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],
+        input=json.dumps(records),capture_output=True,text=True,check=True,timeout=30)
+
+
+def directory_alias(link,target):
+    directory_aliases([(link,target)])
+
+
+def is_directory_alias(link):
+    link=Path(link)
+    try:return link.is_symlink() or getattr(link.lstat(),'st_reparse_tag',0)==0xA0000003
+    except FileNotFoundError:return False
+
+
+def remove_directory_alias(link):
+    link=Path(link)
+    if not is_directory_alias(link):raise ValueError('Refusing to remove an ordinary directory')
+    if getattr(link.lstat(),'st_reparse_tag',0)==0xA0000003:link.rmdir()
+    else:link.unlink()
+
+
+def file_reference(link,target):
+    """Read-only SDK fixtures need aliasing bytes, not privileged file symlinks."""
+    link=Path(link);target=Path(target)
+    if os.name!='nt':link.symlink_to(target);return
+    import shutil
+    if not target.stat().st_mode&0o200:shutil.copyfile(target,link);return
+    try:os.link(target,link)
+    except OSError:shutil.copyfile(target,link)
+
+
 def file_uri_path(uri, *, platform=None):
     platform=os.name if platform is None else platform
     parsed=urlparse(uri);value=unquote(parsed.path)

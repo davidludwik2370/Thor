@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from thorlang import project_template
 
-from tests.native_paths import thor_launcher
+from tests.native_paths import thor_launcher, directory_alias, is_directory_alias
 ROOT=Path(__file__).resolve().parents[1]
 
 def new_launcher():
@@ -82,10 +82,11 @@ class ProjectTemplateTests(unittest.TestCase):
                 result=subprocess.run([*new_launcher(),name,'--parent',temporary,'--no-open'],capture_output=True,text=True)
                 self.assertNotEqual(result.returncode,0)
             self.assertEqual(list(parent.iterdir()),[])
-            (parent/'existing').symlink_to(parent/'missing')
+            missing=parent/'missing';missing.mkdir()
+            directory_alias(parent/'existing',missing);missing.rmdir()
             result=subprocess.run([*new_launcher(),'existing','--parent',temporary,'--no-open'],capture_output=True,text=True)
             self.assertNotEqual(result.returncode,0)
-            self.assertTrue((parent/'existing').is_symlink())
+            self.assertTrue(is_directory_alias(parent/'existing'))
 
     def test_new_creates_in_current_directory_without_odin_or_extra_files(self):
         with tempfile.TemporaryDirectory(prefix='thor-new-') as temporary:

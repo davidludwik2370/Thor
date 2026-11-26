@@ -1,6 +1,6 @@
 """Migrated build policies survive vet's fn/immutable source corrections."""
 from tests.native_paths import EXE_SUFFIX
-from tests.native_paths import native_test_compiler
+from tests.native_paths import native_test_compiler, directory_aliases
 from tests.test_rust_compiler import compiler_paths
 import json
 import os
@@ -309,8 +309,7 @@ main :: proc() {
         sdk = Path(subprocess.check_output([str(native), 'root'], text=True).strip())
         selected = self.root/'selected-sdk'
         selected.mkdir()
-        for name in ['core', 'base', 'vendor']:
-            (selected/name).symlink_to(sdk/name, target_is_directory=True)
+        directory_aliases([(selected/name,sdk/name) for name in ['core','base','vendor']])
         wrapper = self.root/'backend'
         wrapper.write_text('#!/bin/sh\n'
             'if [ "$1" = build ] && [ "$2" = '+shlex.quote(str(support.ROOT/'frontend'))+' ]; then exit 91; fi\n'

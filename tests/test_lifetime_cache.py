@@ -7,6 +7,7 @@ import time
 import unittest
 from tests import test_rust_compiler as native
 from tests.cache_paths import entries
+from tests.native_paths import directory_alias, remove_directory_alias
 
 
 class LifetimeCacheTests(unittest.TestCase):
@@ -105,10 +106,10 @@ class LifetimeCacheTests(unittest.TestCase):
         for name,body in [('reader','_=p^'),('writer','free(p)')]:
             target=self.root/name;target.mkdir()
             (target/'lib.odin').write_text('package lib\nuse::proc(p:^int){'+body+'}\n')
-        link=self.app/'library';link.symlink_to(self.root/'reader',target_is_directory=True)
+        link=self.app/'library';directory_alias(link,self.root/'reader')
         self.source.write_text('package main\nimport lib "library"\nmain::proc(){p~:=new(int);lib.use(p);_=p^}\n')
         self.vet();self.vet()
-        link.unlink();link.symlink_to(self.root/'writer',target_is_directory=True)
+        remove_directory_alias(link);directory_alias(link,self.root/'writer')
         packet,counts=self.vet()
         self.assertTrue(any(d['code']=='thor/lifetime'for d in packet['errors']),packet)
         self.assertNotIn('vet.memory_cache_hits',counts)

@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests.native_paths import rust_binary, native_test_compiler, EXE_SUFFIX
+from tests.native_paths import rust_binary, native_test_compiler, EXE_SUFFIX, directory_aliases, file_reference
 ROOT = Path(__file__).resolve().parents[1]
 COMPILER = Path(os.environ.get('THOR_MIGRATE_TEST_COMPILER', rust_binary()))
 UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']
@@ -292,17 +292,18 @@ main :: proc() {
 set :: proc(fn:int)->int {return fn+1}
 '''})
         native=Path(shutil.which('odin')).resolve()
-        (self.source/'base').symlink_to(native.parent/'base',target_is_directory=True)
-        (self.source/'vendor').symlink_to(native.parent/'vendor',target_is_directory=True)
+        directories=[(self.source/'base',native.parent/'base'),(self.source/'vendor',native.parent/'vendor')]
         if os.name=='nt':
             # ODIN_ROOT also selects the native linker. This intentionally
             # minimal SDK needs the selected backend's ordinary Windows linker.
             (self.source/'bin').mkdir()
-            (self.source/'bin/radlink.exe').symlink_to(native.parent/'bin/radlink.exe')
+            file_reference(self.source/'bin/radlink.exe',native.parent/'bin/radlink.exe')
         for entry in (native.parent/'core').iterdir():
             target=self.source/'core'/entry.name
             if not target.exists():
-                target.symlink_to(entry,target_is_directory=entry.is_dir())
+                if entry.is_dir():directories.append((target,entry))
+                else:file_reference(target,entry)
+        directory_aliases(directories)
         wrapper=native_test_compiler(self.root,'frontend_guard',sdk=str(self.source),
             odin=str(native),frontend=str(self.root/'unused-frontend'))
         self.migrate(['--odin',str(wrapper)])

@@ -1,5 +1,5 @@
 """Command translation is source independent and executable after migration."""
-from tests.native_paths import rust_binary
+from tests.native_paths import rust_binary, directory_alias
 from tests.test_rust_compiler import compiler_paths
 import json
 import os
@@ -147,7 +147,7 @@ main::proc(){fmt.println(inside.value+external.value+linked.value)}
         linked=self.source.parent/'linked-library'
         linked.mkdir()
         (linked/'lib.odin').write_text('package linked\nvalue::3\n')
-        (self.source/'linked').symlink_to(linked,target_is_directory=True)
+        directory_alias(self.source/'linked',linked)
         command=f'odin run local:sample -collection:local={self.source.parent} -thread-count:1'
         result=self.invoke(self.source,'--output-dir',self.output.parent,'--command',command)
         self.assertIn(str(self.output),result.stdout)
