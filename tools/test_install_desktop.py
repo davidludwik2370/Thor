@@ -23,6 +23,34 @@ from contextlib import contextmanager
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def owned_editor_pids(work, rows):
+    """Include native debugger children, which can outlive a test Code window."""
+    work = str(work)
+    processes = {}
+    owned = set()
+    for row in rows.splitlines():
+        parts = row.strip().split(None, 2)
+        if len(parts) != 3:
+            continue
+        pid, parent, command = parts
+        if not pid.isdigit() or not parent.isdigit():
+            continue
+        pid, parent = int(pid), int(parent)
+        processes[pid] = parent
+        if work not in command:
+            continue
+        if ('--user-data-dir' in command and '--type=' not in command
+                or '--database='+work+'/home/code-data/Crashpad' in command
+                or command.startswith(work+'/home/.vscode/extensions/') and '/adapter/codelldb ' in command
+                or command.startswith(work+'/project/.vscode/bin/debug')):
+            owned.add(pid)
+    while True:
+        children = {pid for pid, parent in processes.items() if parent in owned}
+        if children <= owned:
+            return sorted(owned)
+        owned.update(children)
+
+
 @contextmanager
 def mac_editor_registration(private_home, recovery_root):
     """Mac VS Code's native document service needs the actual account HOME.
@@ -145,9 +173,8 @@ def main():
                 subprocess.run(['powershell.exe', '-NoProfile', '-Command', script], capture_output=True, timeout=30)
             else:
                 def owned_roots():
-                    rows = subprocess.check_output(['ps', '-axww', '-o', 'pid=,command='], text=True)
-                    return [int(row.strip().split(None, 1)[0]) for row in rows.splitlines()
-                            if str(work) in row and '--user-data-dir' in row and '--type=' not in row]
+                    rows = subprocess.check_output(['ps', '-axww', '-o', 'pid=,ppid=,command='], text=True)
+                    return owned_editor_pids(work, rows)
                 for pid in owned_roots():
                     try:
                         os.kill(pid, signal.SIGTERM)
