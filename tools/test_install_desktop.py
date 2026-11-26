@@ -42,8 +42,15 @@ def owned_editor_pids(work, rows):
             continue
         def argument(flag, value):
             return re.search(r'(?:^|\s)'+re.escape(flag)+r'(?:=|\s+)'+re.escape(value)+r'(?=\s|$)', command)
+        # Some Electron versions rewrite their displayed argv with switches
+        # first and values afterward. Require both exact disposable paths in
+        # that form; a project argument under our root is not ownership proof.
+        reordered = (re.search(r'(?:^|\s)--user-data-dir(?=\s+--)', command)
+            and re.search(r'(?:^|\s)--extensions-dir(?=\s+--)', command)
+            and re.search(r'(?:^|\s)'+re.escape(work+'/home/code-data')+r'(?=\s|$)', command)
+            and re.search(r'(?:^|\s)'+re.escape(work+'/home/.vscode/extensions')+r'(?=\s|$)', command))
         debug = work+'/project/.vscode/bin/debug'
-        if (argument('--user-data-dir', work+'/home/code-data') and '--type=' not in command
+        if (argument('--user-data-dir', work+'/home/code-data') or reordered
                 or argument('--database', work+'/home/code-data/Crashpad')
                 or command.startswith(work+'/home/.vscode/extensions/') and '/adapter/codelldb ' in command
                 or command == debug or command.startswith(debug+' ')):
@@ -281,6 +288,10 @@ def main():
                 run([*launcher, *common, '--uninstall'], 'cleanup-uninstall')
             except Exception as error:
                 result['cleanup_error'] = str(error)
+            # Keep the original verdict even if a late editor writer prevents
+            # TemporaryDirectory's final removal. Cleanup must not hide it.
+            result['seconds'] = round(time.monotonic() - started, 2)
+            (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     result['seconds'] = round(time.monotonic() - started, 2)
     (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))

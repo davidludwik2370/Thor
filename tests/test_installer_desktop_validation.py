@@ -35,6 +35,15 @@ class DesktopRegistrationTests(unittest.TestCase):
 '''
         self.assertEqual(owned_editor_pids('/tmp/test', rows), [])
 
+    def test_reordered_electron_arguments_and_orphan_utilities_are_owned(self):
+        rows='''100 1 /usr/share/code/code --user-data-dir --extensions-dir --profile --new-window /tmp/test/home/code-data /tmp/test/home/.vscode/extensions Thor
+101 100 /usr/share/code/code --type=utility
+102 1 /usr/share/code/code --type=utility --user-data-dir=/tmp/test/home/code-data
+200 1 /usr/share/code/code --user-data-dir /Users/david/Code --extensions-dir /Users/david/extensions /tmp/test/home/code-data /tmp/test/home/.vscode/extensions
+300 1 /usr/share/code/code --user-data-dir --extensions-dir --profile /tmp/test-other/home/code-data /tmp/test-other/home/.vscode/extensions Thor
+'''
+        self.assertEqual(owned_editor_pids('/tmp/test',rows),[100,101,102])
+
     def fixture(self, root):
         actual, private = root/'actual', root/'private'
         target = actual/'Library/Application Support/Thor/installation.json'
