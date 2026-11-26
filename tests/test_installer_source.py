@@ -360,8 +360,10 @@ class WindowsLauncherPolicyTests(unittest.TestCase):
             script.write_text("Write-Output ('EXECUTED: '+($args -join '|')); exit 17\n")
             if downloaded:
                 Path(str(script)+':Zone.Identifier').write_text('[ZoneTransfer]\nZoneId=3\n')
-            env=dict(os.environ)
-            env.pop('PSExecutionPolicyPreference',None)
+            # dict(os.environ) has uppercase keys on Windows; filtering must
+            # retain Windows' case-insensitive environment semantics.
+            env={key:value for key,value in os.environ.items()
+                 if key.casefold() not in ('psexecutionpolicypreference','psmodulepath')}
             if policy is not None:env['PSExecutionPolicyPreference']=policy
             command=subprocess.list2cmdline([str(root/'thor-install.cmd'),'--prefix',str(root/'space path'),'--path'])
             return subprocess.run(command,shell=True,env=env,capture_output=True,text=True,timeout=30)
@@ -388,10 +390,10 @@ class WindowsLauncherPolicyTests(unittest.TestCase):
         self.assertNotIn('EXECUTED:',result.stdout)
 
     def test_unconfigured_windows_client_can_run_local_checkout(self):
-        env=dict(os.environ);env.pop('PSExecutionPolicyPreference',None)
+        env={key:value for key,value in os.environ.items()
+             if key.casefold() not in ('psexecutionpolicypreference','psmodulepath')}
         # Query Windows PowerShell's built-in module, even when unittest was
         # launched by PowerShell 7 with its own PSModulePath in the environment.
-        env.pop('PSModulePath',None)
         configured=subprocess.check_output(['powershell.exe','-NoProfile','-Command',
             "@((Get-ExecutionPolicy -List).ExecutionPolicy -ne 'Undefined').Count"],env=env,text=True).strip()
         if configured!='0':self.skipTest('Host already has an explicit execution policy')
