@@ -1508,7 +1508,9 @@ is an error. Ordinary sequential test setup continues to build with Cargo.
 
 Linux address-sanitizer tests also require the compiler-rt development package
 matching Clang (for example, `libclang-rt-18-dev` with Ubuntu 24.04's Clang 18).
-This is a test dependency; ordinary Thor installation and builds do not need it.
+Icon regression tests use Python's Pillow package (`python3-pil` on Ubuntu).
+These are test dependencies; ordinary Thor installation and builds do not need
+them.
 
 
 The opt-in [upstream integration run](docs/upstream-integration.md) compares

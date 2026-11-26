@@ -10,15 +10,17 @@ from unittest.mock import patch
 from tests import test_rust_compiler as native
 from tests import test_publish as reference
 from tests import rust_publish_cases as cases
+from tests.native_paths import rust_binary
 
 ROOT=native.ROOT
-PROTOCOL=ROOT/'rust/target/debug/examples/publish_protocol'
+PROTOCOL=rust_binary('publish_protocol',example=True)
 
 class RustPublishProtocolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        result=subprocess.run(['cargo','build','--manifest-path',str(ROOT/'rust/Cargo.toml'),
-            '--locked','--offline','--example','publish_protocol'],capture_output=True,text=True,timeout=600)
+        if native.using_prebuilt_compiler(PROTOCOL):return
+        result=subprocess.run(['cargo','build','--release','--manifest-path',str(ROOT/'rust/Cargo.toml'),
+            '--locked','--offline','--example','publish_protocol','-j','2'],capture_output=True,text=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
 
     def test_icon_pixels_crop_warnings_and_platform_containers(self):
