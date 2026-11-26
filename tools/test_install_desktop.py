@@ -143,7 +143,10 @@ def main():
                         shutil.copy2(source, home / name)
         defaults = data / 'User'
         defaults.mkdir(parents=True)
-        seeded = {'settings.json': b'{"files.autoSave":"off","editor.fontSize":17}\n',
+        # Disposable editor sessions must not start an application-wide updater
+        # while other validation windows are running. Actual user settings and
+        # their normal update policy are never changed.
+        seeded = {'settings.json': b'{"files.autoSave":"off","editor.fontSize":17,"update.mode":"none"}\n',
                   'keybindings.json': b'[{"key":"ctrl+r","command":"workbench.action.files.openFile","when":"editorLangId == python"}]\n'}
         for name, content in seeded.items():
             (defaults / name).write_bytes(content)
