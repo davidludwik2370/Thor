@@ -86,17 +86,26 @@ def main():
             # Match only this test's unique data directory; user windows have
             # different process arguments. No system-wide editor termination.
             if os.name == 'nt':
-                script = "$needle='" + str(data).replace("'", "''") + "'; Get-CimInstance Win32_Process | Where-Object {$_.Name -eq 'Code.exe' -and $_.CommandLine -and $_.CommandLine.Contains($needle) -and -not $_.CommandLine.Contains('--type=')} | ForEach-Object {taskkill.exe /PID $_.ProcessId /T /F | Out-Null}"
+                script = "$needle='" + str(work).replace("'", "''") + "'; Get-CimInstance Win32_Process | Where-Object {$_.Name -eq 'Code.exe' -and $_.CommandLine -and $_.CommandLine.Contains($needle) -and -not $_.CommandLine.Contains('--type=')} | ForEach-Object {taskkill.exe /PID $_.ProcessId /T /F | Out-Null}"
                 subprocess.run(['powershell.exe', '-NoProfile', '-Command', script], capture_output=True, timeout=30)
             else:
-                rows = subprocess.check_output(['ps', '-ax', '-o', 'pid=,command='], text=True)
-                for row in rows.splitlines():
-                    pid, command = row.strip().split(None, 1)
-                    if str(data) in command and '--user-data-dir' in command and '--type=' not in command:
-                        try:
-                            os.kill(int(pid), signal.SIGTERM)
-                        except ProcessLookupError:
-                            pass
+                def owned_roots():
+                    rows = subprocess.check_output(['ps', '-ax', '-o', 'pid=,command='], text=True)
+                    return [int(row.strip().split(None, 1)[0]) for row in rows.splitlines()
+                            if str(work) in row and '--user-data-dir' in row and '--type=' not in row]
+                for pid in owned_roots():
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                deadline = time.monotonic() + 3
+                while owned_roots() and time.monotonic() < deadline:
+                    time.sleep(.1)
+                for pid in owned_roots():
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
             time.sleep(1)
 
         try:
@@ -122,6 +131,7 @@ def main():
             fixture = work / 'project'
             fixture.mkdir()
             shutil.copy2(ROOT / 'tools/install-ubuntu/fixture.thor', fixture / 'editor.thor')
+            shutil.copy2(ROOT / 'tools/install-ubuntu/odin_highlight.odin', fixture / 'odin_highlight.odin')
             thor = prefix / 'bin' / ('thor.cmd' if os.name == 'nt' else 'thor')
             compiler = [str(thor)] if os.name != 'nt' else ['cmd.exe', '/d', '/c', str(thor)]
             for label, flags in [('checked', []), ('unchecked', ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert'])]:
@@ -134,8 +144,24 @@ def main():
             verification = work / 'verification'
             shutil.copytree(ROOT / 'tools/install-ubuntu/verification-extension', verification)
             editor_env = dict(env, THOR_INSTALL_GUI_RESULT=str(output / 'editor-result.json'))
-            run([args.code.resolve(), '--wait', '--new-window', '--profile', 'Thor', '--user-data-dir', data,
-                 '--extensions-dir', extensions, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes',
+            editor_data, editor_extensions, profile_args = data, extensions, ['--profile', 'Thor']
+            if os.sys.platform == 'darwin':
+                # Keep the installer-created named profile intact. Use its exact
+                # settings and installed packages in a fresh extension-test host.
+                editor_data, editor_extensions, profile_args = work/'editor-data', work/'editor-extensions', []
+                storage=json.loads((data/'User/globalStorage/storage.json').read_text())
+                profiles=storage['userDataProfiles']
+                if isinstance(profiles,str):profiles=json.loads(profiles)
+                profile=next(item for item in profiles if item['name']=='Thor')
+                source=data/'User/profiles'/profile['location']
+                (editor_data/'User').mkdir(parents=True)
+                for name in ('settings.json','keybindings.json'):
+                    if (source/name).is_file():shutil.copy2(source/name,editor_data/'User'/name)
+                editor_extensions.mkdir()
+                for package in extensions.iterdir():
+                    if package.is_dir(): (editor_extensions/package.name).symlink_to(package,target_is_directory=True)
+            run([args.code.resolve(), '--wait', '--new-window', *profile_args, '--user-data-dir', editor_data,
+                 '--extensions-dir', editor_extensions, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes',
                  '--extensionDevelopmentPath=' + str(verification),
                  '--extensionTestsPath=' + str(verification / 'test.js'), fixture], 'editor', timeout=240, child_env=editor_env)
             editor = json.loads((output / 'editor-result.json').read_text())
@@ -157,9 +183,10 @@ def main():
         except Exception as error:
             result['error'] = str(error)
         finally:
-            logs = data / 'logs'
-            if logs.is_dir() and not result['success']:
-                shutil.copytree(logs, output / 'editor-startup-logs', dirs_exist_ok=True)
+            for directory in (data, work/'editor-data'):
+                logs = directory / 'logs'
+                if logs.is_dir() and not result['success']:
+                    shutil.copytree(logs, output / ('editor-startup-logs-'+directory.name), dirs_exist_ok=True)
             close_test_editor()
             try:
                 run([*launcher, *common, '--uninstall'], 'cleanup-uninstall')

@@ -27,6 +27,7 @@ mkdir -p "$HOME/work"
 cd "$HOME/work"
 "$thor" new editor --gitignore
 cp /source/tools/install-ubuntu/fixture.thor "$HOME/work/editor/editor.thor"
+cp /source/tools/install-ubuntu/odin_highlight.odin "$HOME/work/editor/odin_highlight.odin"
 "$thor" run "$HOME/work/editor" -o:speed -disable-assert -no-bounds-check -no-type-assert >"$HOME/logs/unchecked.log" 2>&1
 if [ "$(cat "$HOME/work/ran.txt")" != ok ]; then echo 'Unchecked build produced the wrong result' >&2; exit 1; fi
 "$thor" vet "$HOME/work/editor" >"$HOME/logs/vet.log" 2>&1
@@ -47,7 +48,7 @@ cat >"$HOME/work/editor/.vscode/launch.json" <<'JSON'
 {"version":"0.2.0","configurations":[{"name":"Installed Thor","type":"thor-lldb","request":"launch","cwd":"${workspaceFolder}","program":"${workspaceFolder}/.vscode/bin/debug","manifest":"${workspaceFolder}/.vscode/bin/generated/thor-manifest.json","preLaunchTask":"build-thor-debug","initCommands":["settings set target.disable-aslr false"]}]}
 JSON
 cp -R /source/tools/install-ubuntu/verification-extension "$HOME/verification-extension"
-THOR_INSTALL_GUI_RESULT="$HOME/logs/editor-result.json" timeout 180s code --wait --new-window --profile Thor \
+THOR_INSTALL_GUI_RESULT="$HOME/logs/editor-result.json" timeout -k 10s 180s code --wait --new-window --profile Thor \
     --user-data-dir "$HOME/editor-user" --extensions-dir "$HOME/editor-extensions" \
     --disable-workspace-trust --skip-welcome --skip-release-notes \
     --extensionDevelopmentPath="$HOME/verification-extension" \
