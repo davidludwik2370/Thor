@@ -1,5 +1,5 @@
 """Dependency snapshots, resources and invalidation against the Python model."""
-from tests.native_paths import directory_alias, remove_directory_alias, dangling_directory_alias, file_symlink
+from tests.native_paths import directory_alias, remove_directory_alias, dangling_directory_alias, file_symlink, is_directory_alias
 import json
 import os
 from pathlib import Path
@@ -41,9 +41,18 @@ class RustEvaluationInputTests(unittest.TestCase):
         # the archived Unix stat tuple. Borrow only that platform representation
         # while retaining independent reference dependency/invalidation logic.
         if os.name=='nt':
-            with patch('thorlang.dependencies.signature',side_effect=self.snapshot_signature):
+            with patch('thorlang.dependencies.signature',side_effect=self.snapshot_signature), \
+                 patch('thorlang.dependencies.os.walk',side_effect=self.reference_walk):
                 return self.reference_operations(operations,data,collections)
         return self.reference_operations(operations,data,collections)
+
+    @staticmethod
+    def reference_walk(*args,walk=os.walk,**kwargs):
+        # Python's Windows walk can classify a junction as a file. Adapt this
+        # platform representation while preserving the frozen model's logic.
+        for directory,directories,files in walk(*args,**kwargs):
+            directories[:]=[name for name in directories if not is_directory_alias(Path(directory)/name)]
+            yield directory,directories,[name for name in files if not is_directory_alias(Path(directory)/name)]
 
     def snapshot_signature(self,path):
         if os.name=='nt':return self.run_native([{'op':'signature','path':str(path)}])['answers'][0]
@@ -223,6 +232,21 @@ class RustEvaluationInputTests(unittest.TestCase):
                 path=self.source(expression)
                 packet=self.compare([{'op':'source','path':str(path)}])
                 self.assertFalse(packet['usable'])
+
+    def test_constant_resource_snapshots_watch_directory_alias_bindings(self):
+        first=self.root/'first';second=self.root/'second';first.mkdir();second.mkdir()
+        a=first/'asset';b=second/'asset';a.write_text('first');b.write_text('second')
+        link=self.root/'link';directory_alias(link,first)
+        path=self.root/'main.thor'
+        path.write_text('package main\nNAME::"link/asset"\nDATA::#exists(NAME)\nmain::proc(){}\n')
+        operations=[{'op':'source','path':str(path)}]
+        packet=self.run_native(operations)
+        self.assertTrue(packet['usable']);self.assertTrue(packet['valid'])
+        self.assertIn(str(a),packet['data']['files'])
+        remove_directory_alias(link);directory_alias(link,second)
+        changed=self.run_native([],packet['data']);self.assertFalse(changed['valid'])
+        packet=self.run_native(operations);b.write_text('changed content')
+        changed=self.run_native([],packet['data']);self.assertFalse(changed['valid'])
 
     def test_constant_resource_snapshots_watch_all_paths_and_symlink_bindings(self):
         first=self.root/'first';first.write_text('first')

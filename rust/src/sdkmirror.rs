@@ -293,9 +293,14 @@ fn unprivileged_link(path:&Path,target:&Path)->std::io::Result<()> {
 }
 
 pub(super) fn write_link(path:&Path,target:&Path)->Result<()> {
+    let existing=is_link(path)||path.is_file();
+    // Keep an already-correct Windows alias. Removing a hard link while Odin
+    // has its file open can fail even though no filesystem change is needed.
+    #[cfg(windows)]
+    if existing&&points_to(path,target){return Ok(());}
     let parent=path.parent().ok_or_else(||Error::new("SDK link has no parent"))?;
     fs::create_dir_all(parent)?;
-    if is_link(path)||path.is_file(){remove_file_or_link(path)?;}
+    if existing{remove_file_or_link(path).map_err(|error|Error::new(format!("Cannot replace native alias {}: {error}",path.display())))?;}
     #[cfg(unix)]
     std::os::unix::fs::symlink(target,path)?;
     #[cfg(windows)] {
@@ -361,6 +366,19 @@ mod link_tests {
             panic!("owned-link replacement changed target files or followed a directory");
         }
     }
+    #[cfg(windows)]
+    #[test]
+    fn unchanged_alias_survives_a_reader_without_delete_sharing() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let root=std::env::temp_dir().join(format!("thor-open-alias-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir(&root).unwrap();let target=root.join("source.odin");let alias=root.join("view.odin");
+        fs::write(&target,b"authoritative").unwrap();unprivileged_link(&alias,&target).unwrap();
+        let held=fs::OpenOptions::new().read(true).share_mode(1).open(&alias).unwrap();
+        let repeated=write_link(&alias,&target);let bytes=fs::read(&target).unwrap();
+        drop(held);fs::remove_dir_all(&root).unwrap();
+        if repeated.is_err()||bytes!=b"authoritative" {panic!("unchanged alias was replaced while a reader used it: {repeated:?}");}
+    }
+
     #[cfg(windows)]
     #[test]
     fn unprivileged_aliases_are_replaceable_and_generated_writes_do_not_modify_sources() {

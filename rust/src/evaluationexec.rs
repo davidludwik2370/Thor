@@ -37,6 +37,26 @@ fn runtime_path_suffix<'a>(line:&'a str,path:&Path)->Option<&'a str> {
 #[cfg(test)]
 mod runtime_path_tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn executable_start_waits_for_a_temporary_writer() {
+        use std::os::windows::{fs::OpenOptionsExt,process::CommandExt};
+        let root=env::temp_dir().join(format!("thor-locked-image-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir(&root).unwrap();let program=root.join("test-image.exe");
+        fs::copy(env::current_exe().unwrap(),&program).unwrap();
+        let held=fs::OpenOptions::new().write(true).share_mode(1).open(&program).unwrap();
+        let (sender,receiver)=std::sync::mpsc::channel();
+        let worker=thread::spawn(move||{
+            let mut command=Command::new(program);
+            command.arg("--list").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).creation_flags(0x08000000);
+            sender.send(()).unwrap();let mut child=HelperProcess::spawn(&mut command)?;
+            let status=child.child.wait()?;child.stop();Ok::<_,std::io::Error>(status)
+        });
+        receiver.recv().unwrap();thread::sleep(Duration::from_millis(40));drop(held);
+        let result=worker.join().unwrap();fs::remove_dir_all(root).unwrap();
+        if !result.is_ok_and(|status|status.success()) {panic!("native image could not start after its writer closed");}
+    }
+
     #[test]
     fn windows_runtime_paths_keep_unicode_and_drive_aliases() {
         let path=Path::new(r"C:\héllo\Main.thor");
@@ -158,10 +178,24 @@ impl HelperProcess {
             use std::os::unix::process::CommandExt;
             command.process_group(0);
         }
-        Ok(Self {
-            child: command.spawn()?,
-            stopped: false,
-        })
+        #[cfg(not(windows))]
+        let child=command.spawn()?;
+        #[cfg(windows)]
+        let child={
+            let mut attempt=0;
+            loop {
+                match command.spawn() {
+                    Err(error) if matches!(error.raw_os_error(),Some(5|32|33))&&attempt<10 => {
+                        // A freshly linked image can still have a writer open.
+                        // Failed CreateProcess calls have not started a child.
+                        thread::sleep(Duration::from_millis(2<<attempt.min(5)));
+                        attempt+=1;
+                    }
+                    result=>break result?,
+                }
+            }
+        };
+        Ok(Self {child,stopped:false})
     }
     fn stop(&mut self) {
         if self.stopped {
@@ -249,7 +283,7 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captur
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut process = HelperProcess::spawn(command)?;
+    let mut process = HelperProcess::spawn(command).map_err(|error|Error::new(format!("Cannot start {}: {error}",command.get_program().to_string_lossy())))?;
     let child = &mut process.child;
     let stdout = child
         .stdout

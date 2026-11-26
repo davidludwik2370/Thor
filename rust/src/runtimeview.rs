@@ -144,7 +144,7 @@ pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
         match fs::rename(&temporary, &directory) {
             Ok(()) => Ok(()),
             Err(_) if valid() => Ok(()),
-            Err(error) => Err(error.into()),
+            Err(error) => Err(Error::new(format!("Cannot publish native runtime {}: {error}",directory.display()))),
         }
     })();
     // Only this newly created temporary directory is recursively removed.
