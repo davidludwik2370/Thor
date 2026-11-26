@@ -42,7 +42,7 @@ native executables and shared libraries, including native vendor libraries.
 Linux support here means glibc-based systems; Alpine/musl is a separate,
 unvalidated configuration. The macOS ARM64 baseline is macOS 13 (tested on
 13.5.1); Windows desktop validation currently covers Windows 11 x64. Windows 10
-validation is deferred. See `release/linux-compatibility.json` and
+validation is pending on an identified test machine. See `release/linux-compatibility.json` and
 `release/macos-minimum` for the enforced release bounds.
 
 
@@ -155,7 +155,9 @@ and unchecked builds. A checksum-pinned private CMake binary is acquired when
 the system CMake is too old; ordinary binary installs do not need CMake or the
 graphics development packages. Portable macOS releases use the reviewed LLVM
 binary toolchain and refresh native Raygui with the declared deployment target.
-The release builder rejects native libraries requiring newer OS versions.
+The release builder rejects native libraries requiring newer OS versions. Portable
+SDK compilers use generic CPU targets rather than the build machine’s native
+instruction set, so a newer ARM64 build host does not require SVE on older CPUs.
 
 The `Portable release build` GitHub workflow produces native draft assets; the
 `Installer OS compatibility` workflow exercises clean Ubuntu 22.04/24.04,
