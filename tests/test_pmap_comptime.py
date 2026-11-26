@@ -23,7 +23,7 @@ compute::fn(n:int)->int{
             ('value::compute(3)',['-debug'],True),
         ]:
             with self.subTest(declaration=declaration,flags=flags):
-                _,result=self.invoke(self.program(declaration+';if value!=25{panic("automatic mapping")}',prefix),flags=[*flags,'--cache-report'])
+                _,result=CacheTests.invoke(self,self.program(declaration+';if value!=25{panic("automatic mapping")}',prefix),flags=[*flags,'--cache-report'])
                 self.assertEqual(CacheTests.report(self,result)['writes']>0,evaluated)
                 self.assertNotIn('may keep a reference to the stack memory',result.stderr)
                 self.assertNotIn('still allocated',result.stderr)
@@ -288,7 +288,7 @@ main::proc(){
     if rows[0]!=6 {panic("cached mapping")}
 }
 '''
-        root,first=self.invoke(source,flags=['--cache-report'],directory=True)
+        root,first=CacheTests.invoke(self,source,flags=['--cache-report'],directory=True)
         self.assertGreaterEqual(CacheTests.report(self,first)['writes'],1)
         for seed in ('0','1'):
             with self.subTest(hash_seed=seed),patch.dict(os.environ,PYTHONHASHSEED=seed):

@@ -111,7 +111,7 @@ EXPLICIT::#run render()
     def test_cached_precision_result_survives_runtime_edit_and_invalidates_on_format_change(self):
         from tests.test_t21_t22 import CacheTests
         source=self.program('assert(TEXT=="0.3333")','render::fn()->string{return f"{Rational(1,3):.4f}"}\nTEXT::#run render()\n')
-        root,first=self.invoke(source,flags=['--cache-report'])
+        root,first=CacheTests.invoke(self,source,flags=['--cache-report'])
         self.assertGreaterEqual(CacheTests.report(self,first)['writes'],1)
         warm=CacheTests.again(self,root)
         self.assertGreaterEqual(CacheTests.report(self,warm)['hits'],1)
