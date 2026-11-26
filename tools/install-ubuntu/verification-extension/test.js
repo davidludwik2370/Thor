@@ -56,11 +56,18 @@ async function run() {
         const terminalStatus=path.join(folder.uri.fsPath,'terminal-status.txt');
         fs.rmSync(terminalOutput,{force:true});fs.rmSync(terminalStatus,{force:true});
         const quote=value=>"'"+value.replace(/'/g,"'\\''")+"'";
-        const terminal=vscode.window.createTerminal({name:'Installer PATH check',shellPath:'/bin/sh',
-            shellArgs:['-c',`if thor version > ${quote(terminalOutput)} 2>&1; then printf ok > ${quote(terminalStatus)}; else printf fail > ${quote(terminalStatus)}; fi`]});
+        let terminal;
+        if(process.platform==='win32') {
+            const script=path.join(folder.uri.fsPath,'terminal-probe.cmd');
+            fs.writeFileSync(script,`@echo off\r\ncall thor version >"${terminalOutput}" 2>&1\r\nif errorlevel 1 (echo fail>"${terminalStatus}") else (echo ok>"${terminalStatus}")\r\n`);
+            terminal=vscode.window.createTerminal({name:'Installer PATH check',shellPath:process.env.ComSpec||'C:\\Windows\\System32\\cmd.exe',shellArgs:['/d','/c',script]});
+        } else {
+            terminal=vscode.window.createTerminal({name:'Installer PATH check',shellPath:'/bin/sh',
+                shellArgs:['-c',`if thor version > ${quote(terminalOutput)} 2>&1; then printf ok > ${quote(terminalStatus)}; else printf fail > ${quote(terminalStatus)}; fi`]});
+        }
         try {
             await until('terminal PATH',()=>fs.existsSync(terminalStatus));
-            assert.equal(fs.readFileSync(terminalStatus,'utf8'),'ok',fs.readFileSync(terminalOutput,'utf8'));
+            assert.equal(fs.readFileSync(terminalStatus,'utf8').trim(),'ok',fs.readFileSync(terminalOutput,'utf8'));
             assert.match(fs.readFileSync(terminalOutput,'utf8'),/Thor/);
         } finally {terminal.dispose();}
         checks.push('terminal-path-without-shell-profile');

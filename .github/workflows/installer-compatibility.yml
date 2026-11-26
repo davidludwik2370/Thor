@@ -15,6 +15,10 @@ permissions:
   contents: read
 jobs:
   linux:
+    # GitHub requires write-capable contents access to read unpublished drafts.
+    # This manually dispatched job only downloads the candidate; it never edits it.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:

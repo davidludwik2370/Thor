@@ -192,7 +192,7 @@ if $editor; then
     }
     usable_code() {
         [ -x "$1" ] || return 1
-        code_output=$("$1" --version 2>/dev/null) || return 1
+        code_output=$(DONT_PROMPT_WSL_INSTALL=1 "$1" --version 2>/dev/null) || return 1
         code_version=$(printf '%s\n' "$code_output" | head -n 1)
         version_at_least "$code_version" "$minimum_code"
     }

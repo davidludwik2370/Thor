@@ -116,6 +116,8 @@ SDK source acquisition also uses a checksum-pinned private Git LFS binary when
 needed. Its filters apply only to the disposable SDK checkout, and no Git hooks
 or global Git configuration are installed. Packaging rejects unresolved large-
 file pointer files rather than silently shipping unusable vendor libraries.
+SDK downloads also use a checkout-local LFS object store, so global Git cache
+settings cannot retain temporary build objects elsewhere.
 
 Compatible existing Rust/Cargo and Node/npm are reused. Otherwise macOS, Linux
 and Windows source builds download verified binary tools into their temporary
@@ -137,6 +139,27 @@ macOS distributions also include LLVM's matching `dsymutil`. Thor selects it
 only for debug builds using that bundled SDK, without changing the user's PATH
 or external Odin installations. Older Apple symbol tools can otherwise discard
 DWARF 5 information and prevent source breakpoints from resolving.
+
+Maintainers build portable Linux releases on Ubuntu 22.04 using
+`--from-source --portable-bundle`. This refreshes native Raylib/Raygui libraries
+against the same ABI baseline and tests both static/shared linking in checked
+and unchecked builds. A checksum-pinned private CMake binary is acquired when
+the system CMake is too old; ordinary binary installs do not need CMake or the
+graphics development packages. Portable macOS releases use the reviewed LLVM
+binary toolchain and refresh native Raygui with the declared deployment target.
+The release builder rejects native libraries requiring newer OS versions.
+
+The `Portable release build` GitHub workflow produces native draft assets; the
+`Installer OS compatibility` workflow exercises clean Ubuntu 22.04/24.04,
+Debian 12 and current Fedora containers on x64 and ARM64. These tests install
+missing prerequisites and VS Code, run actual editor language services and a
+source debugger breakpoint under Xvfb, check ordinary terminal PATH setup,
+reinstall and uninstall, and preserve default editor preferences. Their small
+logs are retained temporarily; containers and their new images are removed.
+For an existing desktop, maintainers can run `tools/test_install_desktop.py`
+with `--code PATH --output DIR` and optionally `--bundle ARCHIVE`. This uses an
+isolated HOME/editor profile and closes only its own test windows. On Windows,
+run it in the logged-in desktop session, rather than directly inside SSH.
 
 Linux setup no longer installs Node/npm through the OS package manager. BSD
 continues to use native binary packages for Node, Rust and LLVM. Reusing Odin

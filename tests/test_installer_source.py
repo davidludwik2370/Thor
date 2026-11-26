@@ -306,6 +306,26 @@ class LinuxBaselineTests(unittest.TestCase):
         self.assertEqual(p.returncode,0,p.stderr);self.assertFalse(downloaded)
 
 class SourceSDKAcquisitionTests(unittest.TestCase):
+    def test_portable_macos_tls_uses_an_explicit_odin_deployment_target(self):
+        import contextlib
+        for system,portable in [('Darwin',True),('Darwin',False),('Linux',True)]:
+            with self.subTest(system=system,portable=portable),tempfile.TemporaryDirectory() as t,contextlib.ExitStack() as stack:
+                calls=[]
+                def run(args,**kwargs):
+                    args=list(map(str,args));calls.append(args)
+                    if args[-2:]==['rev-parse','HEAD']:
+                        return next(a[-1] for a in calls if a[:1]==['git'] and 'fetch' in a)
+                for obj,name in [(source.source_tools,'ensure_rust'),(source.source_tools,'ensure_git_lfs'),(source,'ensure_node'),(source.source_tools,'retain_llvm_notices')]:stack.enter_context(patch.object(obj,name))
+                stack.enter_context(patch.object(source,'llvm_config',return_value='/llvm/bin/llvm-config'))
+                stack.enter_context(patch.object(source,'host',return_value='macos-aarch64' if system=='Darwin' else 'linux-aarch64'))
+                stack.enter_context(patch.object(source.platform,'system',return_value=system))
+                stack.enter_context(patch.object(source,'run',side_effect=run))
+                source.build(Path(t),[],portable=portable)
+                tls=next(a for a in calls if str(ROOT/'tls/src') in a)
+                flags=[a for a in tls if a.startswith('-minimum-os-version:')]
+                expected=['-minimum-os-version:'+(ROOT/'release/macos-minimum').read_text().strip()] if system=='Darwin' and portable else []
+                self.assertEqual(flags,expected)
+
     def test_lfs_filters_are_scoped_to_the_disposable_checkout(self):
         import contextlib,json
         profile=json.loads((ROOT/'rust/data'/('noalloc-io-sdk-windows.json' if os.name=='nt' else 'noalloc-io-sdk.json')).read_text())

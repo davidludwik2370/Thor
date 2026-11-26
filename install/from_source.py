@@ -146,6 +146,8 @@ def build(work, forward, odin=None, export_bundle=None, portable=False):
     tls = work/('tls'+suffix)
     run([odin, 'build', ROOT/'tls/src', f'-collection:src={ROOT / "tls/src"}',
          f'-collection:thor={ROOT / "frontend"}', '-o:speed', '-thread-count:2',
+         *(['-minimum-os-version:'+(ROOT/'release/macos-minimum').read_text().strip()]
+           if portable and platform.system()=='Darwin' else []),
          f'-define:VERSION=thor-{version}+ols-0c9438f',f'-out:{tls}'], env=env)
     editor = work/'vscode'
     shutil.copytree(ROOT/'editors/vscode', editor,

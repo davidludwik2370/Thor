@@ -1,6 +1,12 @@
 name: Portable release build
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Native assets to build (others can be retained for a platform-only packaging fix)
+        type: choice
+        default: all
+        options: [all, linux, macos, windows]
 permissions:
   contents: read
 jobs:
@@ -10,6 +16,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.release.outputs.version }}
+      runners: ${{ steps.release.outputs.runners }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,6 +24,7 @@ jobs:
       - id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_PLATFORM: ${{ inputs.platform }}
         run: |
           python3 - <<'PY'
           import json,os,re,subprocess
@@ -30,7 +38,11 @@ jobs:
           else:
               d=json.loads(p.stdout)
               if not d['isDraft'] or d['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Existing release is published or belongs to another source commit')
-          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('version='+version+'\n')
+          runners={'all':['ubuntu-22.04','ubuntu-22.04-arm','macos-15','windows-2025'],
+                   'linux':['ubuntu-22.04','ubuntu-22.04-arm'],'macos':['macos-15'],'windows':['windows-2025']}[os.environ['BUILD_PLATFORM'] or 'all']
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('version='+version+'\n')
+              f.write('runners='+json.dumps(runners)+'\n')
           PY
   native:
     needs: prepare
@@ -39,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15, windows-2025]
+        os: ${{ fromJSON(needs.prepare.outputs.runners) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:

@@ -3,6 +3,13 @@
 use super::*;
 
 const MINIMUM: &str = include_str!("../vscode-minimum");
+fn code_command(code:&Path)->Command {
+    let mut command=Command::new(code);
+    // --vscode explicitly requests the native Linux editor. Its launcher must
+    // not stop automated setup at the WSL suggestion to use Windows Code.
+    if cfg!(target_os="linux") {command.env("DONT_PROMPT_WSL_INSTALL","1");}
+    command
+}
 fn version_numbers(text:&str)->Option<[u32;3]> {
     let line=text.lines().find(|line|!line.trim().is_empty())?.trim();
     let mut parts=line.split('-').next()?.split('.');
@@ -10,7 +17,7 @@ fn version_numbers(text:&str)->Option<[u32;3]> {
     if parts.next().is_some(){return None;}Some(result)
 }
 fn check_version(code:&Path)->Result<()> {
-    let output=Command::new(code).arg("--version").output().map_err(err)?;
+    let output=code_command(code).arg("--version").output().map_err(err)?;
     let version=String::from_utf8_lossy(&output.stdout);
     if !output.status.success(){return Err(format!("VS Code cannot report its version: {}",code.display()));}
     let found=version_numbers(&version).ok_or_else(||format!("VS Code returned an unrecognized version: {}",code.display()))?;
@@ -24,6 +31,11 @@ fn check_version(code:&Path)->Result<()> {
 #[cfg(test)]
 mod version_tests {
     use super::*;
+    #[test] fn native_linux_editor_requests_do_not_prompt_for_a_different_editor() {
+        let command=code_command(Path::new("code"));
+        let value=command.get_envs().find(|(key,_)|*key=="DONT_PROMPT_WSL_INSTALL").and_then(|(_,value)|value);
+        assert_eq!(value,if cfg!(target_os="linux"){Some(std::ffi::OsStr::new("1"))}else{None});
+    }
     #[test] fn cli_versions_use_numeric_components_and_reject_unexpected_output() {
         let minimum=version_numbers(MINIMUM).unwrap();
         let old=version_numbers("1.66.0\ncommit\narm64\n").unwrap();
@@ -66,7 +78,7 @@ fn data_dir(o: &Options) -> Result<PathBuf> {
     else { env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or(home()?.join(".config")).join("Code") })
 }
 pub(super) fn cli(code: &Path,o: &Options,bin: &Path,root:&Path) -> Result<Command> {
-    let mut cmd=Command::new(code);
+    let mut cmd=code_command(code);
     // Writing a shell profile does not update this process's environment. The
     // first profile window may be launched here, before the user opens Code.
     let mut paths=vec![bin.to_path_buf()];

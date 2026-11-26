@@ -141,12 +141,13 @@ else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
         commands=self.exercise_macos('/bin/sh',missing=('node','npm'),no_brew=True)
         self.assertEqual(commands,[])
 
-    def exercise_macos_editor(self, *, installed='1.66.0', running=False, system='13.5.1', app_minimum='12.0', signature_fails=False, relocation_fails=False):
+    def exercise_macos_editor(self, *, installed='1.66.0', running=False, system='13.5.1', app_minimum='12.0', signature_fails=False, relocation_fails=False, native_editor_ack=False):
         with tempfile.TemporaryDirectory(prefix='thor-code-upgrade-') as temporary:
             root=Path(temporary).resolve();bin=root/'bin';bin.mkdir();home=root/'home';home.mkdir()
             target=root/'system/Applications/Visual Studio Code.app'
             cli=target/'Contents/Resources/app/bin/code';cli.parent.mkdir(parents=True)
-            cli.write_text('#!/bin/sh\necho '+installed+'\n');cli.chmod(0o755)
+            guard='[ "$DONT_PROMPT_WSL_INSTALL" = 1 ] || exit 53\n' if native_editor_ack else ''
+            cli.write_text('#!/bin/sh\n'+guard+'echo '+installed+'\n');cli.chmod(0o755)
             (target/'previous-marker').write_text('previous editor')
             (bin/'code').symlink_to(cli)
             for name in ('mktemp','rm','mkdir','mv','dirname','cat','awk','head','grep'):
@@ -209,6 +210,11 @@ cli.write_text('#!'+sys.executable+'\\nimport os,sys\\nfrom pathlib import Path\
                 result,downloads,previous=self.exercise_macos_editor(installed=version,running=True)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                 self.assertEqual(downloads,[]);self.assertTrue(previous)
+
+    def test_native_editor_probe_acknowledges_the_wsl_launcher_prompt(self):
+        result,downloads,previous=self.exercise_macos_editor(installed='1.147.0',native_editor_ack=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(downloads,[]);self.assertTrue(previous)
 
     def test_macos_old_running_editor_requires_a_normal_quit_before_upgrade(self):
         for running in (True,'Code'):
