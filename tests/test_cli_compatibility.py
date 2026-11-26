@@ -86,7 +86,7 @@ main :: proc() { fmt.println(f"value {work(VALUE)}") }
     def test_information_commands_do_not_load_a_project(self):
         for engine in compiler_engines():
             version=self.call(engine,'version',cwd=self.root)
-            self.assertEqual(version.stdout.strip(),'Thor '+native.VERSION if hasattr(native,'VERSION') else 'Thor 0.41.6')
+            self.assertEqual(version.stdout.strip(),'Thor '+(native.ROOT/'release/version').read_text().strip())
             root=self.call(engine,'root',cwd=self.root)
             self.assertEqual(Path(root.stdout.strip()),native.ROOT)
             self.assertEqual(root.stderr,'')

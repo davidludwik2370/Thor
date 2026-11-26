@@ -11,6 +11,7 @@ import unittest
 from tests import test_thor as base
 from thorlang.cache import EvaluationCache
 from tests.native_paths import native_test_compiler
+from tests.cache_paths import entries
 
 
 class CacheStorageTests(unittest.TestCase):
@@ -78,7 +79,9 @@ class CacheTests(unittest.TestCase):
     program=base.ThorTests.program
 
     def invoke(self, source, *, flags=(), **kwargs):
-        return base.ThorTests.invoke(self,source,flags=[*flags],**kwargs)
+        temporary=tempfile.TemporaryDirectory(prefix='thor-contents-cache-');self.addCleanup(temporary.cleanup)
+        self.cache=Path(temporary.name)
+        return base.ThorTests.invoke(self,source,flags=['--cache-dir',str(self.cache),*flags],**kwargs)
 
     def report(self,result):
         return next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
@@ -86,7 +89,7 @@ class CacheTests(unittest.TestCase):
     def again(self,root,*,flags=(),fail=None):
         compiler=getattr(self,'compiler',base.THOR)
         result=subprocess.run([str(compiler),'run',str(root/'input'),'--output-dir',str(root/'output'),
-                               '--cache-report',*base.runtime_flags(flags)],capture_output=True,text=True,timeout=45)
+                               '--cache-report','--cache-dir',str(self.cache),*base.runtime_flags(flags)],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result
@@ -102,7 +105,7 @@ class CacheTests(unittest.TestCase):
         self.assertGreater(self.report(bypass)['bypasses'],0)
         cleared=self.again(root,flags=['--clear-cache'])
         self.assertEqual(self.report(cleared)['writes'],1)
-        entry=next((root/'input'/'.thor-cache'/'eval-v1').glob('*.json'))
+        entry=next(iter(entries(self.cache,'eval-v1')))
         entry.write_text('{broken')
         recovered=self.again(root)
         self.assertEqual(self.report(recovered)['corrupt'],1)
@@ -143,7 +146,7 @@ VALUE::#run work()
         # A valid toolchain fingerprint may be recorded before execution fails;
         # neither result packets nor records that reuse results may be published.
         for namespace in ['eval-v1','prepared-v1','scalar-v1']:
-            self.assertFalse(list((root/'input/.thor-cache'/namespace).glob('*.json')))
+            self.assertFalse(entries(self.cache,namespace))
         (root/'input/main.thor').write_text(source.replace('assert(false);',''))
         blocked=root/'blocked';blocked.write_text('not a directory')
         self.assertEqual(self.report(self.again(root,flags=['--cache-dir',str(blocked)]))['writes'],0)
@@ -176,7 +179,8 @@ VALUE::#run work()
         source=source.replace('a[0]="changed"','delete(a[0]);a[0]="changed"')
         root,_=self.invoke(source,flags=['--cache-report'])
         self.assertEqual(self.report(self.again(root))['hits'],2)
-        packets=[json.loads(p.read_text())['value'] for p in (root/'input/.thor-cache/eval-v1').glob('*.json')]
+        packets=[json.loads(p.read_text())['value'] for p in entries(self.cache,'eval-v1')]
+        self.assertTrue(packets)
         self.assertTrue(all(p['kind']=='sequence' and p['values'][0]['bytes']=='68656c6c6f' for p in packets))
 
     def test_resource_existence_and_dynamic_resource_paths(self):

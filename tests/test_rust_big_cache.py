@@ -2,6 +2,7 @@
 import hashlib
 import json
 import unittest
+from tests.cache_paths import entries as cache_entries
 from tests import test_rust_cached_execution as cached
 from tests import test_rust_compiler as native
 
@@ -45,13 +46,13 @@ main::proc(){
                 self.write(number='123456789012345678901234567891')
                 changed=self.invoke(flags=flags,output='123456789012345678901234567891\n')
                 self.assertGreater(changed['cache']['stats']['writes'],0)
-                packets=[json.loads(p.read_text())['value'] for p in (self.cache/'eval-v1').glob('*.json')]
+                packets=[json.loads(p.read_text())['value'] for p in cache_entries(self.cache,'eval-v1')]
                 self.assertTrue(packets)
                 self.assertTrue(all(v['kind']=='big_integer' and set(v)=={'kind','value'} for v in packets))
 
     def test_checksummed_noncanonical_numeric_packets_are_recomputed(self):
         self.write();self.invoke(output='123456789012345678901234567890\n')
-        paths=list((self.cache/'eval-v1').glob('*.json'));self.assertTrue(paths)
+        paths=cache_entries(self.cache,'eval-v1');self.assertTrue(paths)
         for path in paths:
             record=json.loads(path.read_text());record['value']={'kind':'big_integer','value':'01'}
             contents=json.dumps(record['value'],sort_keys=True,separators=(',',':')).encode()

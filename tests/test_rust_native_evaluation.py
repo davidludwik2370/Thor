@@ -2,6 +2,7 @@
 import json
 import os
 import unittest
+from tests.cache_paths import entries as cache_entries
 from tests import test_rust_compiler as native
 
 
@@ -68,7 +69,7 @@ class RustNativeEvaluationTests(unittest.TestCase):
         self.source.write_text(self.source.read_text().replace('fmt.println(VALUE)','unused:=17;_=unused;fmt.println(VALUE)'))
         warm=self.invoke('rust');self.assertEqual(warm.returncode,0,warm.stderr)
         self.assertEqual(warm.stdout,'6\n')
-        records=list((self.root/'cache/scalar-v1').glob('*.json'))
+        records=cache_entries(self.root/'cache','scalar-v1')
         self.assertTrue(records)
 
     def test_capabilities_report_native_evaluation_without_claiming_completion(self):

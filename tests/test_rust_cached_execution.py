@@ -6,6 +6,7 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+from tests.cache_paths import entries as cache_entries
 from tests import test_rust_scheduling as scheduling
 from tests import test_rust_compiler as native
 from tests.native_paths import native_test_compiler, EXE_SUFFIX
@@ -94,7 +95,7 @@ class RustCachedExecutionTests(unittest.TestCase):
 
     def test_corrupt_result_packet_is_recomputed(self):
         self.write();self.invoke(output='6\n')
-        packets=list((self.cache/'eval-v1').glob('*.json'))
+        packets=cache_entries(self.cache,'eval-v1')
         self.assertTrue(packets)
         for packet in packets:packet.write_text('{')
         recovered=self.invoke(output='6\n')
@@ -121,7 +122,7 @@ class RustCachedExecutionTests(unittest.TestCase):
     def test_failed_evaluation_does_not_publish_a_value(self):
         self.write(body='',prefix='work::proc()->int{panic("expected evaluation panic")}\nVALUE::#run work()')
         self.invoke(error='expected evaluation panic')
-        entries=list((self.cache/'eval-v1').glob('*.json'))
+        entries=cache_entries(self.cache,'eval-v1')
         self.assertEqual(entries,[])
 
     def test_owned_cached_results_materialize_independent_storage(self):

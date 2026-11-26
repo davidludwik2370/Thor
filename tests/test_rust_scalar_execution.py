@@ -1,7 +1,7 @@
 """Scalar site records validate bindings, bodies and external inputs on reuse."""
-import shutil
 import os
 import unittest
+from tests.cache_paths import entries as cache_entries
 from tests import test_rust_cached_execution as cached
 from tests import test_rust_compiler as native
 
@@ -14,7 +14,7 @@ class RustScalarExecutionTests(unittest.TestCase):
     invoke=cached.RustCachedExecutionTests.invoke
 
     def discard_prepared(self):
-        shutil.rmtree(self.cache/'prepared-v1',ignore_errors=True)
+        for path in cache_entries(self.cache,'prepared-v1'):path.unlink()
 
     def test_straight_line_site_reuses_before_dependency_extraction(self):
         for flags in (['-debug'],native.UNCHECKED):
@@ -76,7 +76,7 @@ class RustScalarExecutionTests(unittest.TestCase):
 
     def test_missing_contents_target_rebuilds_site_record(self):
         self.write();self.invoke();self.discard_prepared()
-        packets=list((self.cache/'eval-v1').glob('*.json'))
+        packets=cache_entries(self.cache,'eval-v1')
         for packet in packets:packet.unlink()
         changed=self.invoke(output='6\n')
         self.assertEqual(changed['cache']['scalar_reused'],0)
@@ -87,7 +87,7 @@ class RustScalarExecutionTests(unittest.TestCase):
 
     def test_malformed_site_record_is_optional(self):
         self.write();self.invoke();self.discard_prepared()
-        records=list((self.cache/'scalar-v1').glob('*.json'))
+        records=cache_entries(self.cache,'scalar-v1')
         self.assertTrue(records)
         for record in records:record.write_text('{')
         warm=self.invoke(output='6\n')

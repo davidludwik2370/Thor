@@ -1,6 +1,6 @@
 """Prepared value reuse keeps dependency and ownership boundaries intact."""
 import unittest
-import shutil
+from tests.cache_paths import entries as cache_entries
 from tests import test_rust_cached_execution as cached
 from tests import test_rust_compiler as native
 
@@ -14,7 +14,7 @@ class RustPreparedExecutionTests(unittest.TestCase):
         # Exercise the intermediate prepared-key policy independently of the
         # verified-site lookup and exact-snapshot helper aliases.
         for namespace in ('scalar-v1','request-v1'):
-            shutil.rmtree(self.cache/namespace,ignore_errors=True)
+            for path in cache_entries(self.cache,namespace):path.unlink()
         return cached.RustCachedExecutionTests.invoke(self,**kwargs)
 
     def test_scalar_reuse_survives_unrelated_runtime_body_edits(self):
@@ -56,7 +56,7 @@ class RustPreparedExecutionTests(unittest.TestCase):
 
     def test_corrupt_prepared_metadata_falls_back_to_contents(self):
         self.write();self.invoke()
-        records=list((self.cache/'prepared-v1').glob('*.json'))
+        records=cache_entries(self.cache,'prepared-v1')
         self.assertTrue(records)
         for record in records:record.write_text('{')
         warm=self.invoke(output='6\n')
@@ -65,7 +65,7 @@ class RustPreparedExecutionTests(unittest.TestCase):
 
     def test_missing_contents_target_is_recomputed(self):
         self.write();self.invoke()
-        records=list((self.cache/'eval-v1').glob('*.json'))
+        records=cache_entries(self.cache,'eval-v1')
         for record in records:record.unlink()
         warm=self.invoke(output='6\n')
         self.assertEqual(warm['cache']['prepared_hits'],0)
@@ -146,8 +146,7 @@ work::proc()->string{return #procedure}
 
     def test_disabled_cache_writes_no_prepared_record(self):
         self.write();packet=self.invoke(enabled=False,output='6\n')
-        exists=(self.cache/'prepared-v1').exists()
-        self.assertFalse(exists)
+        self.assertFalse(cache_entries(self.cache,'prepared-v1'))
         self.assertEqual(packet['cache']['prepared_hits'],0)
 
 

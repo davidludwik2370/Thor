@@ -254,12 +254,15 @@ fi
 
     def shell_path(self, shell, mode, *, extra_env=None):
         environment={**self.env,**(extra_env or {})}
-        result=subprocess.run([shell,mode,'command -v thor; printf "%s\\n" "$PATH"'],
+        result=subprocess.run([shell,mode,'printf "THOR_COMMAND=%s\\nTHOR_PATH=%s\\n" "$(command -v thor)" "$PATH"'],
             env=environment,capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         lines=result.stdout.splitlines()
-        self.assertEqual(lines[0],str(self.prefix/'bin/thor'),result.stdout+result.stderr)
-        self.assertEqual(lines[-1].split(os.pathsep).count(str(self.prefix/'bin')),1)
+        command=next((line.removeprefix('THOR_COMMAND=') for line in lines if line.startswith('THOR_COMMAND=')),None)
+        shell_path=next((line.removeprefix('THOR_PATH=') for line in lines if line.startswith('THOR_PATH=')),None)
+        self.assertEqual(command,str(self.prefix/'bin/thor'),result.stdout+result.stderr)
+        self.assertIsNotNone(shell_path,result.stdout+result.stderr)
+        self.assertEqual(shell_path.split(os.pathsep).count(str(self.prefix/'bin')),1)
 
     def test_zsh_login_and_nonlogin_shells_find_thor_without_duplicate_path(self):
         shell=shutil.which('zsh')

@@ -1,5 +1,6 @@
 """Native constant counts, string identity and lazy repetition helpers."""
 import unittest
+from tests.cache_paths import entries as cache_entries
 import subprocess
 from tests.native_paths import EXE_SUFFIX
 from tests import test_rust_compiler as native
@@ -96,7 +97,7 @@ fmt.println(len(text),len("\x00\xff"*2))''','import "core:fmt"'),expected='12 4'
         paths=list((self.root/'rust').rglob('main.odin'))
         self.assertEqual(len(paths),1,paths)
         generated=paths[0].read_text()
-        packets=list((self.root/'cache/eval-v1').glob('*.json'))
+        packets=cache_entries(self.root/'cache','eval-v1')
         self.assertLess(len(generated),30000)
         self.assertNotIn('strings.repeat',generated)
         self.assertEqual(packets,[])

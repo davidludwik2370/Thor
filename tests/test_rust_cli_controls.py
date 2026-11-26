@@ -198,16 +198,29 @@ class RustCliControlTests(unittest.TestCase):
         self.cache_packet('rust',['--cache-dir',str(cache)])
         preserved=[];deleted=[]
         for namespace in ['eval-v1','prepared-v1','identity-v1','scalar-v1','rust-parse-v1']:
-            directory=cache/namespace;directory.mkdir(exist_ok=True)
-            foreign=directory/'notes.json';foreign.write_text('unmanaged');preserved.append(foreign)
-            stale=directory/('a'*64+'.json');stale.write_text('{}');deleted.append(stale)
-            target=self.root/(namespace+'.target');target.write_text('owned elsewhere')
-            link=directory/('b'*64+'.json');link.symlink_to(target);preserved.extend([link,target])
+            for directory,prefix,suffix in [(cache/'store-v2/0',namespace+'-','.bin'),(cache/namespace,'','.json')]:
+                directory.mkdir(parents=True,exist_ok=True)
+                foreign=directory/'notes.json';foreign.write_text('unmanaged');preserved.append(foreign)
+                stale=directory/(prefix+'a'*64+suffix);stale.write_text('{}');deleted.append(stale)
+                folder=directory/(prefix+'b'*64+suffix);folder.mkdir();preserved.append(folder)
         report,lines,_=self.cache_packet('rust',['--cache-dir',str(cache),'--clear-cache'])
         self.assertEqual(lines,['7'])
         self.assertGreater(report['thor_cache']['writes'],0)
         for path in deleted:self.assertFalse(path.exists(),path)
         for path in preserved:self.assertTrue(path.exists(),path)
+
+    def test_clear_cache_preserves_external_file_symlinks_where_supported(self):
+        self.write();cache=self.root/'clear-links';directory=cache/'store-v2/0';directory.mkdir(parents=True)
+        target=self.root/'outside-cache';target.write_text('preserve')
+        links=[directory/('eval-v1-'+'b'*64+'.bin'),cache/'eval-v1'/('b'*64+'.json')]
+        for link in links:
+            link.parent.mkdir(parents=True,exist_ok=True)
+            try:link.symlink_to(target)
+            except OSError as error:
+                if os.name=='nt' and error.winerror==1314:self.skipTest('This account cannot create file symlinks; ordinary cache cleanup is tested separately.')
+                raise
+        self.cache_packet('rust',['--cache-dir',str(cache),'--clear-cache'])
+        self.assertTrue(all(link.is_symlink() for link in links));self.assertEqual(target.read_text(),'preserve')
 
     def test_run_timeout_is_forwarded_and_reports_cache_counters_on_failure(self):
         self.write(prefix='spin::proc()->int{for{}}\nVALUE::#run spin()')

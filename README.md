@@ -1506,6 +1506,10 @@ Set `THOR_TEST_PREBUILT=1` for every worker. This keeps Cargo setup from replaci
 the shared executable during another worker's launch. A missing prebuilt compiler
 is an error. Ordinary sequential test setup continues to build with Cargo.
 
+Linux address-sanitizer tests also require the compiler-rt development package
+matching Clang (for example, `libclang-rt-18-dev` with Ubuntu 24.04's Clang 18).
+This is a test dependency; ordinary Thor installation and builds do not need it.
+
 
 The opt-in [upstream integration run](docs/upstream-integration.md) compares
 pinned Odin projects, migrated Thor copies and vet-corrected copies. Its

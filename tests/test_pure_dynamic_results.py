@@ -1,11 +1,14 @@
 """Independently owned dynamic fn/#run results, including cached reconstruction."""
 import json
+from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from tests import test_thor as base
 from thorlang import values
+from tests.cache_paths import entries
 
 
 class PureDynamicResultsTests(unittest.TestCase):
@@ -112,16 +115,18 @@ for i in 0..<3{
     delete(a);delete(b)
 }
 ''','load::fn()->[dynamic]int{v:=make([dynamic]int,1,17);v[0]=7;return v}\n')
-        root,first=self.invoke(source,flags=['--cache-report','--track-allocations=basic'])
+        temporary=tempfile.TemporaryDirectory(prefix='thor-dynamic-cache-');self.addCleanup(temporary.cleanup)
+        cache=Path(temporary.name)
+        root,first=self.invoke(source,flags=['--cache-report','--cache-dir='+str(cache),'--track-allocations=basic'])
         report=lambda result:next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
         self.assertGreater(report(first)['writes'],0)
         result=subprocess.run([str(base.THOR),'run',str(root/'input/main.thor'),'--output-dir',str(root/'output'),
-                               '--cache-report',*base.runtime_flags(['--track-allocations=basic'])],
+                               '--cache-report','--cache-dir='+str(cache),*base.runtime_flags(['--track-allocations=basic'])],
                               capture_output=True,text=True,timeout=45)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertEqual(result.stderr,'')
         self.assertGreater(report(result)['hits'],0)
-        packets=[json.loads(path.read_text())['value'] for path in (root/'input/.thor-cache/eval-v1').glob('*.json')]
+        packets=[json.loads(path.read_text())['value'] for path in entries(cache,'eval-v1')]
         self.assertTrue(any(packet.get('storage')=='dynamic' and packet['capacity']==17 for packet in packets),packets)
 
     def test_inputs_contextless_results_and_invalid_nested_elements_stay_rejected(self):

@@ -1,9 +1,12 @@
 """Exact constants, portable evaluation results, and ownership across fn/#run."""
 import json
+from pathlib import Path
+import tempfile
 from fractions import Fraction
 from thorlang import bigvalues,values
 from tests import test_big_language as language
 from tests import test_thor as base
+from tests.cache_paths import entries
 
 
 class BigCompileTimeTests(base.unittest.TestCase):
@@ -214,7 +217,9 @@ class BigCacheTests(base.unittest.TestCase):
         again=lambda root:CacheTests.again(self,root,flags=['--track-allocations=basic'])
         source=self.program('a:=#run work();b:=#run work();a+=1;assert(a!=b);delete(a);delete(b)',
                             'work::fn()->Integer{return Integer(123456789012345678901234567890)}\n')
-        root,first=self.invoke(source,flags=['--cache-report','--track-allocations=basic'])
+        temporary=tempfile.TemporaryDirectory(prefix='thor-big-cache-');self.addCleanup(temporary.cleanup)
+        self.cache=Path(temporary.name)
+        root,first=self.invoke(source,flags=['--cache-report','--cache-dir',str(self.cache),'--track-allocations=basic'])
         self.assertGreaterEqual(report(first)['writes'],1)
         warm=again(root)
         self.assertGreaterEqual(report(warm)['hits'],2)
@@ -224,5 +229,6 @@ class BigCacheTests(base.unittest.TestCase):
         (root/'input/main.thor').write_text(source.replace('567890)','567891)'), newline='')
         changed=again(root)
         self.assertGreaterEqual(report(changed)['writes'],1)
-        packets=[json.loads(p.read_text())['value'] for p in (root/'input/.thor-cache/eval-v1').glob('*.json')]
+        packets=[json.loads(p.read_text())['value'] for p in entries(self.cache,'eval-v1')]
+        self.assertTrue(packets)
         self.assertTrue(all(v['kind']=='big_integer' and set(v)=={'kind','value'} for v in packets))
