@@ -267,7 +267,7 @@ mod windows_resolve_tests {
         let _cleanup=Cleanup(root.clone());
         fs::write(root.join("sibling"),b"native").unwrap();
         fs::write(root.join("target/sibling"),b"different").unwrap();
-        std::os::windows::fs::symlink_dir(root.join("target/child"),root.join("link")).unwrap();
+        junction::create(root.join("target/child"),root.join("link")).unwrap();
         let input=root.join("link/../sibling");
         let actual_bytes=fs::read(&input).unwrap();
         let target=resolve(&input).unwrap();

@@ -758,6 +758,21 @@ class InstallerLifecycleTests(InstallerTests):
         self.assertFalse(entry.exists())
         self.assertEqual((cache/'notes.txt').read_text(),'keep')
 
+    def test_uninstall_removes_generated_support_file_copies_and_preserves_modified_views(self):
+        bundle=self.bundle(files={'runtime/sample/source.odin':b'package sample\n','runtime/sample/asset.txt':b'asset\n'})
+        for modified in (False,True):
+            with self.subTest(modified=modified):
+                self.invoke(bundle)
+                root=Path(json.loads(self.registry.read_text())['root'])
+                digest='a'*64;view=root/'lib'/('runtime-rust-'+digest[:24]);(view/'sample').mkdir(parents=True,exist_ok=True)
+                (view/'thor-manifest.json').write_text(json.dumps({'engine':'rust','shared_runtime':digest}))
+                (view/'sample/source.odin').write_bytes(b'package sample\n')
+                (view/'sample/asset.txt').write_bytes(b'changed\n' if modified else b'asset\n')
+                self.invoke(None,'--uninstall')
+                self.assertEqual(view.exists(),modified)
+                if modified:self.assertEqual((view/'sample/asset.txt').read_bytes(),b'changed\n')
+                if root.exists():shutil.rmtree(root)
+
     def test_uninstall_recognizes_legacy_managed_path_without_ownership_journal(self):
         self.invoke(self.bundle(),'--path')
         (self.prefix/'setup-state.json').unlink()

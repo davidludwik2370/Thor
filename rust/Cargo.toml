@@ -34,6 +34,7 @@ libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 file-id = "=0.2.3"
+junction = "=2.1.0"
 
 [profile.release]
 lto = "thin"

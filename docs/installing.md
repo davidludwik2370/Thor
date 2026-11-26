@@ -163,13 +163,23 @@ directories accommodate prepared parser caches and shared runtime output. The
 discovery record lets VS Code use the installation without environment variables
 or per-project settings. Explicit editor paths take precedence.
 
-`--path` adds a marked block to `.profile` (bash/sh) or `.zprofile` (zsh), backing
-up existing content and avoiding duplicates. Windows adds only the new directory
-to user PATH; fish receives a `fish_add_path` instruction. Open a new terminal
-afterward. Without `--path`, use the installed absolute command or configure PATH
-yourself. Updating a startup file does not refresh an already running desktop
-session or VS Code process. In an existing bash terminal, run `. ~/.profile`;
-otherwise sign out and back in (or restart VS Code from a refreshed shell).
+`--path` configures login and interactive startup files for zsh and bash. Zsh
+uses `.zprofile` and `.zshrc` (including an exported `ZDOTDIR`). Bash uses its
+first existing login file (`.bash_profile`, `.bash_login`, or `.profile`) and
+`.bashrc`; other POSIX shells use `.profile`. The marked block adds Thor only
+when its command directory is absent from PATH. Existing contents are retained
+and backed up; uninstall restores the owned edits. Windows adds only the new
+directory to user PATH; fish receives a `fish_add_path` instruction. Open a new
+terminal afterward. Without `--path`, use the installed absolute command or
+configure PATH yourself. Existing desktop sessions and editor processes may
+need restarting to inherit the updated environment.
+
+Windows compilation works without enabling Developer Mode or running Thor as
+administrator. Generated library views use directory junctions and file hard
+links when symbolic links are unavailable, with independent copies for
+read-only or different-volume files. Generated writes replace files atomically
+and preserve the original sources. These are build-time filesystem operations;
+they add no overhead to the compiled program.
 
 The installer also gives the VS Code process it launches the updated PATH.
 Thor's extension adds the registered command directory to new integrated
@@ -398,14 +408,3 @@ prebuilt installation with Rust, Cargo, Node and Python absent from user PATH.
 VS Code's private Node and CodeLLDB's private Python are their own components.
 Xvfb enables editor testing; this container check does not replace a hardware or
 full desktop VM test.
-
-### PATH in regular terminal windows
-
-`--path` configures login and interactive startup files for zsh and bash. Zsh
-uses `.zprofile` and `.zshrc` (including an exported `ZDOTDIR`). Bash uses its
-first existing login file (`.bash_profile`, `.bash_login`, or `.profile`) and
-`.bashrc`. The managed block adds Thor only when its command directory is absent
-from PATH, so loading both files does not duplicate it. Existing contents are
-retained; uninstall restores the owned edits. Open a new terminal tab after setup
-to load the updated startup configuration. VS Code also supplies Thor's command
-directory to its own terminals independently.

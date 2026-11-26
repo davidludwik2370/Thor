@@ -30,9 +30,11 @@ function fixture({workspace = '/projects/my project', file = '/projects/my proje
 
 test('configured compiler paths work without a terminal PATH entry',async()=>{
     const {vscode}=fixture();
-    vscode.workspace.getConfiguration=()=>({get:()=>"/tools/Thor O'Brien/thor"});
+    const compiler=process.platform==='win32'?"C:\\tools\\Thor O'Brien\\thor.exe":"/tools/Thor O'Brien/thor";
+    vscode.workspace.getConfiguration=()=>({get:()=>compiler});
     const terminal=await runProject(vscode);
-    assert.equal(terminal.commands[0].text,"'/tools/Thor O'\\''Brien/thor' run .");
+    const expected=process.platform==='win32'?"'C:\\tools\\Thor O'\\''Brien\\thor.exe' run .":"'/tools/Thor O'\\''Brien/thor' run .";
+    assert.equal(terminal.commands[0].text,expected);
 });
 test('native installer paths use correct PowerShell and cmd quoting',()=>{
     assert.equal(invocation({env:{shell:'powershell.exe'}},null,"C:/Thor O'Brien/thor.exe"),"& 'C:/Thor O''Brien/thor.exe' run .");

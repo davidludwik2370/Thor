@@ -13,15 +13,36 @@ test('TLS watches source files while excluding standard Thor build/debug output'
     assert.equal(isBuildOutput('/project/.vscode/config.thor'),false);
 });
 
-test('custom output roots and symlinked generated files are excluded by their manifest',()=>{
+function generatedFixture(action) {
     const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'thor-watch-'));
     try {
         const generated=path.join(temporary,'custom-output'),nested=path.join(generated,'package');
         fs.mkdirSync(nested,{recursive:true});
         fs.writeFileSync(path.join(generated,'thor-manifest.json'),'{}');
         const file=path.join(nested,'main.odin');fs.writeFileSync(file,'package main');
-        assert.ok(isBuildOutput(file));
-        const linked=path.join(temporary,'linked.odin');fs.symlinkSync(file,linked);
-        assert.ok(isBuildOutput(linked));
+        action({temporary,generated,file});
     } finally {fs.rmSync(temporary,{recursive:true,force:true});}
+}
+test('custom output roots are excluded by their manifest',()=>{
+    generatedFixture(({file})=>assert.ok(isBuildOutput(file)));
+});
+test('directory aliases to generated packages are excluded without symlink privileges',()=>{
+    generatedFixture(({temporary,generated})=>{
+        const linked=path.join(temporary,'linked-output');
+        fs.symlinkSync(generated,linked,process.platform==='win32'?'junction':'dir');
+        assert.ok(isBuildOutput(path.join(linked,'package/main.odin')));
+    });
+});
+test('file symlinks to generated files are excluded where supported',t=>{
+    generatedFixture(({temporary,file})=>{
+        const linked=path.join(temporary,'linked.odin');
+        try {fs.symlinkSync(file,linked,'file');}
+        catch(error) {
+            if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code)) {
+                t.skip('This account cannot create file symlinks; directory junction coverage remains enabled.');return;
+            }
+            throw error;
+        }
+        assert.ok(isBuildOutput(linked));
+    });
 });

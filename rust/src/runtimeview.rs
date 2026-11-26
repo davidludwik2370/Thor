@@ -37,35 +37,50 @@ pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
             );
         }
     }
+    #[cfg(windows)]
+    let file_identities=links.values().filter(|path|path.is_file()).map(|path| {
+        let signature=match crate::evaluationinputs::signature(path) {
+            Ok(value)=>value,
+            Err(error) if error.kind()==std::io::ErrorKind::Unsupported=>Some(json!(["contents",sha256(&fs::read(path)?)])),
+            Err(error)=>return Err(error.into()),
+        };
+        // Only filtered package files need this small Windows-only read.
+        // Independent copies must also follow same-size edits with restored
+        // timestamps; identity alone only detects atomic source replacement.
+        Ok((path,signature,sha256(&fs::read(path)?)))
+    }).collect::<Result<Vec<_>>>()?;
     let layout = if tabs {
-        sha256(&serde_json::to_vec(&(
-            "rust-runtime-tabs-v1",
-            &source,
-            &links,
-            &copies,
-        ))?)
+        #[cfg(windows)]
+        let key=serde_json::to_vec(&("rust-runtime-tabs-windows-v2",&source,&links,&copies,&file_identities))?;
+        #[cfg(not(windows))]
+        let key=serde_json::to_vec(&("rust-runtime-tabs-v1",&source,&links,&copies))?;
+        sha256(&key)
     } else {
-        sha256(&serde_json::to_vec(&("rust-runtime-v2", &source, &links))?)
+        #[cfg(windows)]
+        let key=serde_json::to_vec(&("rust-runtime-windows-v3",&source,&links,&file_identities))?;
+        #[cfg(not(windows))]
+        let key=serde_json::to_vec(&("rust-runtime-v2",&source,&links))?;
+        sha256(&key)
     };
     let directory = root
         .join("lib")
         .join(format!("runtime-rust-{}", &layout[..24]));
     let manifest = json!({"engine":"rust","shared_runtime":layout});
     let valid = || -> bool {
-        !directory.is_symlink()
+        !sdkmirror::is_link(&directory)
             && fs::read(directory.join("thor-manifest.json"))
                 .ok()
                 .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
                 .as_ref()
                 == Some(&manifest)
             && links.iter().all(|(relative, target)| {
-                fs::read_link(directory.join(relative)).ok().as_ref() == Some(target)
+                sdkmirror::points_to(&directory.join(relative),target)
             })
             && copies.iter().all(|(relative, bytes)| {
                 fs::read(directory.join(relative)).ok().as_ref() == Some(bytes)
             })
     };
-    if directory.exists() || directory.is_symlink() {
+    if directory.exists() || sdkmirror::is_link(&directory) {
         if valid() {
             return Ok(directory);
         }
@@ -176,8 +191,8 @@ mod tests {
         let header = fs::read_to_string(first.join("sample/sample.odin")).unwrap();
         let nested = fs::read_to_string(first.join("sample/nested/code.odin")).unwrap();
         let test = first.join("sample/sample_test.odin").exists();
-        let link = fs::read_link(first.join("sample/asset.txt")).unwrap();
-        let normal = fs::read_link(plain.join("sample/sample.odin")).unwrap();
+        let link = sdkmirror::points_to(&first.join("sample/asset.txt"),&expected.join("asset.txt"));
+        let normal = sdkmirror::points_to(&plain.join("sample/sample.odin"),&expected.join("sample.odin"));
         let again = prepare(&directory, true).unwrap();
         fs::write(package.join("sample.odin"), "package sample\nVALUE :: 7\n").unwrap();
         let changed = prepare(&directory, true).unwrap();
@@ -186,8 +201,8 @@ mod tests {
         if !header.starts_with("#+vet !tabs\n")
             || !nested.starts_with("#+vet !tabs\n")
             || test
-            || link != expected.join("asset.txt")
-            || normal != expected.join("sample.odin")
+            || !link
+            || !normal
             || again != first
             || changed == first
             || !current.contains("VALUE :: 7")
@@ -195,4 +210,40 @@ mod tests {
             panic!("runtime policy view changed authority, content caching or test filtering");
         }
     }
+    #[cfg(windows)]
+    #[test]
+    fn atomically_replaced_support_files_get_a_fresh_unprivileged_view() {
+        let root=std::env::temp_dir().join(format!("thor-runtime-replace-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let package=root.join("runtime/sample");fs::create_dir_all(&package).unwrap();
+        let source=package.join("sample.odin");fs::write(&source,"package sample\nVALUE :: 1\n").unwrap();
+        fs::write(package.join("sample_test.odin"),"excluded test").unwrap();
+        let original_time=fs::metadata(&source).unwrap().modified().unwrap();
+        let before=prepare(&root,false).unwrap();
+        atomic_write(&source,b"package sample\nVALUE :: 2\n").unwrap();
+        fs::OpenOptions::new().write(true).open(&source).unwrap().set_times(fs::FileTimes::new().set_modified(original_time)).unwrap();
+        let after=prepare(&root,false).unwrap();let text=fs::read_to_string(after.join("sample/sample.odin")).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        if before==after||!text.contains("VALUE :: 2"){panic!("runtime view reused a replaced file with matching timestamps");}
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn readonly_support_copies_follow_edits_with_restored_metadata() {
+        let root=std::env::temp_dir().join(format!("thor-runtime-readonly-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let package=root.join("runtime/sample");fs::create_dir_all(&package).unwrap();
+        let source=package.join("asset.txt");fs::write(&source,b"original").unwrap();
+        fs::write(package.join("sample_test.odin"),"excluded test").unwrap();
+        let permissions=fs::metadata(&source).unwrap().permissions();
+        let original_time=fs::metadata(&source).unwrap().modified().unwrap();
+        let mut readonly=permissions.clone();readonly.set_readonly(true);fs::set_permissions(&source,readonly.clone()).unwrap();
+        let before=prepare(&root,false).unwrap();
+        fs::set_permissions(&source,permissions.clone()).unwrap();
+        fs::write(&source,b"modified").unwrap();
+        fs::OpenOptions::new().write(true).open(&source).unwrap().set_times(fs::FileTimes::new().set_modified(original_time)).unwrap();
+        fs::set_permissions(&source,readonly).unwrap();
+        let after=prepare(&root,false).unwrap();let bytes=fs::read(after.join("sample/asset.txt")).unwrap();
+        fs::set_permissions(&source,permissions).unwrap();fs::remove_dir_all(&root).unwrap();
+        if before==after||bytes!=b"modified"{panic!("runtime view reused stale copied support bytes");}
+    }
+
 }

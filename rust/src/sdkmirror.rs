@@ -213,39 +213,102 @@ impl SdkMirror {
     }
 }
 
-/// Remove an owned file or link without following it. Windows directory links
-/// require RemoveDirectory, even when their target no longer exists.
-pub(super) fn remove_file_or_link(path: &Path) -> std::io::Result<()> {
+/// Inspect an alias without treating an ordinary directory as a removable link.
+pub(super) fn is_link(path:&Path)->bool {
+    let Ok(metadata)=fs::symlink_metadata(path) else{return false;};
+    if metadata.file_type().is_symlink(){return true;}
+    #[cfg(windows)] {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes()&0x400!=0 {return junction::exists(path).unwrap_or(false);}
+    }
+    false
+}
+
+/// Generated views may use unprivileged Windows junctions and file hard links.
+pub(super) fn points_to(path:&Path,target:&Path)->bool {
+    let linked=fs::read_link(path).ok();
     #[cfg(windows)]
-    {
-        use std::os::windows::fs::FileTypeExt;
-        if fs::symlink_metadata(path)?.file_type().is_symlink_dir() {
+    let linked=linked.or_else(||junction::get_target(path).ok());
+    if let Some(linked)=linked {
+        if linked==target {return true;}
+        let linked=if linked.is_absolute(){linked}else{path.parent().unwrap_or(Path::new(".")).join(linked)};
+        let expected=crate::project::canonicalize(target).ok();
+        return expected.is_some()&&crate::project::canonicalize(linked).ok()==expected;
+    }
+    #[cfg(windows)] {
+        if path.is_file()&&target.is_file() {
+            if let (Ok(a),Ok(b))=(file_id::get_high_res_file_id(path),file_id::get_high_res_file_id(target)) {
+                if a==b {return true;}
+            }
+            // A different-volume/read-only source may require an independent
+            // file copy. Certify its bytes, never just a timestamp or pathname.
+            return fs::read(path).ok().zip(fs::read(target).ok()).is_some_and(|(a,b)|a==b);
+        }
+    }
+    false
+}
+
+/// Remove an owned file or alias without following its target. Windows uses
+/// RemoveDirectory for directory reparse points, including dangling junctions.
+pub(super) fn remove_file_or_link(path:&Path)->std::io::Result<()> {
+    #[cfg(windows)] {
+        use std::os::windows::fs::{FileTypeExt,MetadataExt};
+        let metadata=fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink_dir() ||
+            metadata.file_attributes()&0x410==0x410&&junction::exists(path)? {
             return fs::remove_dir(path);
         }
     }
     fs::remove_file(path)
 }
 
-pub(super) fn write_link(path: &Path, target: &Path) -> Result<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| Error::new("SDK link has no parent"))?;
+#[cfg(windows)]
+fn copy_view_file(path:&Path,target:&Path)->std::io::Result<()> {
+    use std::io;
+    let parent=path.parent().ok_or_else(||io::Error::other("view file has no parent"))?;
+    let nonce=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(io::Error::other)?.as_nanos();
+    let temporary=parent.join(format!(".thor-view-copy-{}-{nonce}",std::process::id()));
+    let copied=(|| {
+        let mut input=fs::File::open(target)?;
+        let mut output=fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+        io::copy(&mut input,&mut output)?;
+        drop(output);
+        fs::rename(&temporary,path)
+    })();
+    if copied.is_err(){let _=fs::remove_file(&temporary);}
+    copied
+}
+
+#[cfg(windows)]
+fn unprivileged_link(path:&Path,target:&Path)->std::io::Result<()> {
+    if target.is_dir(){return junction::create(target,path);}
+    // Hard links preserve edits without copying support files. Generated writes
+    // always use atomic replacement, so they cannot change the original inode.
+    if !fs::metadata(target)?.permissions().readonly()&&fs::hard_link(target,path).is_ok(){return Ok(());}
+    copy_view_file(path,target)
+}
+
+pub(super) fn write_link(path:&Path,target:&Path)->Result<()> {
+    let parent=path.parent().ok_or_else(||Error::new("SDK link has no parent"))?;
     fs::create_dir_all(parent)?;
-    if path.is_symlink() || path.is_file() {
-        remove_file_or_link(path)?;
-    }
+    if is_link(path)||path.is_file(){remove_file_or_link(path)?;}
     #[cfg(unix)]
-    std::os::unix::fs::symlink(target, path)?;
-    #[cfg(windows)]
-    if target.is_dir() {
-        std::os::windows::fs::symlink_dir(target, path)?;
-    } else {
-        std::os::windows::fs::symlink_file(target, path)?;
+    std::os::unix::fs::symlink(target,path)?;
+    #[cfg(windows)] {
+        use std::sync::atomic::{AtomicBool,Ordering};
+        static MISSING_PRIVILEGE:AtomicBool=AtomicBool::new(false);
+        if MISSING_PRIVILEGE.load(Ordering::Relaxed){unprivileged_link(path,target)?;}
+        else {
+            let result=if target.is_dir(){std::os::windows::fs::symlink_dir(target,path)}else{std::os::windows::fs::symlink_file(target,path)};
+            if let Err(error)=result {
+                if error.raw_os_error()==Some(1314){MISSING_PRIVILEGE.store(true,Ordering::Relaxed);}
+                else if !matches!(error.kind(),std::io::ErrorKind::PermissionDenied|std::io::ErrorKind::Unsupported){return Err(error.into());}
+                unprivileged_link(path,target)?;
+            }
+        }
     }
-    #[cfg(not(any(unix, windows)))]
-    return Err(Error::new(
-        "native SDK overlays require filesystem symbolic links",
-    ));
+    #[cfg(not(any(unix,windows)))]
+    return Err(Error::new("native SDK overlays require filesystem aliases"));
     Ok(())
 }
 
@@ -266,7 +329,7 @@ mod link_tests {
         write_link(&link, &first).unwrap();
         write_link(&link, &first).unwrap();
         write_link(&link, &second).unwrap();
-        let retargeted = fs::read_link(&link).unwrap() == second;
+        let retargeted = points_to(&link, &second);
         fs::remove_dir(&second).unwrap();
         write_link(&link, &first).unwrap();
         let restored = fs::read_to_string(link.join("asset")).unwrap() == "original";
@@ -282,4 +345,25 @@ mod link_tests {
             panic!("owned-link replacement changed target files or followed a directory");
         }
     }
+    #[cfg(windows)]
+    #[test]
+    fn unprivileged_aliases_are_replaceable_and_generated_writes_do_not_modify_sources() {
+        let root=std::env::temp_dir().join(format!("thor-unprivileged-links-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&root).unwrap();
+        let source=root.join("source");let link=root.join("link");let copied=root.join("copied");
+        fs::create_dir(&source).unwrap();fs::write(source.join("file"),b"original").unwrap();
+        unprivileged_link(&link,&source).unwrap();
+        let directory=points_to(&link,&source);
+        remove_file_or_link(&link).unwrap();
+        unprivileged_link(&link,&source.join("file")).unwrap();
+        let file=points_to(&link,&source.join("file"));
+        atomic_write(&link,b"generated").unwrap();
+        let original=fs::read(source.join("file")).unwrap();
+        copy_view_file(&copied,&source.join("file")).unwrap();
+        fs::write(&copied,b"separate").unwrap();
+        let independent=fs::read(source.join("file")).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        if !directory||!file||original!=b"original"||independent!=b"original" {panic!("unprivileged aliases modified their authoritative source");}
+    }
+
 }

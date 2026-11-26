@@ -427,10 +427,13 @@ fn generated_views(root:&Path,directory:&Path)->bool {
                     let source=root.join("runtime").join(relative);
                     if kind.is_symlink() {
                         if fs::canonicalize(&path).ok()!=fs::canonicalize(&source).ok() || !source.exists() {return false;}
-                    } else if kind.is_file() && path.extension().is_some_and(|e|e=="odin") {
+                    } else if kind.is_file() {
                         let Ok(original)=fs::read(source) else {return false;};
-                        let expected=[b"#+vet !tabs\n".as_slice(),original.as_slice()].concat();
-                        if fs::read(path).ok().as_deref()!=Some(expected.as_slice()){return false;}
+                        let Ok(current)=fs::read(&path) else {return false;};
+                        if current!=original {
+                            let expected=[b"#+vet !tabs\n".as_slice(),original.as_slice()].concat();
+                            if path.extension().is_none_or(|e|e!="odin")||current!=expected{return false;}
+                        }
                     } else {return false;}
                 }
             }true

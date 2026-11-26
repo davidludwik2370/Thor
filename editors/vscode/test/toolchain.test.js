@@ -43,7 +43,7 @@ test('Windows compiler discovery selects native executables even with a shell la
 
 test('installed bundles are discoverable from GUI environments without shell variables',()=>{
     const root=path.resolve('/data/Thor/versions/0.41.6-abcdef');
-    const options={env:{},home:'/home/user',platform:'linux',exists:installed(root),
+    const options={env:{},home:path.resolve('/home/user'),platform:'linux',exists:installed(root),
         read:file=>{assert.equal(file,path.resolve('/home/user/.config/thor/installation.json'));
             return JSON.stringify({schema:1,managed_by:'thor-install',root});}};
     assert.equal(findRegisteredToolchain(options),root);

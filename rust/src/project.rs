@@ -835,7 +835,7 @@ impl Project {
                 "output directory cannot contain original source files",
             ));
         }
-        if self.destination.is_symlink() {
+        if sdkmirror::is_link(&self.destination) {
             return Err(Error::new("output directory must not be a symlink"));
         }
         let manifest_path = self.destination.join("thor-manifest.json");
@@ -947,7 +947,7 @@ impl Project {
             {
                 continue;
             }
-            if path.is_file() || path.is_symlink() {
+            if path.is_file() || sdkmirror::is_link(&path) {
                 sdkmirror::remove_file_or_link(&path)?;
             }
         }
@@ -1127,7 +1127,7 @@ impl Project {
             if directory == self.destination {
                 break;
             }
-            if directory.is_symlink() {
+            if sdkmirror::is_link(&directory) {
                 return Err(Error::new("generated output parent must not be a symlink"));
             }
             parent = directory.parent();
