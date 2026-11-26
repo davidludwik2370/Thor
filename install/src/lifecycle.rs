@@ -22,12 +22,12 @@ mod windows_prerequisite_tests {
         let directory=env::temp_dir().join(format!("thor policy {} 'quoted'",unique()));
         fs::create_dir(&directory).unwrap();let _guard=RemoveDir(directory.clone());
         let file=directory.join("helper.ps1");
-        fs::write(&file,"param([switch]$VSCode)\nWrite-Output ('HELPER_EXECUTED: '+$VSCode); exit 17\n").unwrap();
+        fs::write(&file,"param([switch]$VSCode)\nWrite-Output ('HELPER_EXECUTED: '+$VSCode); exit 0\n").unwrap();
         for (policy,allowed) in [("RemoteSigned",true),("Restricted",false),("AllSigned",false)] {
             let output=windows_prerequisite_command(&file,true).env("PSExecutionPolicyPreference",policy).output().unwrap();
             let executed=String::from_utf8_lossy(&output.stdout).contains("HELPER_EXECUTED: True");
             assert_eq!(executed,allowed,"policy {policy}: {}",String::from_utf8_lossy(&output.stderr));
-            assert_eq!(output.status.code()==Some(17),allowed);
+            assert_eq!(output.status.success(),allowed);
         }
     }
     #[test]
@@ -35,11 +35,11 @@ mod windows_prerequisite_tests {
         let directory=env::temp_dir().join(format!("thor downloaded policy {}",unique()));
         fs::create_dir(&directory).unwrap();let _guard=RemoveDir(directory.clone());
         let file=directory.join("helper.ps1");
-        fs::write(&file,"Write-Output 'HELPER_EXECUTED'; exit 17\n").unwrap();
+        fs::write(&file,"Write-Output 'HELPER_EXECUTED'; exit 0\n").unwrap();
         fs::write(directory.join("helper.ps1:Zone.Identifier"),"[ZoneTransfer]\nZoneId=3\n").unwrap();
         let output=windows_prerequisite_command(&file,false).env("PSExecutionPolicyPreference","RemoteSigned").output().unwrap();
         let executed=String::from_utf8_lossy(&output.stdout).contains("HELPER_EXECUTED");
-        assert!(!executed);assert_ne!(output.status.code(),Some(17));
+        assert!(!executed);assert!(!output.status.success());
     }
 }
 

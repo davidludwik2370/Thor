@@ -377,7 +377,7 @@ if '--new-window' in a:
  if os.environ.get('CODE_TEST_DELAYED_PROFILE'):
   import subprocess
   # Simulate Code's CLI returning before its cold GUI has registered a profile.
-  subprocess.Popen([sys.executable,'-c','import time,sys;from pathlib import Path;time.sleep(11);Path(sys.argv[1]).write_text(sys.argv[2])',str(p),value],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+  subprocess.Popen([sys.executable,'-c','import time,sys;from pathlib import Path;time.sleep(11);f=Path(sys.argv[1]);t=f.with_name(f.name+".new");t.write_text(sys.argv[2]);t.replace(f)',str(p),value],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
  else:p.write_text(value)
 ''')
         code.chmod(0o755)

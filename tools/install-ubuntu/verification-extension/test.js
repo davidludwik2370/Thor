@@ -71,7 +71,13 @@ async function run() {
             await until('terminal PATH',()=>fs.existsSync(terminalStatus));
             assert.equal(fs.readFileSync(terminalStatus,'utf8').trim(),'ok',fs.readFileSync(terminalOutput,'utf8'));
             assert.match(fs.readFileSync(terminalOutput,'utf8'),/Thor/);
-        } finally {terminal.dispose();}
+        } finally {
+            terminal.dispose();
+            // This was a one-shot PATH probe, not an interactive shell for
+            // Thor: Run. Wait for its asynchronous close notification before
+            // selecting the next terminal in the integration test.
+            await until('terminal PATH probe close',()=>!vscode.window.terminals.includes(terminal));
+        }
         check('terminal-path-without-shell-profile');
         const source=path.join(folder.uri.fsPath,'editor.thor');
         const document=await vscode.workspace.openTextDocument(source);
@@ -118,8 +124,20 @@ async function run() {
         const runMarker=path.join(folder.uri.fsPath,'ran.txt');
         // A prior CLI smoke run must not satisfy the editor Run check.
         fs.rmSync(runMarker,{force:true});
-        await vscode.commands.executeCommand('thor.run');
-        await until('Cmd+R program',()=>fs.existsSync(runMarker));
+        const runDiagnostics={shell:vscode.env.shell,commands:[],output:''};
+        const runOutput=vscode.window.onDidStartTerminalShellExecution(event=>{
+            runDiagnostics.commands.push(event.execution.commandLine.value);
+            void (async()=>{for await(const chunk of event.execution.read())runDiagnostics.output+=chunk;})()
+                .catch(error=>{runDiagnostics.readError=String(error);});
+        });
+        try {
+            const runTerminal=await vscode.commands.executeCommand('thor.run');
+            runDiagnostics.options=runTerminal?.creationOptions;
+            await until('Cmd+R program',()=>fs.existsSync(runMarker));
+        } catch(error) {
+            fs.writeFileSync(path.join(path.dirname(result),'run-diagnostics.json'),JSON.stringify(runDiagnostics,null,2));
+            throw error;
+        } finally {runOutput.dispose();}
         assert.equal(fs.readFileSync(runMarker,'utf8'),'ok');
         check('run-without-shell-path');
         // Use the regular Thor command and a source breakpoint. The test launch
