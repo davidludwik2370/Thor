@@ -1,0 +1,135 @@
+{
+  "release": "0.41.10",
+  "source_commit": "5895ca1a1ef7e27bba58d8a1d338edf9da957979",
+  "final_maintained_inventory": 5014,
+  "coverage": "Full baseline runs followed by corrective selections; platform and capability skips retained.",
+  "windows": {
+    "baseline": {
+      "tests": 5004,
+      "seconds": 4453.01,
+      "failures": 19,
+      "errors": 30,
+      "skipped": 184
+    },
+    "corrective": {
+      "tests": 683,
+      "seconds": 686.131,
+      "failures": 9,
+      "errors": 0,
+      "skipped": 74
+    },
+    "platform_regressions": {
+      "tests": 101,
+      "seconds": 57.044,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3
+    },
+    "unexpected_corrective_failures": [],
+    "remaining_native_debugger_tests": [
+      "tests.test_debugger.DebuggerTests.test_automatic_using_header_preserves_breakpoints_steps_and_arguments",
+      "tests.test_debugger.DebuggerTests.test_breakpoint_in_shared_basic_uses_its_installed_source_map",
+      "tests.test_debugger.DebuggerTests.test_deferred_branch_location_steps_into_original_user_call",
+      "tests.test_debugger.DebuggerTests.test_or_else_fallback_list_keeps_breakpoints_and_user_step_into",
+      "tests.test_debugger.DebuggerTests.test_parallel_map_generic_callback_keeps_source_breakpoints_and_result_fields",
+      "tests.test_debugger.DebuggerTests.test_static_readonly_slice_literals_keep_source_breakpoints_and_values",
+      "tests.test_debugger.DebuggerTests.test_step_into_user_call_inside_switch_and_inspect_helper_locals",
+      "tests.test_debugger.DebuggerTests.test_unicode_inline_breakpoint_uses_utf16_editor_columns",
+      "tests.test_parameter_contracts_debugger.ParameterContractDebuggerTests.test_runtime_step_into_metadata_and_ro_input_keeps_source_and_values"
+    ],
+    "final_rust_units_passed": 141,
+    "final_editor_tests_passed": 206
+  },
+  "linux": {
+    "baseline": {
+      "tests": 5001,
+      "seconds": 3744.443,
+      "failures": 22,
+      "errors": 3,
+      "skipped": 63
+    },
+    "corrective": {
+      "tests": 376,
+      "seconds": 380.755,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 23
+    },
+    "platform_regressions": {
+      "tests": 101,
+      "seconds": 42.099,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    "inventory_gap_check": {
+      "tests": 10,
+      "seconds": 0.081,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    "final_rust_units_passed": 135,
+    "remaining_native_debugger_tests": [
+      "tests.test_debugger.DebuggerTests.test_deferred_branch_location_steps_into_original_user_call",
+      "tests.test_debugger.DebuggerTests.test_mut_annotation_keeps_original_breakpoints_and_slice_values"
+    ]
+  },
+  "macos": {
+    "final_rust_units_passed": 136,
+    "bundle_runtime_modes": {
+      "success": true,
+      "checked": true,
+      "unchecked": true,
+      "debug-unchecked": true,
+      "seconds": 25.6
+    }
+  },
+  "github_bootstrap_path": {
+    "macos": {
+      "success": true,
+      "commit": "5895ca1a1ef7e27bba58d8a1d338edf9da957979",
+      "source": "GitHub clone and published release",
+      "shells": [
+        {
+          "mode": "login",
+          "found": true,
+          "doctor": true,
+          "path_count": 1
+        },
+        {
+          "mode": "interactive",
+          "found": true,
+          "doctor": true,
+          "path_count": 1
+        }
+      ],
+      "uninstall_restored_startup_files": true
+    },
+    "linux": {
+      "success": true,
+      "commit": "5895ca1a1ef7e27bba58d8a1d338edf9da957979",
+      "source": "GitHub clone and published release",
+      "shells": [
+        {
+          "mode": "login",
+          "found": true,
+          "doctor": true,
+          "path_count": 1
+        },
+        {
+          "mode": "interactive",
+          "found": true,
+          "doctor": true,
+          "path_count": 1
+        }
+      ],
+      "uninstall_restored_startup_files": true
+    }
+  },
+  "release_asset_sha256": {
+    "thor-0.41.10-windows-x86_64.tar.gz": "a5df74372a7531efcb7d3727871a60aa6cdf466b86e1a67f574b7ea461e7acf9",
+    "thor-0.41.10-linux-x86_64.tar.gz": "b32da821c580ff9890f5cfee3194871b98f3b413768b349d80b76a0f5e54e207",
+    "thor-0.41.10-macos-aarch64.tar.gz": "7ef92b6e959780b109f7a8f032c3cebb1284a90f33fba66da02927fa4b8ac88a"
+  }
+}
