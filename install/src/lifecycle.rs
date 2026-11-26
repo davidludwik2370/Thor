@@ -7,6 +7,7 @@ pub(super) fn prerequisites(o:&Options)->Result<()> {
     let _guard=RemoveDir(temp.clone());
     fs::write(temp.join("vscode-minimum"),include_str!("../vscode-minimum")).map_err(err)?;
     fs::write(temp.join("vscode-macos-version"),include_str!("../vscode-macos-version")).map_err(err)?;
+    fs::write(temp.join("llvm-apt.sh"),include_str!("../llvm-apt.sh")).map_err(err)?;
     let mut cmd;
     if cfg!(windows) {
         let file=temp.join("prerequisites.ps1");fs::write(&file,include_str!("../prerequisites.ps1")).map_err(err)?;

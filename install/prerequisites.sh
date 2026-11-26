@@ -155,7 +155,10 @@ if $source_build; then
         if ! $reuse_odin && ! supported_llvm "${LLVM_CONFIG:-$(command -v llvm-config || :)}" && ! $llvm_found; then
             case "$system" in FreeBSD) packages llvm19;; NetBSD) packages llvm;; OpenBSD) packages llvm;;
                 Linux)
-                    if command -v apt-get >/dev/null 2>&1; then packages llvm-dev
+                    if command -v apt-get >/dev/null 2>&1; then
+                        script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+                        . "$script_dir/llvm-apt.sh"
+                        install_apt_llvm
                     elif command -v pacman >/dev/null 2>&1; then packages llvm
                     else packages llvm-devel; fi;;
             esac

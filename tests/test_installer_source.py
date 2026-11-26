@@ -155,10 +155,10 @@ class SourceFallbackTests(unittest.TestCase):
             return result,(root/'download-called').exists()
 
     def test_older_macos_uses_source_without_downloading_incompatible_sdk(self):
-        result,downloaded=self.exercise_macos_bootstrap('13.5.1','--vscode','--profile','Thor','--path')
+        result,downloaded=self.exercise_macos_bootstrap('12.7.6','--vscode','--profile','Thor','--path',minimum='13.0')
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertFalse(downloaded)
-        self.assertIn('this Mac: 13.5.1',result.stdout)
+        self.assertIn('this Mac: 12.7.6',result.stdout)
         self.assertIn('SOURCE-FALLBACK',result.stdout)
         for option in ('--vscode','--profile','Thor','--path'):self.assertIn(repr(option),result.stdout)
 

@@ -76,7 +76,7 @@ def ensure_node(work, env):
     source_tools.ensure_node(work, env, host())
 
 
-def build(work, forward, odin=None, export_bundle=None):
+def build(work, forward, odin=None, export_bundle=None, portable=False):
     target = host()
     install_env = dict(os.environ)
     env = dict(install_env)
@@ -157,7 +157,7 @@ def build(work, forward, odin=None, export_bundle=None):
     run([sys.executable, ROOT/'tools/build_distribution.py', '--odin', odin,
          '--compiler', work/'target/release'/('thor-rust'+suffix),
          '--installer', work/'target/release'/('thor-install'+suffix),
-         '--tls', tls, '--vsix', vsix, '--output', output], env=env)
+         '--tls', tls, '--vsix', vsix, '--output', output, *(['--portable'] if portable else [])], env=env)
     bundle = output/f'thor-{version}-{target}.tar.gz'
     # Code can outlive this process. Its terminals must inherit the caller's
     # environment, not Cargo/Rustup/npm paths that disappear with work/.
@@ -176,13 +176,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--odin', type=Path, help='reuse a reviewed Odin executable instead of building it')
     parser.add_argument('--export-bundle',type=Path,help='retain the verified native bundle/checksum in this directory (maintainers)')
+    parser.add_argument('--portable-bundle',action='store_true',help='enforce the reviewed release ABI baseline (maintainers)')
     options, forward = parser.parse_known_args()
     host()
     if '--dry-run' in forward:
         print('Source install plan: pinned Odin/LLVM, release Rust transpiler/installer, TLS, VSIX; inventoried install and final checks. No changes made.')
         return 0
     with tempfile.TemporaryDirectory(prefix='thor-source-') as temporary:
-        build(Path(temporary), forward, options.odin,options.export_bundle)
+        build(Path(temporary), forward, options.odin,options.export_bundle,options.portable_bundle)
     return 0
 
 

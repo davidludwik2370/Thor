@@ -1,0 +1,89 @@
+name: Portable release build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          from pathlib import Path
+          version=Path('release/version').read_text().strip()
+          if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise RuntimeError('Invalid release version')
+          tag='v'+version
+          p=subprocess.run(['gh','release','view',tag,'--json','isDraft,targetCommitish'],capture_output=True,text=True)
+          if p.returncode:
+              subprocess.run(['gh','release','create',tag,'--draft','--target',os.environ['GITHUB_SHA'],'--title','Thor '+version,'--notes','Compatibility validation in progress; not published.'],check=True)
+          else:
+              d=json.loads(p.stdout)
+              if not d['isDraft'] or d['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Existing release is published or belongs to another source commit')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('version='+version+'\n')
+          PY
+  native:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build and verify portable POSIX distribution
+        if: runner.os != 'Windows'
+        run: |
+          ./thor-install --from-source --portable-bundle --prefix "$RUNNER_TEMP/thor-portable-install" --path --export-bundle "$RUNNER_TEMP/thor-release"
+          ./thor-install --doctor --prefix "$RUNNER_TEMP/thor-portable-install"
+          ./thor-install --uninstall --prefix "$RUNNER_TEMP/thor-portable-install"
+      - name: Build and verify Windows distribution
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          .\thor-install.ps1 --from-source --prefix "$env:RUNNER_TEMP\thor-portable-install" --path --export-bundle "$env:RUNNER_TEMP\thor-release"
+          if ($LASTEXITCODE -ne 0) {throw 'Portable Windows source install failed'}
+          .\thor-install.ps1 --doctor --prefix "$env:RUNNER_TEMP\thor-portable-install"
+          if ($LASTEXITCODE -ne 0) {throw 'Windows doctor failed'}
+          .\thor-install.ps1 --uninstall --prefix "$env:RUNNER_TEMP\thor-portable-install"
+          if ($LASTEXITCODE -ne 0) {throw 'Windows uninstall failed'}
+      - name: Independently inspect Linux artifact ABI
+        if: runner.os == 'Linux'
+        run: |
+          python3 tools/release_compatibility.py "$RUNNER_TEMP"/thor-release/*.tar.gz --report "$RUNNER_TEMP/linux-abi.json"
+      - name: Upload only to this source commit's draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          tag='v'+Path('release/version').read_text().strip()
+          d=json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft,targetCommitish'],text=True))
+          if not d['isDraft'] or d['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Refusing to overwrite a published/different release')
+          root=Path(os.environ['RUNNER_TEMP'])/'thor-release'
+          files=sorted(root.glob('*.tar.gz'))
+          if len(files)!=1:raise RuntimeError('Expected one native release')
+          archive=files[0];sidecar=archive.with_name(archive.name+'.sha256')
+          digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+          if sidecar.read_text().split()[0]!=digest:raise RuntimeError('Artifact checksum differs')
+          subprocess.run(['gh','release','upload',tag,str(archive),str(sidecar),'--clobber'],check=True)
+          PY

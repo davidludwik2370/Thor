@@ -16,8 +16,10 @@ import tempfile
 import zipfile
 if __package__:
     from .ols_source import stage_source
+    from .release_compatibility import inspect_directory
 else:
     from ols_source import stage_source
+    from release_compatibility import inspect_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -272,11 +274,14 @@ def build(options):
             copy(ROOT/name, stage/name)
         rust_licenses(stage)
         relocate_odin(stage)
+        compatibility = inspect_directory(stage, arch, portable=getattr(options,'portable',False)) if system=='linux' else None
         files = {}
         for p in sorted(stage.rglob('*')):
             if p.is_file():
                 files[p.relative_to(stage).as_posix()] = dict(size=p.stat().st_size,sha256=sha(p),executable=bool(p.stat().st_mode & 0o111))
         manifest = dict(schema=1,product='Thor',version=version,target=system+'-'+arch,odin_version=odin_version,files=files)
+        if compatibility:
+            manifest['compatibility'] = compatibility
         raw = (json.dumps(manifest,sort_keys=True,indent=2)+'\n').encode()
         output = options.output/f'thor-{version}-{system}-{arch}.tar.gz'
         temporary_output = output.with_suffix('.tmp')
@@ -307,6 +312,7 @@ def main():
     parser.add_argument('--vsix',type=Path,default=ROOT/'editors/vscode/thor-language.vsix')
     parser.add_argument('--ols-source',type=Path,help='Pinned upstream OLS checkout (otherwise download and verify pinned source)')
     parser.add_argument('--output',type=Path,default=ROOT/'dist')
+    parser.add_argument('--portable',action='store_true',help='Require the reviewed Linux release ABI baseline (maintainers)')
     options=parser.parse_args()
     try:build(options)
     except (OSError,ValueError,subprocess.CalledProcessError) as error:parser.exit(1,f'distribution build failed: {error}\n')
