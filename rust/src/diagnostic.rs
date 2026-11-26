@@ -99,8 +99,14 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 impl From<std::io::Error> for Error {
+    #[track_caller]
     fn from(error: std::io::Error) -> Self {
-        Self::io("I/O failure", error)
+        let mut result=Self::io("I/O failure", error);
+        if std::env::var_os("THOR_TRACE_IO").is_some() {
+            let caller=std::panic::Location::caller();
+            result.message.push_str(&format!(" [at {}:{}:{}]",caller.file(),caller.line(),caller.column()));
+        }
+        result
     }
 }
 impl From<serde_json::Error> for Error {
