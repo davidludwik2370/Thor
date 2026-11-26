@@ -103,8 +103,21 @@ class DebugMaps {
         this.debugRoots = (listing.debug_roots || []).map(canonical);
         this.program=listing.debug_program;
         const mapFiles = [...listing.generated.filter(name => name.endsWith('.odin.map.json')), ...(listing.shared_maps || [])];
-        for (const name of mapFiles) {
-            const map = JSON.parse(fs.readFileSync(path.isAbsolute(name) ? name : path.join(directory, name), 'utf8'));
+        const maps=mapFiles.map(name=>JSON.parse(fs.readFileSync(path.isAbsolute(name)?name:path.join(directory,name),'utf8')));
+        for (const alias of listing.debug_aliases || []) {
+            const bytes=fs.readFileSync(alias.generated),original=fs.readFileSync(alias.original);
+            const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+            if(hash(bytes)!==alias.generated_sha256)throw new Error(`Generated source changed or maps are outdated: ${alias.generated}. Rebuild before debugging.`);
+            if(hash(original)!==alias.original_sha256)throw new Error(`Source changed since the debug build: ${alias.original}. Rebuild before debugging.`);
+            if(!Number.isSafeInteger(alias.offset)||alias.offset<0||alias.offset>bytes.length||!bytes.subarray(alias.offset).equals(original)) {
+                throw new Error(`Invalid native library alias: ${alias.generated}. Rebuild before debugging.`);
+            }
+            const segments=alias.offset?[[0,alias.offset,alias.original,0,0,'support',false]]:[];
+            segments.push([alias.offset,bytes.length,alias.original,0,original.length,'copy',true]);
+            maps.push({version:1,generated:alias.generated,generated_sha256:alias.generated_sha256,
+                sources:{[alias.original]:original.toString()},segments,regions:[]});
+        }
+        for (const map of maps) {
             if (map.version !== 1) throw new Error(`Unsupported Thor source-map version: ${map.version}`);
             const file = canonical(map.generated);
             const bytes = fs.readFileSync(file);

@@ -7,6 +7,60 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const {Framing,DebugMaps,ThorDebugAdapter} = require('../debug-adapter');
 
+function nativeAliasFixture(kind) {
+    const directory=fs.mkdtempSync(path.join(os.tmpdir(),'thor-native-debug-alias-'));
+    const runtime=path.join(directory,'runtime'),original=path.join(runtime,'format/code.odin');
+    const generated=path.join(directory,'lib/runtime-view/format/code.odin');
+    fs.mkdirSync(path.dirname(original),{recursive:true});fs.mkdirSync(path.dirname(generated),{recursive:true});
+    fs.mkdirSync(path.join(runtime,'basic'));fs.writeFileSync(path.join(runtime,'basic/basic.thor'),'package basic\n');
+    const text='package format\nwork::proc(){\n    value:=7 // 😀\n    _=value\n}\n';
+    const prefix=kind==='prefixed'?'#+vet !tabs\n':'';
+    fs.writeFileSync(original,text);
+    if(kind==='hardlink')fs.linkSync(original,generated);else fs.writeFileSync(generated,prefix+text);
+    const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+    const alias={generated,original,offset:Buffer.byteLength(prefix),generated_sha256:hash(fs.readFileSync(generated)),original_sha256:hash(fs.readFileSync(original))};
+    const data={debug_map_version:1,odin_flags:['-debug'],generated:[],debug_roots:[runtime],debug_aliases:[alias]};
+    const manifest=path.join(directory,'thor-manifest.json');
+    const save=()=>fs.writeFileSync(manifest,JSON.stringify(data));save();
+    return {directory,runtime,original,generated,text,data,manifest,save};
+}
+
+test('copied and hard-linked native libraries retain source breakpoints and stepping privileges',async()=>{
+    for(const kind of ['copy','hardlink','prefixed']) {
+        const fixture=nativeAliasFixture(kind);
+        try {
+            const {runtime,original,generated,manifest}=fixture,maps=new DebugMaps(manifest),line=kind==='prefixed'?4:3;
+            const point=maps.location(generated,line,1);
+            assert.equal(point.source.path,original);assert.equal(point.line,3);assert.equal(point.column,5);
+            const candidates=maps.candidates(original,3);
+            assert.equal(candidates.length,1);assert.equal(fs.realpathSync(candidates[0].file),fs.realpathSync(generated));assert.equal(candidates[0].line,line);
+            for(const fromLibrary of [false,true]) {
+                const adapter=Object.create(ThorDebugAdapter.prototype),calls=[],events=[];
+                adapter.maps=maps;adapter.frames=new Map();adapter.references=new Map();adapter.sourceAliases=new Map();
+                adapter.step={command:'stepIn',args:{},count:0,start:{source:{path:fromLibrary?path.join(runtime,'basic/basic.thor'):path.join(fixture.directory,'app.thor')},line:7,name:'main::main'}};
+                adapter.request=async command=>{calls.push(command);return {stackFrames:[{id:1,name:'format::work',source:{path:generated},line,column:1}]};};
+                adapter.emit=event=>events.push(event);
+                await adapter.stopped({body:{reason:'step',threadId:1}});
+                assert.deepEqual(calls,fromLibrary?['stackTrace']:['stackTrace','stepOut']);
+                assert.equal(events.length,fromLibrary?1:0);
+            }
+        } finally {fs.rmSync(fixture.directory,{recursive:true,force:true});}
+    }
+});
+
+test('native library aliases reject changed sources, changed views and invalid identity mappings',()=>{
+    const fixture=nativeAliasFixture('copy');
+    try {
+        const {original,generated,manifest,text,data,save}=fixture;
+        fs.writeFileSync(original,text+'// edited\n');assert.throws(()=>new DebugMaps(manifest),/Source changed/);
+        fs.writeFileSync(original,text);fs.writeFileSync(generated,text+'// edited\n');assert.throws(()=>new DebugMaps(manifest),/Generated source changed/);
+        fs.writeFileSync(generated,text);
+        for(const offset of [-1,0.5,Buffer.byteLength(text)+1,1]) {
+            data.debug_aliases[0].offset=offset;save();assert.throws(()=>new DebugMaps(manifest),/Invalid native library alias/);
+        }
+    } finally {fs.rmSync(fixture.directory,{recursive:true,force:true});}
+});
+
 test('PDB disassembly labels use their own frame without losing source references',()=>{
     const adapter=Object.create(ThorDebugAdapter.prototype);
     adapter.frames=new Map();adapter.sourceAliases=new Map();

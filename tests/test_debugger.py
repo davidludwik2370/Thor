@@ -189,6 +189,22 @@ class DebuggerCleanupTests(unittest.TestCase):
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_native_runtime_view_breakpoint_uses_the_original_library_source(self):
+        directory,_=self.build('''package main
+import formatting "thor:format"
+main::proc(){
+    buffer:formatting.Buffer
+    formatting.buffer_init(&buffer)
+    formatting.buffer_destroy(&buffer)
+}
+''')
+        library=ROOT/'runtime/format/buffer.odin'
+        line=next(i for i,text in enumerate(library.read_text().splitlines(),1) if 'buffer.scratch={storage=' in text)
+        client=self.launch(directory,library,[line])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(library),line),frame)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_migrated_native_debug_command_keeps_breakpoints_and_step_into(self):
         temporary=tempfile.TemporaryDirectory(prefix='thor-migrated-dap-')
         self.addCleanup(cleanup_debug_directory,temporary)

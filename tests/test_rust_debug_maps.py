@@ -55,6 +55,22 @@ const regions=[];for(const unit of maps.files.values())for(const row of [...unit
         self.assertNotIn('debug_program',checked)
         self.assertTrue(binary.exists())
 
+    def test_native_runtime_aliases_are_verified_only_for_debug_builds(self):
+        source='package main\nmain::proc(){text:=f"value {7}";defer delete(text);if text!="value 7"{panic("format")}}\n'
+        manifest,data,binary=self.build(source)
+        self.assertIn('debug_aliases',data)
+        for alias in data['debug_aliases']:
+            with self.subTest(generated=alias['generated']):
+                original=Path(alias['original']).read_bytes();generated=Path(alias['generated']).read_bytes()
+                self.assertEqual(hashlib.sha256(original).hexdigest(),alias['original_sha256'])
+                self.assertEqual(hashlib.sha256(generated).hexdigest(),alias['generated_sha256'])
+                self.assertEqual(generated[alias['offset']:],original)
+        if shutil.which('node'):self.assertTrue(self.inspect(manifest,binary,2)['candidates'])
+        result=subprocess.run([str(native.RUST),'check',str(self.source),'--output-dir',str(manifest.parent)],
+            cwd=self.root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertNotIn('debug_aliases',json.loads(manifest.read_bytes()))
+
     @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
     def test_helpers_captures_and_checked_variants_keep_source_identity(self):
         source='''package main

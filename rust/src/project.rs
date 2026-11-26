@@ -917,6 +917,7 @@ impl Project {
                 roots.extend(["base", "core", "vendor"].map(|name| Path::new(root).join(name)));
             }
             manifest["debug_roots"] = json!(roots);
+            manifest["debug_aliases"] = json!(runtimeview::debug_aliases(&self.options.root,&self.backend_runtime)?);
         }
         if self.memory.enabled() {
             manifest["memory_debug"] = json!({"tracking":self.memory.tracking,"address_sanitizer":self.memory.address,"source_map_version":1,"llvm_symbolizer":self.memory.symbolizer});

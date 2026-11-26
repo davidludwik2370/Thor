@@ -2,6 +2,35 @@
 //! Links keep editable sources authoritative without a per-project library copy.
 use super::*;
 
+// Directory symlinks resolve to the source automatically. Copied/hard-linked
+// files retain a distinct PDB pathname and need an explicit identity map.
+// Only debug builds request these small, byte-verified alias records.
+pub(super) fn debug_aliases(root:&Path,view:&Path)->Result<Vec<Value>> {
+    fn collect(directory:&Path,files:&mut Vec<PathBuf>)->std::io::Result<()> {
+        for entry in fs::read_dir(directory)? {
+            let entry=entry?;let path=entry.path();let kind=entry.file_type()?;
+            if kind.is_dir(){collect(&path,files)?;}
+            else if path.extension().is_some_and(|e|e=="odin")&&!path.file_name().unwrap().to_string_lossy().ends_with("_test.odin"){files.push(path);}
+        }
+        Ok(())
+    }
+    let source=crate::project::canonicalize(root.join("runtime"))?;
+    let mut files=vec![];collect(&source,&mut files)?;files.sort();
+    let mut aliases=vec![];
+    for original in files {
+        let relative=original.strip_prefix(&source).unwrap();
+        if relative.components().count()<2 {continue;}
+        let generated=view.join(relative);
+        if crate::project::canonicalize(&generated)?==crate::project::canonicalize(&original)?{continue;}
+        let bytes=fs::read(&generated)?;let original_bytes=fs::read(&original)?;
+        let offset=if bytes==original_bytes {0} else if bytes.strip_prefix(b"#+vet !tabs\n")==Some(original_bytes.as_slice()){b"#+vet !tabs\n".len()}else {
+            return Err(Error::new(format!("Native runtime view differs from its source: {}. Rebuild the runtime view.",generated.display())));
+        };
+        aliases.push(json!({"generated":generated,"original":original,"generated_sha256":sha256(&bytes),"original_sha256":sha256(&original_bytes),"offset":offset}));
+    }
+    Ok(aliases)
+}
+
 pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
     let source = crate::project::canonicalize(root.join("runtime"))?;
     let mut links = BTreeMap::new();
@@ -169,6 +198,21 @@ fn collect_tab_views(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn copied_native_debug_aliases_are_byte_verified_and_preserve_policy_prefixes() {
+        let root=std::env::temp_dir().join(format!("thor-runtime-debug-aliases-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join("runtime/sample")).unwrap();fs::create_dir_all(root.join("view/sample")).unwrap();
+        let raw=b"package sample\nwork::proc(){}\n";
+        fs::write(root.join("runtime/sample/code.odin"),raw).unwrap();
+        fs::write(root.join("runtime/sample/code_test.odin"),b"excluded").unwrap();
+        fs::write(root.join("view/sample/code.odin"),raw).unwrap();
+        let plain=debug_aliases(&root,&root.join("view")).unwrap();
+        fs::write(root.join("view/sample/code.odin"),[b"#+vet !tabs\n".as_slice(),raw.as_slice()].concat()).unwrap();
+        let prefixed=debug_aliases(&root,&root.join("view")).unwrap();
+        fs::write(root.join("view/sample/code.odin"),b"changed").unwrap();let rejected=debug_aliases(&root,&root.join("view")).is_err();
+        fs::remove_dir_all(&root).unwrap();
+        if plain.len()!=1||plain[0]["offset"]!=0||plain[0]["original_sha256"]!=sha256(raw)||prefixed.len()!=1||prefixed[0]["offset"]!=json!(b"#+vet !tabs\n".len())||!rejected {panic!("native alias debug map changed source identity or accepted different bytes");}
+    }
     #[test]
     fn policy_views_filter_tests_preserve_links_and_follow_support_edits() {
         let directory = std::env::temp_dir().join(format!(
