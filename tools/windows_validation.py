@@ -12,6 +12,8 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.storage import prune
 
 
 def source_identity(root):
@@ -80,7 +82,45 @@ class Validation:
             raise RuntimeError(f'{name} failed; see {log}')
         return text
 
+    def maintain(self, phase):
+        record = {'phase': phase}
+        self.packet.setdefault('maintenance', []).append(record)
+        try:
+            cleanup = prune(self.root, apply=True)
+            record['removed'] = cleanup['removed']
+        except Exception as error:
+            record['error'] = str(error)
+            raise
+        finally:
+            self.write()
+
     def run(self):
+        self.maintain('before')
+        try:
+            self.run_stage()
+        except BaseException as error:
+            # Preserve the actual verdict before removing regenerable output.
+            self.packet.update(success=False, error=str(error), finished=time.time())
+            try:
+                self.write()
+            except Exception as report_error:
+                self.packet['report_error'] = str(report_error)
+            try:
+                self.maintain('after')
+            except Exception:
+                # The maintenance record contains its error; keep the original
+                # test failure/interrupt as the primary cause.
+                pass
+            raise
+        else:
+            try:
+                self.maintain('after')
+            except Exception as error:
+                self.packet.update(success=False, error='Cleanup failed: '+str(error))
+                self.write()
+                raise
+
+    def run_stage(self):
         stage = self.stage
         odin = os.environ.get('THOR_ODIN', 'odin')
         compiler = self.root / 'rust/target/release/thor-rust.exe'

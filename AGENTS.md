@@ -32,6 +32,11 @@ change successful program behavior.
 - Prefer `python3 tools/build_compiler.py` for compiler development builds and
   `python3 tools/test_compiler.py` for suites. These apply development retention.
   Preserve logs/results, not obsolete object histories or copied installations.
+- Create remote validation snapshots in disposable workspaces. Never copy
+  `target`, compiler caches, `node_modules`, or installed toolchains into a new
+  candidate snapshot. Preserve unique source edits and test evidence before
+  removing a finished workspace; use the maintained Windows stage runner so
+  failed/interrupted stages also prune regenerable output.
 - Integration replay workspaces can be restored with
   `python3 tools/integration_storage.py restore` and archived again after use with
   `python3 tools/integration_storage.py archive`. The archive verifies sources

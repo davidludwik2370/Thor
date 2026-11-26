@@ -85,7 +85,7 @@ def candidates(root,*,reset_builds=False):
                 result.append(archive)
                 checksum=Path(str(archive)+'.sha256')
                 if checksum.exists():result.append(checksum)
-    for artifacts in [root/'thor_test/artifacts',root/'integration-projects/results']:
+    for artifacts in [root/'thor_test/artifacts',root/'integration-projects/results',root/'windows-results']:
         if not artifacts.is_dir() or is_link(artifacts):continue
         result.extend(artifacts/name for name in ['cache','runtime-cache','vet-cache','test-cache'] if (artifacts/name).is_dir() and not is_link(artifacts/name))
         for base,dirs,files in os.walk(artifacts,followlinks=False):
@@ -94,14 +94,36 @@ def candidates(root,*,reset_builds=False):
             for name in files:
                 path=Path(base)/name
                 if is_link(path):continue
-                with path.open('rb') as stream:head=stream.read(8)
-                if head[:4] in MAGIC or head.startswith(b'!<arch>\n') or head[:2]==b'MZ':result.append(path)
+                # Report text can quote binary signatures. Only native output
+                # filenames are disposable in the stage's evidence directory.
+                if artifacts==root/'windows-results' and path.suffix.lower() not in {'.exe','.dll','.pdb','.o','.obj','.a','.lib'}:continue
+                with path.open('rb') as stream:head=stream.read(32)
+                if head[:4] in MAGIC or head.startswith((b'!<arch>\n',b'Microsoft C/C++ MSF')) or head[:2]==b'MZ':result.append(path)
     return sorted(set(result))
+
+def protected_sources(root):
+    """ZIP validation snapshots have a source inventory instead of Git metadata."""
+    manifest=root/'snapshot-manifest.json'
+    protected=set()
+    if is_link(manifest):
+        raise RuntimeError('Linked snapshot source inventory; cleanup refused')
+    if manifest.exists():
+        files=json.loads(manifest.read_text(encoding='utf-8')).get('files')
+        if not isinstance(files,dict) or not files:
+            raise RuntimeError('Invalid snapshot source inventory; cleanup refused')
+        for name in files:
+            if not isinstance(name,str) or not name or not (root/name).resolve().is_relative_to(root):
+                raise RuntimeError('Snapshot source path escapes the workspace; cleanup refused')
+            protected.add((root/name).resolve())
+        protected.add(manifest)
+    if (root/'.git').exists() or not protected:
+        tracked=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).split(b'\0')
+        protected.update(root/os.fsdecode(name) for name in tracked if name)
+    return protected
 
 def prune(root,*,apply=False,reset_builds=False):
     root=root.resolve()
-    tracked=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).split(b'\0')
-    protected={root/os.fsdecode(name) for name in tracked if name}
+    protected=protected_sources(root)
     protected_directories={parent for source in protected for parent in source.parents}
     paths=candidates(root,reset_builds=reset_builds)
     records=[]
@@ -116,7 +138,8 @@ def prune(root,*,apply=False,reset_builds=False):
             if is_link(path):raise RuntimeError('Cleanup target became a link: '+str(path))
             if path.name=='debug' and path.parent.name=='target' and (path.parent.parent/'Cargo.toml').is_file():
                 # Cargo coordinates with active builds using its native locks.
-                subprocess.run(['cargo','clean','--profile','dev','--manifest-path',str(path.parent.parent/'Cargo.toml')],check=True)
+                subprocess.run(['cargo','clean','--profile','dev','--manifest-path',str(path.parent.parent/'Cargo.toml'),
+                                '--target-dir',str(path.parent)],check=True)
             elif path.is_dir():shutil.rmtree(path)
             elif path.exists():path.unlink()
     return {'applied':apply,'time':time.time(),'root':str(root),'removed' if apply else 'candidates':records}

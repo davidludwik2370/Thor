@@ -44,6 +44,14 @@ Keep the logs from failed attempts before updating or rerunning a stage.
 Only an executable's expected output and successful exit establish smoke-test
 success. Missing host facilities and skipped tests must remain explicit.
 
+Every stage now runs [development storage maintenance](storage.md) before and
+after execution, including failure and interruption. It preserves inventoried
+source, fixtures and text/JSON reports while pruning obsolete caches, oversized
+debug histories and generated native outputs in `windows-results`. The JSON
+records include cleanup outcomes. Completed candidate snapshots should be
+retired after preserving their unique edits and reports; create the next
+candidate from source, never by copying its predecessor's build/cache trees.
+
 Rust compilation uses two workers; Rust and Odin unit-test execution are also
 bounded. Command timeouts clean up only the process tree launched by the stage.
 Source snapshots exclude local build products, caches, integration clones,

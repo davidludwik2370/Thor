@@ -59,7 +59,10 @@ python3 tools/storage.py --apply   # Prune them
 ```
 
 The build wrapper prunes before/after building. The maintained test runner prunes
-before running and again after success. Failed test runs retain evidence.
+before running and again after success, failure or interruption. Test results
+are written before cleanup and updated with its outcome; failed runs retain
+source and diagnostic reports rather than obsolete compiler objects. An
+unwritable result file does not skip cleanup or produce a successful exit.
 Development histories above 1.5 GiB are cleaned through Cargo's native locking;
 the active release compiler remains available. `--reset-builds` explicitly also
 discards smaller debug histories. Direct Cargo commands remain supported, but
@@ -73,6 +76,32 @@ publication-install clones are disposable. Current source, VM disks, editor
 settings, ordinary project executables and unrelated toolchains are preserved.
 The root frontend executable cache retains recent builds and four older builds;
 the standard maintenance commands discard older copies after seven days.
+
+### Windows validation snapshots
+
+`tools/windows_validation.py` applies the same maintenance before and after each
+stage, including failed and interrupted stages. Its JSON records include the
+maintenance outcome. Cleanup failures cannot replace the original test failure
+or leave an overall successful stage verdict. Native executables and PDB files
+under `windows-results` are disposable; source fixtures, logs and JSON reports
+remain. Active release compiler binaries outside that result directory remain.
+
+Source ZIP snapshots do not need Git metadata for maintenance: their
+`snapshot-manifest.json` protects source paths, in addition to Git-tracked files
+when Git metadata is present. Invalid inventories and paths outside the snapshot
+abort cleanup. Tracked/source-inventoried files are protected even when they have
+generated-looking names. Directory links are not traversed.
+
+Create new candidates in temporary workspaces, copying source rather than
+`target`, caches, `node_modules`, installed SDKs or prior run directories. Keep
+source edits and test reports outside those temporary workspaces before their
+final removal. The stage runner keeps sources in place; it does not automatically
+retire whole snapshot directories. Old manually retained snapshots from before
+these controls require a separate, verified source/evidence archive before
+removal. Bounded caches do not retroactively remove those independent copies.
+The [Windows storage validation report](validation/windows-storage-2026-11-26.md)
+records a verified retirement of the older run snapshots and the regression
+checks for failure/interruption cleanup.
 
 ## Installed toolchains
 

@@ -119,21 +119,56 @@ def main():
     print(f'Running {len(selected)} tests; {len(archived)} historical implementation tests '
           'are available with --reference.', flush=True)
     started = time.monotonic()
-    with contextlib.nullcontext() if options.reference else native_only():
-        result = unittest.TextTestRunner(verbosity=2, resultclass=ProgressResult).run(unittest.TestSuite(selected))
-    if result.wasSuccessful():prune(ROOT,apply=True)
-    if options.output:
-        packet = {'mode': 'reference' if options.reference else 'native',
-                  'tests': result.testsRun, 'seconds': time.monotonic()-started,
-                  'selected': [test.id() for test in selected],
-                  'test_seconds': getattr(result, 'timings', {}),
-                  'success': result.wasSuccessful(), 'archived': archived,
-                  'skipped': [{'test': test.id(), 'reason': reason} for test, reason in result.skipped],
-                  'failures': [{'test': test.id(), 'detail': detail} for test, detail in result.failures],
-                  'errors': [{'test': test.id(), 'detail': detail} for test, detail in result.errors]}
-        options.output.parent.mkdir(parents=True, exist_ok=True)
-        options.output.write_text(json.dumps(packet, indent=2)+'\n')
-    return not result.wasSuccessful()
+    result = None
+    packet = {'mode': 'reference' if options.reference else 'native',
+              'selected': [test.id() for test in selected], 'archived': archived,
+              'success': False}
+    report_saved = True
+    cleanup_failed = False
+
+    def save_report():
+        if options.output is None:
+            return True
+        try:
+            options.output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = options.output.with_suffix(options.output.suffix+'.tmp')
+            temporary.write_text(json.dumps(packet, indent=2)+'\n', encoding='utf-8')
+            temporary.replace(options.output)
+            return True
+        except OSError as error:
+            print(f'Could not save test results: {error}', file=sys.stderr)
+            return False
+
+    try:
+        with contextlib.nullcontext() if options.reference else native_only():
+            result = unittest.TextTestRunner(verbosity=2, resultclass=ProgressResult).run(unittest.TestSuite(selected))
+    except BaseException as error:
+        packet.update(aborted=True, error=f'{type(error).__name__}: {error}')
+        raise
+    finally:
+        packet['seconds'] = time.monotonic()-started
+        if result is not None:
+            packet.update(tests=result.testsRun, test_seconds=getattr(result, 'timings', {}),
+                success=result.wasSuccessful(),
+                skipped=[{'test': test.id(), 'reason': reason} for test, reason in result.skipped],
+                failures=[{'test': test.id(), 'detail': detail} for test, detail in result.failures],
+                errors=[{'test': test.id(), 'detail': detail} for test, detail in result.errors])
+        report_saved = save_report()
+        # Failed/interrupted suites keep their source and reports, rather than
+        # keeping an unbounded history of disposable caches and object files.
+        try:
+            cleanup = prune(ROOT,apply=True)
+            packet['cleanup_removed'] = cleanup['removed']
+        except Exception as error:
+            cleanup_failed = True
+            packet.update(success=False, cleanup_error=str(error))
+            print(f'Development cleanup failed: {error}', file=sys.stderr)
+        if not report_saved:
+            packet.update(success=False, report_error='Could not save test results before cleanup.')
+        packet['seconds'] = time.monotonic()-started
+        saved_after_cleanup = save_report()
+        report_saved = saved_after_cleanup and report_saved
+    return not result.wasSuccessful() or cleanup_failed or not report_saved
 
 
 if __name__ == '__main__':

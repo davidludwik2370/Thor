@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-26",
+  "platform": "Windows 11 Pro x64, build 26200",
+  "cleanup": {
+    "success": true,
+    "removed_root": "C:\\Users\\david\\Code\\thor-validation\\runs\\20261123-480b053b",
+    "archive": "C:\\Users\\david\\Code\\thor-validation\\retired-run-evidence\\20261123-480b053b.tar.gz",
+    "archive_sha256": "24afe7ac82376f8b0d908288363be1a03e31882f75ec8aa34a7bc3b6043b5326",
+    "archive_bytes": 1240487207,
+    "preserved_files": 125015,
+    "preserved_link_records": 458,
+    "source_manifest_differences": 0,
+    "external_link_targets_preserved": 1,
+    "before_free_bytes": 60739829760,
+    "after_free_bytes": 135401922560,
+    "recovered_bytes": 74662092800,
+    "finished": 1795723150.7083302
+  },
+  "archive": {
+    "archive_sha256": "24afe7ac82376f8b0d908288363be1a03e31882f75ec8aa34a7bc3b6043b5326",
+    "archive_bytes": 1240487207,
+    "preserved_files": 125015,
+    "preserved_links": 458,
+    "source_manifest_differences": 0,
+    "mac_sha256_verified": true,
+    "mac_all_archive_members_verified": true,
+    "source_snapshot_count": 8
+  },
+  "windows_cleanup_regressions": {
+    "temporary_workspace_removed": true,
+    "success": true,
+    "runs": [
+      {
+        "mode": "normal",
+        "exit_code": 0,
+        "tail": "or_return_success) ... ok\ntest_success_saves_results_and_cleans_generated_storage (tests.test_test_runner_storage.TestRunnerStorageTests.test_success_saves_results_and_cleans_generated_storage) ... ok\n\n----------------------------------------------------------------------\nRan 26 tests in 1.410s\n\nOK\n"
+      },
+      {
+        "mode": "optimized",
+        "exit_code": 0,
+        "tail": "or_return_success) ... ok\ntest_success_saves_results_and_cleans_generated_storage (tests.test_test_runner_storage.TestRunnerStorageTests.test_success_saves_results_and_cleans_generated_storage) ... ok\n\n----------------------------------------------------------------------\nRan 26 tests in 1.348s\n\nOK\n"
+      }
+    ]
+  },
+  "macos_cleanup_regressions": {
+    "ordinary_tests": 26,
+    "optimized_tests": 26,
+    "success": true,
+    "related_archive_group_tests": 36,
+    "related_archive_group_windows_only_skips": 2
+  },
+  "maintained_runner": {
+    "tests": 26,
+    "success": true,
+    "cleanup_error": null
+  },
+  "assertion_hygiene": {
+    "tests": 7,
+    "success": true
+  },
+  "post_cleanup_doctor": {
+    "context": "logged-in normal user, interactive limited task",
+    "success": true,
+    "exit_code": 0,
+    "stdout": "Thor 0.41.12: C:\\Users\\david\\AppData\\Local\\Thor\\versions\\0.41.12-c64e532c3d9b\nPASS: installed file inventory and checksums\nC:\\Users\\david\\AppData\\Local\\Thor\\versions\\0.41.12-c64e532c3d9b\\odin/odin.exe version dev-2026-11:9a69916\nThor installation OK: 42\nPASS: checked Thor compile-time and runtime execution\nThor installation OK: 42\nPASS: unchecked release compilation and execution\nPASS: installed Thor/Odin/installer commands\nPASS: current process PATH\nPASS: TLS startup, type hover and field completion\nPASS: VS Code profile and Thor/OLS/CodeLLDB extension inventory\nPASS: installed Thor extension entry point and JavaScript runtime dependencies\nPASS: OLS startup, type hover and field completion\nSKIP: interactive VS Code rendering and source breakpoint; verify visually in a trusted workspace\nDoctor verification complete. All requested non-interactive checks passed; skipped checks are listed above.\n",
+    "stderr": ""
+  },
+  "scope_notes": [
+    "Only the retired November 23 run was removed.",
+    "The installed toolchain, current source checkout and Linux VM were preserved.",
+    "Elevated SSH junction traversal was rejected with Windows error 448; the standard-user Doctor passed with unchanged runtime files.",
+    "No compiler/runtime implementation, runtime links or Windows security settings were changed.",
+    "Temporary tasks and uploaded regression fixtures were removed; private evidence archives and small reports remain."
+  ]
+}
