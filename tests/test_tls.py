@@ -1,5 +1,6 @@
 """Exercise the TLS executable through its actual stdio LSP transport."""
 from __future__ import annotations
+from tests.native_paths import directory_alias
 
 import json
 import os
@@ -3090,7 +3091,7 @@ main :: proc() {
         real = root / 'real'
         real.mkdir()
         alias = root / 'alias'
-        alias.symlink_to(real, target_is_directory=True)
+        directory_alias(alias,real)
         main = alias / 'main.thor'
         text = 'package main\nmain :: proc(){_ = missing}\n'
         main.write_text(text)

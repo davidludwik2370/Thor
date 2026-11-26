@@ -23,6 +23,14 @@ import time
 
 IDS={'thor-local.thor-language','danielgavin.ols','vadimcn.vscode-lldb','aesl.odin'}
 
+def is_link(path):
+    path=Path(path)
+    if path.is_symlink():return True
+    if os.name!='nt':return False
+    try:return getattr(path.lstat(),'st_reparse_tag',0)==0xA0000003
+    except FileNotFoundError:return False
+
+
 def read(path):
     return json.loads(path.read_text())
 
@@ -59,10 +67,10 @@ def validate(home,repo):
         raise RuntimeError('This VM has not been authorized for the installation reset helper.')
     if repo.resolve()!=(home/'Thor').resolve():raise RuntimeError('This helper targets ~/Thor only.')
     for path in [home/'.config/Code',home/'.vscode/extensions',home/'.local/share/ols',home/'.cache/thor-validation']:
-        if path.is_symlink() or not path.resolve().is_relative_to(home.resolve()):
+        if is_link(path) or not path.resolve().is_relative_to(home.resolve()):
             raise RuntimeError('Reset target is linked outside its expected location; preserved: '+str(path))
     prefix=home/'.local/share/thor';record=home/'.config/thor/installation.json'
-    if prefix.is_symlink():raise RuntimeError('Installation prefix is a symlink; it was preserved.')
+    if is_link(prefix):raise RuntimeError('Installation prefix is a symlink; it was preserved.')
     if record.exists():
         value=read(record)
         if value.get('schema')!=1 or value.get('managed_by')!='thor-install' or value.get('prefix')!=str(prefix):
@@ -87,9 +95,9 @@ def validate(home,repo):
         raise RuntimeError('Bundle lacks automatic native ARM64 OLS source.')
     required=sum(value['size'] for value in manifest['files'].values())+bundle.stat().st_size+256*1024*1024
     if shutil.disk_usage(home).free<required:raise RuntimeError('Not enough space for a fresh installation and its recovery backup.')
-    for path in [home/'.profile',home/'.zprofile']:
+    for path in [home/name for name in ('.profile','.bash_profile','.bash_login','.bashrc','.zprofile','.zshrc')]:
         if path.exists():
-            if path.is_symlink():raise RuntimeError('Shell profile is a symlink; it was preserved.')
+            if is_link(path):raise RuntimeError('Shell profile is a symlink; it was preserved.')
             without_path_block(path.read_text())
     storage=home/'.config/Code/User/globalStorage/storage.json'
     if storage.exists():
@@ -114,7 +122,7 @@ class Backup:
         dest=self.directory/'home'/relative;dest.parent.mkdir(parents=True,exist_ok=True)
         return dest
     def move(self,path):
-        if path.exists() or path.is_symlink():shutil.move(path,self.destination(path))
+        if path.exists() or is_link(path):shutil.move(path,self.destination(path))
     def copy(self,path):
         if path.exists():shutil.copy2(path,self.destination(path))
 
@@ -157,7 +165,7 @@ def reset(home,backup):
     if cached.exists():
         for path in list(cached.iterdir()):
             if package_name(path.name):backup.move(path)
-    for path in [home/'.profile',home/'.zprofile']:
+    for path in [home/name for name in ('.profile','.bash_profile','.bash_login','.bashrc','.zprofile','.zshrc')]:
         if path.exists():
             original=path.read_text();clean=without_path_block(original)
             if clean!=original:backup.copy(path);path.write_text(clean)

@@ -1,3 +1,5 @@
+import os, sys
+from tests.native_paths import directory_alias
 import hashlib
 import io
 import json
@@ -60,12 +62,14 @@ class VMResetTests(unittest.TestCase):
         extension=self.write('.vscode/extensions/example.python-1/package.json','unrelated extension')
         project=self.write('Thor/demo/main.thor','user project')
         idle=self.write('.config/thor-validation/vm-idle-settings-before.json','idle preferences')
-        self.write('.profile','before\n# >>> thor-install PATH >>>\nexport PATH=somewhere\n# <<< thor-install PATH <<<\nafter\n')
+        for name in ('.profile','.bash_profile','.bash_login','.bashrc','.zprofile','.zshrc'):
+            self.write(name,'before\n# >>> thor-install PATH >>>\nexport PATH=somewhere\n# <<< thor-install PATH <<<\nafter\n')
         backup=reset.Backup(self.home);reset.reset(self.home,backup)
         self.assertFalse(self.prefix.exists());self.assertFalse((self.home/'.config/thor').exists())
         self.assertEqual(project.read_text(),'user project');self.assertEqual(idle.read_text(),'idle preferences')
         self.assertEqual(other.read_text(),'unrelated settings');self.assertEqual(extension.read_text(),'unrelated extension')
-        self.assertEqual((self.home/'.profile').read_text(),'before\nafter\n')
+        for name in ('.profile','.bash_profile','.bash_login','.bashrc','.zprofile','.zshrc'):
+            self.assertEqual((self.home/name).read_text(),'before\nafter\n')
         storage=reset.read(self.home/'.config/Code/User/globalStorage/storage.json')
         self.assertEqual(storage['userDataProfiles'],[{'name':'Work','location':'work-id'}])
         self.assertEqual(storage['profileAssociations']['workspaces'],{'other':'work-id'});self.assertEqual(storage['keep'],123)
@@ -81,7 +85,7 @@ class VMResetTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'Incomplete'):self.validate()
         self.assertTrue(self.prefix.exists())
     def test_symlinked_prefix_is_preserved(self):
-        original=self.home/'original-prefix';self.prefix.rename(original);self.prefix.symlink_to(original,target_is_directory=True)
+        original=self.home/'original-prefix';self.prefix.rename(original);directory_alias(self.prefix,original)
         with self.assertRaisesRegex(RuntimeError,'symlink'):self.validate()
         self.assertTrue(original.exists())
     def test_local_release_server_only_exposes_bundle_and_checksum(self):
@@ -92,9 +96,9 @@ class VMResetTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen(url+'/../../.profile')
             with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen(url+'/')
     def test_execute_keeps_exact_installer_arguments(self):
-        script=self.write('Thor/thor-install','#!/bin/sh\nprintf "%s\\n" "$@" > args.txt\nprintf "%s" "$THOR_RELEASE_BASE" > mirror.txt\n')
-        script.chmod(0o755);log=io.StringIO()
-        reset.execute(['./thor-install','--vscode','--profile','Thor'],self.repo,{'THOR_RELEASE_BASE':'http://127.0.0.1:1234','PATH':'/usr/bin:/bin'},log)
+        script=self.write('Thor/installer-fixture.py','import os,sys\nfrom pathlib import Path\nPath("args.txt").write_text("\\n".join(sys.argv[1:]))\nPath("mirror.txt").write_text(os.environ["THOR_RELEASE_BASE"])\n')
+        log=io.StringIO()
+        reset.execute([sys.executable,str(script),'--vscode','--profile','Thor'],self.repo,{**os.environ,'THOR_RELEASE_BASE':'http://127.0.0.1:1234'},log)
         self.assertEqual((self.repo/'args.txt').read_text().splitlines(),['--vscode','--profile','Thor'])
         self.assertEqual((self.repo/'mirror.txt').read_text(),'http://127.0.0.1:1234')
 

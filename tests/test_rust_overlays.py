@@ -1,4 +1,5 @@
 """Unsaved source files participate in native discovery without being created."""
+from tests.native_paths import directory_alias
 from tests.test_rust_compiler import compiler_engines
 import json
 import os
@@ -120,7 +121,7 @@ class RustOverlayTests(unittest.TestCase):
 
     def test_virtual_file_paths_resolve_through_an_existing_directory_symlink(self):
         link = self.root / 'linked'
-        link.symlink_to(self.app, target_is_directory=True)
+        directory_alias(link,self.app)
         alias = link / self.source.name
         overlay = self.overlay({alias: 'package main\nmain::proc(){}\n'})
         for engine in compiler_engines():

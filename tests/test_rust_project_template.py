@@ -1,4 +1,5 @@
 """Native scaffolding matches the reference without requiring Odin or Python."""
+from tests.native_paths import thor_launcher, dangling_directory_alias, is_directory_alias
 from tests.test_rust_compiler import compiler_engines
 import json
 import os
@@ -53,7 +54,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         self.assertEqual(set(files), {'default_project.thor', '.vscode/tasks.json', '.vscode/launch.json'})
         self.assertEqual(files['default_project.thor'], (ROOT/'templates/main.thor').read_bytes())
         task = files['.vscode/tasks.json']['tasks'][0]
-        self.assertEqual(Path(task['command']), ROOT/'thor')
+        self.assertEqual(Path(task['command']), thor_launcher())
         self.assertEqual(task['args'][:4], ['build', '.', '-debug', '-o:none'])
         self.assertEqual(files['.vscode/launch.json']['configurations'][0]['type'], 'thor-lldb')
 
@@ -79,11 +80,11 @@ class RustProjectTemplateTests(unittest.TestCase):
         for engine in compiler_engines():
             parent = self.root/engine
             parent.mkdir()
-            (parent/'existing').symlink_to(parent/'missing', target_is_directory=True)
+            dangling_directory_alias(parent/'existing',parent/'missing')
             result = self.invoke(engine, ['existing', '--parent', str(parent)])
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn('already exists', result.stderr)
-            self.assertTrue((parent/'existing').is_symlink())
+            self.assertTrue(is_directory_alias(parent/'existing'))
             result = self.invoke(engine, ['sample', '--parent', str(parent)])
             self.assertEqual(result.returncode, 0, result.stderr)
             before = self.files(parent/'sample')

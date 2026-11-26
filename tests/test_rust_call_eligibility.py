@@ -1,4 +1,5 @@
 """Compile-time call eligibility and reference diagnostic precedence."""
+from tests.native_paths import directory_alias, file_reference
 import unittest
 import tempfile
 from pathlib import Path
@@ -96,7 +97,7 @@ class RustCallEligibilityTests(unittest.TestCase):
             root=Path(directory).resolve()
             for support in (native.ROOT/'runtime').iterdir():
                 if support.name!='format':
-                    (root/support.name).symlink_to(support,target_is_directory=support.is_dir())
+                    directory_alias(root/support.name,support) if support.is_dir() else file_reference(root/support.name,support)
             (root/'format').mkdir()
             (root/'format/main.thor').write_text('package format\nforeign {format_plain::proc(value:int)->int ---}\n')
             self.compare(self.program('_=#run format.format_plain(7)','import "thor:format"'),

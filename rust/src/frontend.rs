@@ -147,7 +147,7 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf, String)> 
             if !output.status.success() || output.oversized {
                 return Err(Error::new("could not build Thor's Odin frontend"));
             }
-            fs::rename(&intermediate, &binary)?;
+            publish_frontend(&intermediate, &binary)?;
             Ok(())
         })();
         let _ = fs::remove_dir_all(work);
@@ -165,6 +165,41 @@ fn unique() -> String {
     format!("{time}-{sequence}")
 }
 
+fn publish_frontend(intermediate: &Path, binary: &Path) -> Result<()> {
+    // A concurrent compiler may have published this content-addressed helper
+    // and started executing it. Never replace the winning executable.
+    match fs::hard_link(intermediate, binary) {
+        Ok(()) => Ok(()),
+        Err(_) if binary.is_file() => Ok(()),
+        Err(_) => match fs::rename(intermediate, binary) {
+            Ok(()) => Ok(()),
+            Err(_) if binary.is_file() => Ok(()),
+            Err(error) => Err(Error::new(format!("Cannot publish frontend {}: {error}", binary.display()))),
+        },
+    }
+}
+
+fn replace_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    #[cfg(not(windows))]
+    { fs::rename(from, to) }
+    #[cfg(windows)]
+    {
+        // Odin/editor readers can briefly hold a handle without delete sharing.
+        // Retry only native sharing/lock violations; persistent failures retain
+        // the previous output and still report an error. The normal path does
+        // not sleep or allocate, and compiled programs are unaffected.
+        for attempt in 0..=10 {
+            match fs::rename(from, to) {
+                Err(error) if matches!(error.raw_os_error(), Some(32 | 33)) && attempt < 10 => {
+                    thread::sleep(Duration::from_millis(2 << attempt.min(5)));
+                }
+                result => return result,
+            }
+        }
+        unreachable!()
+    }
+}
+
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -177,7 +212,8 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
             .write(true)
             .open(&temp)?;
         file.write_all(bytes)?;
-        fs::rename(&temp, path)?;
+        drop(file);
+        replace_file(&temp, path).map_err(|error| Error::new(format!("Cannot publish {}: {error}", path.display())))?;
         Ok(())
     })();
     if result.is_err() {
@@ -485,6 +521,46 @@ impl Frontend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn concurrent_frontend_publish_preserves_the_complete_winner() {
+        let directory=std::env::temp_dir().join(format!("thor-frontend-publish-{}-{}",std::process::id(),unique()));
+        fs::create_dir(&directory).unwrap();
+        let first=directory.join("first");let second=directory.join("second");let output=directory.join("frontend");
+        fs::write(&first,b"complete first build").unwrap();fs::write(&second,b"complete second build").unwrap();
+        publish_frontend(&first,&output).unwrap();publish_frontend(&second,&output).unwrap();
+        let bytes=fs::read(&output).unwrap();fs::remove_dir_all(&directory).unwrap();
+        if bytes!=b"complete first build" {panic!("concurrent frontend replaced the winning executable");}
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn atomic_write_waits_for_a_reader_without_delete_sharing() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory=std::env::temp_dir().join(format!("thor-shared-reader-{}-{}",std::process::id(),unique()));
+        fs::create_dir(&directory).unwrap();let output=directory.join("source.odin");
+        fs::write(&output,b"original").unwrap();
+        let held=fs::OpenOptions::new().read(true).share_mode(1).open(&output).unwrap();
+        let path=output.clone();let (sender,receiver)=std::sync::mpsc::channel();
+        let writer=thread::spawn(move||{sender.send(()).unwrap();atomic_write(&path,b"replacement")});
+        receiver.recv().unwrap();thread::sleep(Duration::from_millis(40));drop(held);
+        writer.join().unwrap().unwrap();let bytes=fs::read(&output).unwrap();
+        let entries=fs::read_dir(&directory).unwrap().count();fs::remove_dir_all(&directory).unwrap();
+        if bytes!=b"replacement"||entries!=1 {panic!("reader contention left an incomplete atomic write");}
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn persistent_reader_lock_preserves_the_previous_output_and_cleans_temporary_files() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory=std::env::temp_dir().join(format!("thor-persistent-reader-{}-{}",std::process::id(),unique()));
+        fs::create_dir(&directory).unwrap();let output=directory.join("source.odin");
+        fs::write(&output,b"original").unwrap();
+        let held=fs::OpenOptions::new().read(true).share_mode(1).open(&output).unwrap();
+        let result=atomic_write(&output,b"replacement");let bytes=fs::read(&output).unwrap();
+        let entries=fs::read_dir(&directory).unwrap().count();drop(held);fs::remove_dir_all(&directory).unwrap();
+        if result.is_ok()||bytes!=b"original"||entries!=1 {panic!("persistent sharing failure damaged the previous output");}
+    }
+
     fn packet(payload: &str) -> Vec<u8> {
         format!("{{\"version\":1,\"schema\":\"odin-frontend-raw-v1\",\"sha256\":\"{}\",\"payload\":{payload}}}", sha256(payload.as_bytes())).into_bytes()
     }

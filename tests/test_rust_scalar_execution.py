@@ -1,4 +1,5 @@
 """Scalar site records validate bindings, bodies and external inputs on reuse."""
+from tests.native_paths import directory_alias, remove_directory_alias
 import os
 import unittest
 from tests.cache_paths import entries as cache_entries
@@ -131,13 +132,13 @@ class RustScalarExecutionTests(unittest.TestCase):
         for name,value in [('one',6),('two',7)]:
             directory=self.root/name/'sample';directory.mkdir(parents=True)
             (directory/'sample.odin').write_text(f'package sample\nwork::proc()->int{{return {value}}}\n')
-        link=self.root/'sdk';link.symlink_to(self.root/'one',target_is_directory=True)
+        link=self.root/'sdk';directory_alias(link,self.root/'one')
         self.source.write_text('package main\nimport lib "extras:sample"\nVALUE::#run lib.work()\nmain::proc(){_=VALUE}\n')
         flags=['-debug','-collection:extras='+str(link)]
         self.invoke(flags=flags);self.discard_prepared()
         warm=self.invoke(flags=flags)
         self.assertGreater(warm['cache']['scalar_reused'],0)
-        link.unlink();link.symlink_to(self.root/'two',target_is_directory=True)
+        remove_directory_alias(link);directory_alias(link,self.root/'two')
         changed=self.invoke(flags=flags)
         self.assertEqual(changed['cache']['scalar_reused'],0)
         self.assertEqual(changed['results'][0][1]['value'],'7')

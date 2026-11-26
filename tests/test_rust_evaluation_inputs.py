@@ -1,4 +1,5 @@
 """Dependency snapshots, resources and invalidation against the Python model."""
+from tests.native_paths import directory_alias, remove_directory_alias, dangling_directory_alias, file_symlink
 import json
 import os
 from pathlib import Path
@@ -138,23 +139,23 @@ class RustEvaluationInputTests(unittest.TestCase):
 
     def test_symlink_bindings_missing_tails_and_parent_components(self):
         target=self.root/'target';target.mkdir();(target/'child').mkdir()
-        link=self.root/'link';link.symlink_to(target/'child',target_is_directory=True)
-        broken=self.root/'broken';broken.symlink_to(self.root/'not-yet')
+        link=self.root/'link';directory_alias(link,target/'child')
+        broken=self.root/'broken';dangling_directory_alias(broken,self.root/'not-yet')
         paths=[link/'missing/leaf',link/'../sibling',broken/'tail']
         operations=[{'op':op,'path':str(path)} for path in paths for op in ['binding','resolve']]
         self.compare(operations)
 
     def test_retargeted_symlink_invalidates_binding(self):
         first=self.root/'first';second=self.root/'second';first.mkdir();second.mkdir()
-        link=self.root/'link';link.symlink_to(first,target_is_directory=True)
+        link=self.root/'link';directory_alias(link,first)
         packet=self.compare([{'op':'binding','path':str(link/'missing')}])
-        link.unlink();link.symlink_to(second,target_is_directory=True)
+        remove_directory_alias(link);directory_alias(link,second)
         answer=self.compare([],packet['data'])
         self.assertFalse(answer['valid'])
 
     def test_cyclic_symlink_binding_disables_optional_reuse(self):
         first=self.root/'first';second=self.root/'second'
-        first.symlink_to(second);second.symlink_to(first)
+        file_symlink(first,second);file_symlink(second,first)
         answer=self.run_native([{'op':'binding','path':str(first)}])
         self.assertFalse(answer['usable'])
         self.assertFalse(answer['valid'])
@@ -164,7 +165,7 @@ class RustEvaluationInputTests(unittest.TestCase):
         child=self.root/'nested';child.mkdir();(child/'c.odin').write_text('child')
         for name in ['.git','__pycache__','.thor-cache','.thor-build']:
             directory=self.root/name;directory.mkdir();(directory/'ignored.odin').write_text('ignored')
-        (self.root/'link.odin').symlink_to(child,target_is_directory=True)
+        directory_alias(self.root/'link.odin',child)
         packet=self.compare([{'op':'tree','path':str(self.root)}])
         (child/'c.odin').write_text('changed')
         answer=self.compare([],packet['data'])
@@ -226,7 +227,7 @@ class RustEvaluationInputTests(unittest.TestCase):
     def test_constant_resource_snapshots_watch_all_paths_and_symlink_bindings(self):
         first=self.root/'first';first.write_text('first')
         second=self.root/'second';second.write_text('second')
-        link=self.root/'link';link.symlink_to(first)
+        link=self.root/'link';file_symlink(link,first)
         path=self.root/'main.thor'
         path.write_text('package main\nNAME::("link" when ODIN_OS==.Darwin else "missing")\n'
                         'ALIAS::NAME\nDATA::#exists(ALIAS)\nmain::proc(){}\n')
@@ -240,7 +241,7 @@ class RustEvaluationInputTests(unittest.TestCase):
         changed=self.run_native([],packet['data'])
         self.assertFalse(changed['valid'])
         packet=self.run_native(operations)
-        link.unlink();link.symlink_to(second)
+        link.unlink();file_symlink(link,second)
         changed=self.run_native([],packet['data'])
         self.assertFalse(changed['valid'])
         packet=self.run_native(operations)

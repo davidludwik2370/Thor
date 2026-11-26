@@ -31,6 +31,25 @@ def directory_alias(link,target):
     directory_aliases([(link,target)])
 
 
+def dangling_directory_alias(link,target):
+    """Make a dangling directory reference without requiring Windows symlink rights."""
+    target=Path(target)
+    if target.exists():raise ValueError('Dangling fixture target already exists')
+    target.mkdir()
+    try:directory_alias(link,target)
+    finally:target.rmdir()
+
+
+def file_symlink(link,target):
+    """Only skip fixtures that specifically require file-symlink privileges."""
+    import unittest
+    try:Path(link).symlink_to(target)
+    except OSError as error:
+        if os.name=='nt' and error.winerror==1314:
+            raise unittest.SkipTest('This account cannot create file symlinks; directory aliases are exercised with junctions.') from error
+        raise
+
+
 def is_directory_alias(link):
     link=Path(link)
     try:return link.is_symlink() or getattr(link.lstat(),'st_reparse_tag',0)==0xA0000003

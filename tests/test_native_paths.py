@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 from tests.native_paths import ROOT, file_uri_key, file_uri_path, normalize_lsp_uris, rust_binary, thor_launcher
-from tests.native_paths import native_test_compiler
+from tests.native_paths import native_test_compiler, dangling_directory_alias
 from tests.native_paths import directory_aliases,directory_alias,remove_directory_alias,is_directory_alias,file_reference
 
 
@@ -24,6 +24,16 @@ class NativePathTests(unittest.TestCase):
             reference=root/'reference';file_reference(reference,first/'asset')
             self.assertEqual(reference.read_text(),'first');reference.unlink()
             self.assertEqual((first/'asset').read_text(),'first')
+
+    def test_dangling_directory_alias_preserves_its_missing_target(self):
+        with tempfile.TemporaryDirectory(prefix='thor-dangling-alias-') as temporary:
+            root=Path(temporary);alias=root/'alias';target=root/'future'
+            dangling_directory_alias(alias,target)
+            self.assertTrue(is_directory_alias(alias));self.assertFalse(target.exists())
+            target.mkdir();(target/'asset').write_text('kept')
+            self.assertEqual((alias/'asset').read_text(),'kept')
+            remove_directory_alias(alias)
+            self.assertEqual((target/'asset').read_text(),'kept')
 
     def test_diagnostic_uri_identity_only_normalizes_the_windows_drive(self):
         self.assertEqual(file_uri_key('file:///C%3A/h%C3%A9llo/Name.thor',platform='nt'),

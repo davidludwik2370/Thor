@@ -142,8 +142,8 @@ main::proc(){err:=os.write_entire_file(os.args[1],"GUI executable ran");if err!=
 
     def test_linked_native_dll_is_packaged_and_loaded_after_relocation(self):
         libraries=self.project/'libs';libraries.mkdir()
-        source=libraries/'answer.c';source.write_text('__declspec(dllexport) int answer(void){return 42;}\n')
-        build=subprocess.run(['cl','/nologo','/LD',str(source),'/link','/OUT:'+str(libraries/'answer.dll')],cwd=libraries,capture_output=True,text=True,timeout=90)
+        source=libraries/'answer.odin';source.write_text('package answer\n@(export) answer::proc \"c\"()->i32{return 42}\n')
+        build=subprocess.run([os.environ.get('THOR_ODIN','odin'),'build',str(libraries),'-build-mode:dll','-thread-count:2','-out:'+str(libraries/'answer.dll')],cwd=libraries,capture_output=True,text=True,timeout=90)
         self.assertEqual(build.returncode,0,build.stdout+build.stderr)
         self.program('''package main
 import "core:fmt"

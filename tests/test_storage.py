@@ -1,4 +1,5 @@
 """Development cleanup preserves source, evidence and unrelated/linked files."""
+from tests.native_paths import directory_alias, is_directory_alias
 import json
 from pathlib import Path
 import subprocess
@@ -32,11 +33,20 @@ class StorageCleanupTests(unittest.TestCase):
         other=self.write('.thor-cache/sdk-parser/old.json')
         with self.assertRaisesRegex(RuntimeError,'tracked source'):storage.prune(self.root,apply=True,reset_builds=True)
         self.assertTrue(other.exists());self.assertTrue(path.exists())
+    def test_source_walk_does_not_visit_a_linked_tree(self):
+        outside=self.root/'outside';(outside/'.thor-cache/sdk-parser').mkdir(parents=True)
+        kept=outside/'.thor-cache/sdk-parser/kept';kept.write_text('outside')
+        source=self.root/'source';source.mkdir();alias=source/'linked'
+        directory_alias(alias,outside)
+        candidates=storage.candidates(source)
+        self.assertEqual(candidates,[])
+        self.assertTrue(is_directory_alias(alias));self.assertEqual(kept.read_text(),'outside')
+
     def test_directory_links_and_unknown_files_are_preserved(self):
         outside=self.root/'external';outside.mkdir();target=outside/'report';target.write_text('keep')
-        linked=self.root/'.thor-cache/sdk-parser';linked.parent.mkdir();linked.symlink_to(outside,target_is_directory=True)
+        linked=self.root/'.thor-cache/sdk-parser';linked.parent.mkdir();directory_alias(linked,outside)
         storage.prune(self.root,apply=True,reset_builds=True)
-        self.assertTrue(linked.is_symlink());self.assertEqual(target.read_text(),'keep')
+        self.assertTrue(is_directory_alias(linked));self.assertEqual(target.read_text(),'keep')
     def test_only_two_distribution_versions_per_platform_are_retained(self):
         for n in range(4):self.write(f'dist/thor-0.{n}-macos-aarch64.tar.gz')
         linux=self.write('dist/thor-0.1-linux-aarch64.tar.gz')

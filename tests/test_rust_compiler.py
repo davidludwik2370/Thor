@@ -3,6 +3,7 @@
 An unsupported-feature status is a migration gap, never a successful comparison.
 Use real Odin runs and output checks that survive -disable-assert.
 """
+from tests.native_paths import directory_alias
 import json
 import os
 from pathlib import Path
@@ -853,7 +854,7 @@ change::proc(self:^Record){self.items[0]=9}
         library=self.root/'custom/basic';library.mkdir(parents=True)
         (library/'basic.odin').write_text('package basic\nprint::proc(values:[]int){values[0]=9}\n')
         for module in (ROOT/'runtime').iterdir():
-            if module.is_dir() and module.name!='basic':(library.parent/module.name).symlink_to(module,target_is_directory=True)
+            if module.is_dir() and module.name!='basic':directory_alias(library.parent/module.name,module)
         self.compare(self.program('values :> []int{1};basic.print(values)','import "thor:basic"\n'),command='check',flags=['-collection:thor='+str(library.parent)],fail='read-only slice')
 
 

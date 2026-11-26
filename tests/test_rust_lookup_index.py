@@ -60,12 +60,13 @@ work::fn(n:int)->int {return n+1}
 if values[0][0]!=2 {panic("cached contents")}''',
                             'work::proc()->[][2]int{values:=make([][2]int,1);values[0]={2,3};return values}\n')
         self.source.write_text(text,newline='')
-        cold, report = self.profile('transpile', ['--cache-report'])
+        cache_flags=['--cache-report','--cache-dir',str(self.root/'profile-cache')]
+        cold, report = self.profile('transpile', cache_flags)
         self.assertEqual(cold.returncode, 0, cold.stderr)
         self.assertGreater(report['counters']['evaluation.helper_preparations'], 0)
         self.assertGreater(report['counters']['analysis.inherited_source_facts'], 0)
-        self.source.write_text(text.replace('main :: proc() {', 'main :: proc() {\nunused:=17;_=unused;', 1))
-        warm, report = self.profile('transpile', ['--cache-report'])
+        self.source.write_text(text.replace('main :: proc() {', 'main :: proc() {\nunused:=17;_=unused;', 1),newline='')
+        warm, report = self.profile('transpile', cache_flags)
         self.assertEqual(warm.returncode, 0, warm.stderr)
         cache = json.loads(warm.stdout.splitlines()[0])
         self.assertGreater(cache['thor_prepared_hits'], 0)
