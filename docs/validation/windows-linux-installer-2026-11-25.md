@@ -55,3 +55,42 @@ Transient JSON results, installer logs and archive checksums are under ignored
 checks passed (42 tests); editor unit checks passed (200 tests). No Python
 compiler implementation was changed. The Mac ARM64 release candidate also passed
 checked, unchecked optimized and unchecked debug build/run tests.
+
+## Published 0.41.9 results (completed November 26)
+
+The final cycle downloaded the ordinary public GitHub release, without
+`--from-source`, `--bundle`, or maintainer export flags:
+
+| Host | Full uninstall and reinstall | Additional runtime/editor verification |
+| --- | ---: | ---: |
+| Windows 11 x64 | 43.35 seconds | 22.90 seconds; all 14 editor checks passed |
+| Ubuntu 24.04 x64 on WSL2 | 48.81 seconds | 22.70 seconds; all 14 editor checks passed |
+
+These timings reuse the development tools and VS Code installed in the initial
+cycle. Ubuntu's initial fresh-VM setup also exercised prerequisite installation
+and installation of native Linux VS Code. Windows reused its existing VS Code
+and development tools, as intended by uninstall's preservation policy.
+
+Both final cycles passed Doctor and checked/unchecked execution. The Linux editor
+started with no native CodeLLDB adapter installed and completed its first-use
+setup, original-source breakpoint, watch, step and clean exit successfully.
+Windows uninstall restored the exact original user PATH. Hashes confirmed that
+the default Windows VS Code settings and keybindings were unchanged.
+
+Uninstall intentionally retains VS Code profile registrations. For the optional
+color check, missing Dark Modern/Thor color preferences were restored only in the
+test-created Thor profile after reinstall; existing preferences were not
+replaced. This is separate from the installer checks of TLS, OLS and the debugger.
+
+All six published archive/sidecar assets match their local SHA-256 digests. The
+Windows bundle-verification workflow now packages the current editor sources
+rather than reusing a potentially stale VSIX from its input artifact.
+
+Temporary test editor directories and source/export bundles on the PC were
+removed. Installed Thor 0.41.9, the public checkout and the Thor profile remain
+available. The Ubuntu distro is named `ThorInstallTest`, defaults to user `david`,
+and was stopped after verification to release its memory. Its filesystem used
+approximately 4.6 GB after cleanup, with a 16 GB virtual disk limit. Enter it with
+`wsl -d ThorInstallTest`; it runs native Linux tools, with WSLg available for GUI
+use. The automated GUI checks used a virtual X display and do not assess visual
+spacing or color appearance on a physical monitor.

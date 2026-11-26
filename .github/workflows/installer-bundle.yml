@@ -25,6 +25,17 @@ jobs:
         run: cargo build --release --locked --manifest-path install/Cargo.toml -j 2
       - name: Build current transpiler
         run: cargo build --release --locked --manifest-path rust/Cargo.toml --bin thor-rust -j 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Package current editor extension
+        working-directory: editors/vscode
+        shell: powershell
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) {throw 'Could not install editor packaging dependencies'}
+          npm run package
+          if ($LASTEXITCODE -ne 0) {throw 'Could not package current Thor extension'}
       - name: Repackage and verify editor installation
         shell: powershell
         run: |
@@ -40,7 +51,7 @@ jobs:
           $version=(Get-Content release/version -Raw).Trim()
           & "$root\odin\odin.exe" build tls/src "-collection:src=$PWD/tls/src" "-collection:thor=$PWD/frontend" -o:speed -thread-count:2 "-define:VERSION=thor-$version+ols-0c9438f" "-out:$env:RUNNER_TEMP\tls.exe"
           if ($LASTEXITCODE -ne 0) {throw 'Could not build current TLS'}
-          python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler rust/target/release/thor-rust.exe --installer install/target/release/thor-install.exe --tls "$env:RUNNER_TEMP\tls.exe" --vsix "$root\editors\thor-language.vsix" --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
+          python tools/build_distribution.py --odin "$root\odin\odin.exe" --compiler rust/target/release/thor-rust.exe --installer install/target/release/thor-install.exe --tls "$env:RUNNER_TEMP\tls.exe" --vsix editors/vscode/thor-language.vsix --ols-source "$root\ols" --output "$env:RUNNER_TEMP\verified-release"
           if ($LASTEXITCODE -ne 0) {throw 'Could not package current installer'}
           $release=(Get-ChildItem "$env:RUNNER_TEMP\verified-release\*.tar.gz" | Select-Object -First 1).FullName
           .\thor-install.ps1 --bundle $release --prefix "$env:RUNNER_TEMP\thor-final" --path --vscode --code-user-data "$env:RUNNER_TEMP\code-data" --extensions-dir "$env:RUNNER_TEMP\code-extensions"
