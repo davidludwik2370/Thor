@@ -587,10 +587,10 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<()> {
         if kind.is_symlink() {
             let link = fs::read_link(&child)?;
             #[cfg(unix)]
-            std::os::unix::fs::symlink(link, target)?;
+            crate::file_alias::directory(&link, &target)?;
             #[cfg(windows)]
             if child.is_dir() {
-                std::os::windows::fs::symlink_dir(link, target)?;
+                crate::file_alias::directory(&link, &target)?;
             } else {
                 std::os::windows::fs::symlink_file(link, target)?;
             }

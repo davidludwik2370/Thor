@@ -421,11 +421,11 @@ fn write_tree(
                     resolved.clone()
                 };
                 #[cfg(unix)]
-                std::os::unix::fs::symlink(target, path)?;
+                crate::file_alias::directory(&target, &path)?;
                 #[cfg(windows)]
                 {
                     if resolved.is_dir() {
-                        std::os::windows::fs::symlink_dir(target, path)?;
+                        crate::file_alias::directory(&target, &path)?;
                     } else {
                         std::os::windows::fs::symlink_file(target, path)?;
                     }

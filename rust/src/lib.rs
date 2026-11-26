@@ -21,6 +21,7 @@ pub mod evaluationcache;
 pub mod evaluationinputs;
 mod extremaplan;
 mod fallbacks;
+mod file_alias;
 pub mod formatting;
 pub mod frontend;
 pub mod kind;

@@ -285,7 +285,7 @@ fn copy_view_file(path:&Path,target:&Path)->std::io::Result<()> {
 
 #[cfg(windows)]
 fn unprivileged_link(path:&Path,target:&Path)->std::io::Result<()> {
-    if target.is_dir(){return junction::create(target,path);}
+    if target.is_dir(){return crate::file_alias::directory_junction(target,path);}
     // Hard links preserve edits without copying support files. Generated writes
     // always use atomic replacement, so they cannot change the original inode.
     if !fs::metadata(target)?.permissions().readonly()&&fs::hard_link(target,path).is_ok(){return Ok(());}
@@ -299,18 +299,8 @@ pub(super) fn write_link(path:&Path,target:&Path)->Result<()> {
     #[cfg(unix)]
     std::os::unix::fs::symlink(target,path)?;
     #[cfg(windows)] {
-        use std::sync::atomic::{AtomicBool,Ordering};
-        static MISSING_PRIVILEGE:AtomicBool=AtomicBool::new(false);
         let fallback=||unprivileged_link(path,target).map_err(|error|Error::new(format!("Cannot create native library alias {} -> {}: {error}",path.display(),target.display())));
-        if MISSING_PRIVILEGE.load(Ordering::Relaxed){fallback()?;}
-        else {
-            let result=if target.is_dir(){std::os::windows::fs::symlink_dir(target,path)}else{std::os::windows::fs::symlink_file(target,path)};
-            if let Err(error)=result {
-                if error.raw_os_error()==Some(1314){MISSING_PRIVILEGE.store(true,Ordering::Relaxed);}
-                else if !matches!(error.kind(),std::io::ErrorKind::PermissionDenied|std::io::ErrorKind::Unsupported){return Err(error.into());}
-                fallback()?;
-            }
-        }
+        if !crate::file_alias::symbolic(target,path,target.is_dir())?{fallback()?;}
     }
     #[cfg(not(any(unix,windows)))]
     return Err(Error::new("native SDK overlays require filesystem aliases"));
