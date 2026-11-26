@@ -185,12 +185,12 @@ fn replace_file(from: &Path, to: &Path) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         // Odin/editor readers can briefly hold a handle without delete sharing.
-        // Retry only native sharing/lock violations; persistent failures retain
-        // the previous output and still report an error. The normal path does
+        // MoveFileEx reports this as access denied or a sharing/lock violation.
+        // Persistent failures retain the previous output and report an error. The normal path does
         // not sleep or allocate, and compiled programs are unaffected.
         for attempt in 0..=10 {
             match fs::rename(from, to) {
-                Err(error) if matches!(error.raw_os_error(), Some(32 | 33)) && attempt < 10 => {
+                Err(error) if matches!(error.raw_os_error(), Some(5 | 32 | 33)) && attempt < 10 => {
                     thread::sleep(Duration::from_millis(2 << attempt.min(5)));
                 }
                 result => return result,
