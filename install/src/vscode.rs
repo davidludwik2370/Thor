@@ -120,15 +120,17 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     if let Some(name)=&o.profile {
         let existing=profile_directory(&data,name)?;
         if existing.is_none() {
-            println!("Creating profile {name}; VS Code may open a new window.");
+            println!("Creating profile {name}; VS Code may open a new window. Waiting up to two minutes for its first launch.");
             let mut cmd=cli(code,o,&bin,root)?;cmd.args(["--profile",name,"--new-window"]); command(cmd)?;
             let mut directory=None;
-            for _ in 0..100 {
+            // Cold editor startup on an HDD can take longer than ten seconds.
+            // Polling returns immediately once VS Code registers the profile.
+            for _ in 0..1200 {
                 directory=profile_directory(&data,name)?;
                 if directory.is_some(){break;}
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
-            let directory=directory.ok_or("VS Code did not create the requested profile. On headless Ubuntu use a graphical session (Xvfb is suitable for validation); then rerun the installer.")?;
+            let directory=directory.ok_or("VS Code did not register the requested profile within two minutes. Check that its window starts in your logged-in desktop session, then rerun the installer. Headless Linux validation needs a graphical session such as Xvfb.")?;
             let template=read_json(&root.join("install/profiles/Thor.code-profile"))?;
             let mut settings:Value=serde_json::from_str(field(&template,"settings")?).map_err(err)?;
             settings["thor.colors.recommended"]=json!(o.colors.unwrap_or(true));

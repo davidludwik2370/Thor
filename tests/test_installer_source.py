@@ -389,6 +389,9 @@ class WindowsLauncherPolicyTests(unittest.TestCase):
 
     def test_unconfigured_windows_client_can_run_local_checkout(self):
         env=dict(os.environ);env.pop('PSExecutionPolicyPreference',None)
+        # Query Windows PowerShell's built-in module, even when unittest was
+        # launched by PowerShell 7 with its own PSModulePath in the environment.
+        env.pop('PSModulePath',None)
         configured=subprocess.check_output(['powershell.exe','-NoProfile','-Command',
             "@((Get-ExecutionPolicy -List).ExecutionPolicy -ne 'Undefined').Count"],env=env,text=True).strip()
         if configured!='0':self.skipTest('Host already has an explicit execution policy')

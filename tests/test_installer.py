@@ -373,7 +373,12 @@ if '--install-extension' in a:
   (profile/'extensions.json').write_text(json.dumps([{'identifier':{'id':'thor-local.thor-language'},'location':{'scheme':'file','path':str(extension)}}]))
 if '--new-window' in a:
  p=d/'User/globalStorage/storage.json';p.parent.mkdir(parents=True,exist_ok=True)
- p.write_text(json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]}))
+ value=json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]})
+ if os.environ.get('CODE_TEST_DELAYED_PROFILE'):
+  import subprocess
+  # Simulate Code's CLI returning before its cold GUI has registered a profile.
+  subprocess.Popen([sys.executable,'-c','import time,sys;from pathlib import Path;time.sleep(11);Path(sys.argv[1]).write_text(sys.argv[2])',str(p),value],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+ else:p.write_text(value)
 ''')
         code.chmod(0o755)
         return code,data,extensions,profile
@@ -383,6 +388,13 @@ if '--new-window' in a:
         self.env['CODE_LOCATE_EMPTY']='1'
         result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
         self.assertIn('JavaScript runtime dependencies',result.stdout)
+
+    def test_cold_editor_profile_registration_can_exceed_ten_seconds(self):
+        code,data,extensions,profile=self.fake_code()
+        self.env['CODE_TEST_DELAYED_PROFILE']='1'
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
+        self.assertTrue((profile/'settings.json').is_file())
+        self.assertEqual(json.loads((data/'User/globalStorage/storage.json').read_text())['userDataProfiles'][0]['name'],'Thor')
 
     def test_old_editor_is_rejected_before_profiles_or_extensions_are_changed(self):
         code,data,extensions,profile=self.fake_code()
