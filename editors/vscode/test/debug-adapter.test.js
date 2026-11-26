@@ -33,7 +33,7 @@ test('copied and hard-linked native libraries retain source breakpoints and step
             const point=maps.location(generated,line,1);
             assert.equal(point.source.path,original);assert.equal(point.line,3);assert.equal(point.column,5);
             const candidates=maps.candidates(original,3);
-            assert.equal(candidates.length,1);assert.equal(fs.realpathSync(candidates[0].file),fs.realpathSync(generated));assert.equal(candidates[0].line,line);
+            assert.equal(candidates.length,1);assert.equal(path.relative(fs.realpathSync(candidates[0].file),fs.realpathSync(generated)),'');assert.equal(candidates[0].line,line);
             for(const fromLibrary of [false,true]) {
                 const adapter=Object.create(ThorDebugAdapter.prototype),calls=[],events=[];
                 adapter.maps=maps;adapter.frames=new Map();adapter.references=new Map();adapter.sourceAliases=new Map();
