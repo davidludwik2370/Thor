@@ -49,6 +49,9 @@ def verify_vsix(path):
         package=json.loads(archive.read('extension/package.json'))
         if package.get('publisher')!='thor-local' or package.get('name')!='thor-language':
             raise ValueError('The selected VSIX is not the Thor extension')
+        expected=json.loads((ROOT/'editors/vscode/package.json').read_text())['version']
+        if package.get('version')!=expected:
+            raise ValueError(f'Stale Thor VSIX: expected {expected}, got {package.get("version")}. Repackage the editor extension before building a distribution.')
         for name in package.get('dependencies',{}):
             if f'extension/node_modules/{name}/package.json' not in names:
                 raise ValueError(f'VSIX runtime dependency missing: {name}. Package with npm dependencies enabled.')

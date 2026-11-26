@@ -177,3 +177,9 @@ a native step-in may initially stop on the signature before parameters are
 stored. Odin strings and slices have native descriptors; `text.len`, `text.data`,
 and `values.data[0]` are supported inspection expressions without requiring
 custom string/slice formatters.
+
+On a fresh CodeLLDB installation, its marketplace extension downloads the native
+adapter on first activation. Thor waits for that upstream setup to finish before
+starting its source-mapping adapter, including when CodeLLDB replaces its own
+extension directory. The preparation can be cancelled; a failed download reports
+where to find CodeLLDB's output. Subsequent sessions start immediately.

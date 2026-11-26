@@ -242,13 +242,23 @@ class SourceVsixTests(unittest.TestCase):
         import json,zipfile
         with tempfile.TemporaryDirectory() as temporary:
             vsix=Path(temporary)/'thor.vsix'
-            package={'publisher':'thor-local','name':'thor-language','dependencies':{'vscode-languageclient':'9.0.1'}}
+            version=json.loads((ROOT/'editors/vscode/package.json').read_text())['version']
+            package={'publisher':'thor-local','name':'thor-language','version':version,'dependencies':{'vscode-languageclient':'9.0.1'}}
             with zipfile.ZipFile(vsix,'w') as archive:archive.writestr('extension/package.json',json.dumps(package))
             with self.assertRaisesRegex(ValueError,'runtime dependency missing'):verify_vsix(vsix)
             with zipfile.ZipFile(vsix,'a') as archive:
                 archive.writestr('extension/node_modules/vscode-languageclient/package.json','{}')
                 archive.writestr('extension/node_modules/vscode-languageclient/node.js','fixture')
             verify_vsix(vsix)
+
+    def test_stale_editor_payload_is_rejected_before_distribution(self):
+        from tools.build_distribution import verify_vsix
+        import json,zipfile
+        with tempfile.TemporaryDirectory() as temporary:
+            vsix=Path(temporary)/'stale.vsix'
+            package={'publisher':'thor-local','name':'thor-language','version':'0.0.0'}
+            with zipfile.ZipFile(vsix,'w') as archive:archive.writestr('extension/package.json',json.dumps(package))
+            with self.assertRaisesRegex(ValueError,'Stale Thor VSIX'):verify_vsix(vsix)
 
 class SourceSdkComponentsTests(unittest.TestCase):
     def test_runtime_linkers_and_their_licenses_are_staged_without_build_history(self):

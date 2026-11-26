@@ -1,13 +1,13 @@
 'use strict';
 const vscode = require('vscode');
 const {ThorDebugAdapter} = require('./debug-adapter');
+const {prepareCodeLLDB} = require('./debug-backend');
 
 function activateDebugging(context) {
     context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('thor-lldb', {
-        createDebugAdapterDescriptor(session) {
-            const backend = vscode.extensions.getExtension('vadimcn.vscode-lldb');
-            if (!backend) throw new Error('Install or enable the CodeLLDB extension (vadimcn.vscode-lldb) to debug Thor programs.');
-            const adapter = new ThorDebugAdapter({backend: backend.extensionPath,
+        async createDebugAdapterDescriptor(session) {
+            const backend = await prepareCodeLLDB(vscode);
+            const adapter = new ThorDebugAdapter({backend,
                 library: vscode.workspace.getConfiguration('lldb',session.workspaceFolder?.uri).get('library'),
                 cwd: session.configuration.cwd || session.workspaceFolder?.uri.fsPath});
             return new vscode.DebugAdapterInlineImplementation(adapter);
