@@ -22,7 +22,8 @@ pub(crate) fn retry_sharing<T>(mut operation: impl FnMut() -> io::Result<T>) -> 
     }
 }
 
-pub(crate) fn read(path: &Path) -> io::Result<Vec<u8>> {
+pub(crate) fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
+    let path=path.as_ref();
     retry_sharing(|| fs::read(path))
 }
 
