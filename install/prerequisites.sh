@@ -182,6 +182,19 @@ fi
 if $editor; then
     script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
     minimum_code=$(cat "$script_dir/vscode-minimum")
+    if [ "$system" = Linux ] && command -v dnf >/dev/null 2>&1; then
+        # Fedora 45's default is OpenSSL 4, while VS Code's extension signature
+        # verifier still loads libssl.so.3. Install the maintained side-by-side
+        # provider; leave the system OpenSSL and signature verification intact.
+        ssl_cache=$(command -v ldconfig || :)
+        [ -n "$ssl_cache" ] || ssl_cache=/sbin/ldconfig
+        has_ssl3() { "$ssl_cache" -p 2>/dev/null | awk '$1 == "libssl.so.3" {found=1} END {exit !found}'; }
+        if ! has_ssl3; then
+            packages 'libssl.so.3()(64bit)'
+            has_ssl3 || { echo 'VS Code extension verification requires libssl.so.3; install its distribution provider and rerun.' >&2; exit 1; }
+        fi
+        echo 'PASS: VS Code extension signature-verification runtime'
+    fi
     version_at_least() {
         awk -v current="$1" -v minimum="$2" 'BEGIN {
             sub(/-.*/, "", current);

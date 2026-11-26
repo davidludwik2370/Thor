@@ -1,0 +1,90 @@
+name: Refresh portable installer assets
+on:
+  workflow_dispatch:
+    inputs:
+      base_source:
+        description: Source commit of the verified compiler/TLS/SDK being retained
+        required: true
+        default: d1a8fbf42cb977a557856f884efd26667be84585
+        type: string
+permissions:
+  contents: read
+jobs:
+  linux:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BASE_SOURCE: ${{ inputs.base_source }}
+      CARGO_TARGET_DIR: ${{ runner.temp }}/thor-installer-target
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require unchanged compiler, TLS, runtime and SDK inputs
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess,json
+          from pathlib import Path
+          base=os.environ['BASE_SOURCE']
+          if not re.fullmatch(r'[0-9a-f]{40}',base):raise RuntimeError('A full source commit is required')
+          subprocess.run(['git','fetch','--depth=1','origin',base],check=True)
+          paths=['rust','runtime','frontend','tls','editors','templates','assets','llvm-symbolizer-thor',
+                 'release/version','release/linux-compatibility.json','release/macos-minimum',
+                 'install/linux-vendor.json','install/ols-source.json','install/source-tools.json',
+                 'install/git-lfs-source.json','install/cmake-source.json']
+          subprocess.run(['git','diff','--exit-code',base,'HEAD','--',*paths],check=True)
+          tag='v'+Path('release/version').read_text().strip()
+          release=json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft,targetCommitish'],text=True))
+          if not release['isDraft'] or release['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Expected this source commit\'s draft release')
+          PY
+      - name: Install the verified base and rebuild only the native installer
+        run: |
+          case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=aarch64;; *) exit 1;; esac
+          version=$(cat release/version)
+          mkdir -p "$RUNNER_TEMP/thor-previous"
+          gh release download "v$version" --pattern "thor-$version-linux-$arch.tar.gz*" --dir "$RUNNER_TEMP/thor-previous"
+          ./thor-install --bundle "$RUNNER_TEMP/thor-previous/thor-$version-linux-$arch.tar.gz" --prefix "$RUNNER_TEMP/thor-refresh" --no-install-deps
+          cargo fetch --locked --manifest-path rust/Cargo.toml
+          cargo build --release --locked --manifest-path install/Cargo.toml -j 2
+          python3 - <<'PY'
+          import os,subprocess,sys
+          from pathlib import Path
+          temporary=Path(os.environ['RUNNER_TEMP'])
+          roots=list((temporary/'thor-refresh/versions').iterdir())
+          if len(roots)!=1:raise RuntimeError('Expected one verified base installation')
+          root=roots[0]
+          subprocess.run([sys.executable,'tools/build_distribution.py','--odin',str(root/'odin/odin'),
+              '--compiler',str(root/'thor'),'--installer',str(Path(os.environ['CARGO_TARGET_DIR'])/'release/thor-install'),
+              '--tls',str(root/'tls/bin/tls'),'--vsix',str(root/'editors/thor-language.vsix'),
+              '--output',str(temporary/'thor-release'),'--portable'],check=True)
+          PY
+      - name: Verify content upgrade, checked and unchecked execution, ABI and uninstall
+        run: |
+          ./thor-install --bundle "$RUNNER_TEMP"/thor-release/*.tar.gz --prefix "$RUNNER_TEMP/thor-refresh" --no-install-deps
+          ./thor-install --doctor --prefix "$RUNNER_TEMP/thor-refresh"
+          ./thor-install --uninstall --prefix "$RUNNER_TEMP/thor-refresh"
+          ./thor-install --uninstall --prefix "$RUNNER_TEMP/thor-refresh"
+          python3 tools/release_compatibility.py "$RUNNER_TEMP"/thor-release/*.tar.gz --report "$RUNNER_TEMP/linux-abi.json"
+      - name: Update only this source commit's unpublished draft
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          tag='v'+Path('release/version').read_text().strip()
+          release=json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft,targetCommitish'],text=True))
+          if not release['isDraft'] or release['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Refusing to overwrite a published or different release')
+          files=list((Path(os.environ['RUNNER_TEMP'])/'thor-release').glob('*.tar.gz'))
+          if len(files)!=1:raise RuntimeError('Expected one native artifact')
+          archive=files[0];sidecar=archive.with_name(archive.name+'.sha256')
+          if hashlib.sha256(archive.read_bytes()).hexdigest()!=sidecar.read_text().split()[0]:raise RuntimeError('Artifact checksum differs')
+          subprocess.run(['gh','release','upload',tag,str(archive),str(sidecar),'--clobber'],check=True)
+          PY

@@ -84,6 +84,14 @@ availability can impose further requirements on older OS versions.
 BSD source installs retain their system LLVM runtime dependency; standalone BSD
 binary releases need separate loader/redistribution validation before publication.
 
+On Fedora, editor setup also checks for the OpenSSL 3 runtime needed by VS Code's
+extension signature verifier. Fedora 45 provides this alongside OpenSSL 4 as a
+[maintained compatibility package](https://packages.fedoraproject.org/pkgs/openssl3/openssl3-libs/).
+The installer adds its `libssl.so.3` provider when missing, including when Code is
+already installed. This addresses the upstream
+[extension verification failure](https://github.com/microsoft/vscode/issues/338194)
+while retaining signature verification and the system's existing OpenSSL.
+
 A named profile is created through VS Code's launcher, which can open a window.
 Run profile setup in a graphical session. Toolchain-only installation works
 without a desktop.

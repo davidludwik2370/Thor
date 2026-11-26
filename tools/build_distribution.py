@@ -173,7 +173,7 @@ def library_notices(source, stage):
     raise ValueError(f'No redistribution license text found for {source}.')
 
 
-def relocate_odin(stage):
+def relocate_odin(stage, original_odin=None):
     directory = stage/'odin'
     odin = directory/('odin.exe' if os.name == 'nt' else 'odin')
     if os.name == 'nt':
@@ -186,7 +186,9 @@ def relocate_odin(stage):
         return
     if system not in ('Darwin', 'Linux'):
         raise ValueError('Unsupported native release builder host.')
-    pending = [(odin, odin)]
+    # An installed SDK resolves $ORIGIN/lib beside its original executable.
+    # Resolve dependencies there before populating the new staging directory.
+    pending = [(original_odin if system=='Linux' and original_odin else odin, odin)]
     helpers=[directory/'libexec'/name for name in ('llvm-symbolizer','dsymutil')
              if (directory/'libexec'/name).is_file()]
     pending.extend((helper,helper) for helper in helpers)
@@ -280,7 +282,7 @@ def build(options):
         for name in ('LICENSE','NOTICE','cli/LICENSE','tls/LICENSE','editors/vscode/LICENSE','install/profiles/Thor.code-profile'):
             copy(ROOT/name, stage/name)
         rust_licenses(stage)
-        relocate_odin(stage)
+        relocate_odin(stage,odin)
         compatibility = inspect_directory(stage, arch, portable=getattr(options,'portable',False)) if system=='linux' else None
         if system=='macos':
             compatibility = inspect_macos_directory(stage,arch,portable=getattr(options,'portable',False))

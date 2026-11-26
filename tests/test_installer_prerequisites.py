@@ -12,6 +12,49 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipIf(os.name=='nt','POSIX prerequisite script')
 class PrerequisiteTests(unittest.TestCase):
+    def exercise_linux_editor_ssl(self, present=False, editor=True):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);bin=root/'bin';bin.mkdir()
+            def executable(name,text):
+                p=bin/name;p.write_text(text);p.chmod(0o755)
+            for name in ('mktemp','rm','dirname','cat','awk','head'):
+                (bin/name).symlink_to(shutil.which(name))
+            executable('uname','#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo aarch64;; esac\n')
+            executable('id','#!/bin/sh\necho 0\n');executable('curl','#!/bin/sh\nexit 0\n')
+            executable('clang',f'''#!{sys.executable}
+import pathlib,sys
+p=pathlib.Path(sys.argv[sys.argv.index('-o')+1]);p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
+''')
+            executable('code','#!/bin/sh\necho 1.148.0\n')
+            executable('ldconfig','#!/bin/sh\necho "libssl.so.4 (libc6,AArch64) => /lib64/libssl.so.4"\nif [ -f "$FIXTURE_SSL_READY" ]; then echo "libssl.so.3 (libc6,AArch64) => /lib64/libssl.so.3"; fi\n')
+            executable('dnf',f'''#!{sys.executable}
+import json,os,pathlib,sys
+with open(os.environ['FIXTURE_LOG'],'a') as f:f.write(json.dumps(sys.argv[1:])+'\\n')
+pathlib.Path(os.environ['FIXTURE_SSL_READY']).write_text('installed')
+''')
+            for name in ('vscode-minimum','vscode-macos-version'):shutil.copy2(ROOT/'install'/name,root/name)
+            script=root/'prerequisites.sh';script.write_text((ROOT/'install/prerequisites.sh').read_text())
+            ready=root/'ssl-ready';log=root/'dnf.jsonl'
+            if present:ready.write_text('already installed')
+            value=subprocess.run(['/bin/sh',str(script),*(['--vscode'] if editor else [])],capture_output=True,text=True,timeout=20,
+                env={**os.environ,'PATH':str(bin),'HOME':str(root),'FIXTURE_SSL_READY':str(ready),'FIXTURE_LOG':str(log)})
+            calls=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+            return value,calls
+
+    def test_missing_ssl3_is_installed_even_when_the_editor_is_already_present(self):
+        value,calls=self.exercise_linux_editor_ssl()
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr)
+        self.assertEqual(calls,[['install','-y','libssl.so.3()(64bit)']])
+        self.assertIn('signature-verification runtime',value.stdout)
+
+    def test_existing_ssl3_is_reused_without_package_changes(self):
+        value,calls=self.exercise_linux_editor_ssl(present=True)
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr);self.assertEqual(calls,[])
+
+    def test_toolchain_only_install_does_not_add_editor_crypto_dependencies(self):
+        value,calls=self.exercise_linux_editor_ssl(editor=False)
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr);self.assertEqual(calls,[])
+
     def exercise_apt(self,failure=None):
         with tempfile.TemporaryDirectory(prefix='thor-prerequisite-test-') as temp:
             directory=Path(temp);bin=directory/'bin';bin.mkdir()

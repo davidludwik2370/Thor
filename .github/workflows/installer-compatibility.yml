@@ -21,8 +21,14 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         os: [ubuntu-22.04, ubuntu-22.04-arm]
+        distro:
+          - {name: ubuntu22, image: 'ubuntu:22.04'}
+          - {name: ubuntu24, image: 'ubuntu:24.04'}
+          - {name: debian12, image: 'debian:12'}
+          - {name: fedora, image: 'fedora:latest'}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -42,20 +48,19 @@ jobs:
       - name: Clean install, real editor services, debugger, ordinary PATH and uninstall
         env:
           PUBLIC_INSTALL: ${{ inputs.public_install }}
+          TEST_IMAGE: ${{ matrix.distro.image }}
+          TEST_DISTRO: ${{ matrix.distro.name }}
         run: |
-          for image in ubuntu:22.04 ubuntu:24.04 debian:12 fedora:latest; do
-            label=$(printf '%s' "$image" | tr ':' '-')
-            args=()
-            if [ "$PUBLIC_INSTALL" != true ]; then
-              files=("$RUNNER_TEMP"/thor-candidate/*.tar.gz)
-              args=(--bundle "${files[0]}")
-            fi
-            python3 tools/test_install_linux.py --image "$image" "${args[@]}" --output "$RUNNER_TEMP/compatibility/$label"
-          done
+          args=()
+          if [ "$PUBLIC_INSTALL" != true ]; then
+            files=("$RUNNER_TEMP"/thor-candidate/*.tar.gz)
+            args=(--bundle "${files[0]}")
+          fi
+          python3 tools/test_install_linux.py --image "$TEST_IMAGE" "${args[@]}" --output "$RUNNER_TEMP/compatibility/$TEST_DISTRO"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installer-compatibility-${{ matrix.os }}
+          name: installer-compatibility-${{ matrix.os }}-${{ matrix.distro.name }}
           path: ${{ runner.temp }}/compatibility/**
           retention-days: 3
           if-no-files-found: warn
