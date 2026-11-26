@@ -14,6 +14,7 @@ from pathlib import Path
 import shutil
 import signal
 import shlex
+import plistlib
 import subprocess
 import tempfile
 import time
@@ -205,6 +206,13 @@ def main():
                  '--extensionDevelopmentPath=' + str(verification),
                  '--extensionTestsPath=' + str(verification / 'test.js'), fixture]
             if os.sys.platform=='darwin':
+                for parent in args.code.resolve().parents:
+                    info_file=parent/'Info.plist'
+                    if parent.name=='Contents' and info_file.is_file():
+                        with info_file.open('rb') as stream:executable=plistlib.load(stream)['CFBundleExecutable']
+                        native=parent/'MacOS'/executable
+                        if native.is_file():command=[native,*command[2:]]
+                        break
                 editor_env['HOME']=str(Path.home())
                 with mac_editor_registration(home,output):
                     try:
