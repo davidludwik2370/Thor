@@ -1,5 +1,6 @@
 """Pure runtime calls and native, contents-preserving explicit #run acceptance."""
 import json
+import sys
 import unittest
 from tests import test_thor as base
 from thorlang import values
@@ -225,7 +226,8 @@ work::fn(n:int)->int{data:=make([]int,n);return len(data)}
 
     def test_run_cycles_cross_target_and_timeout_configuration(self):
         self.invoke(self.program('_=FIRST','work::fn(n:int)->int{return n}\nFIRST::#run work(SECOND)\nSECOND::#run work(FIRST)\n'),command='check',fail='Cyclic #run')
-        self.invoke(self.program('_=VALUE','work::fn()->int{return 7}\nVALUE::#run work()\n'),command='check',flags=['-target:linux_amd64'],fail='native targets only')
+        foreign='linux_amd64' if sys.platform=='win32' else 'windows_amd64'
+        self.invoke(self.program('_=VALUE','work::fn()->int{return 7}\nVALUE::#run work()\n'),command='check',flags=['-target:'+foreign],fail='native targets only')
         self.invoke(self.program(''),command='check',flags=['--run-timeout','-1'],fail='--run-timeout requires a finite, nonnegative')
 
     def test_run_imports_and_selective_aliases(self):
