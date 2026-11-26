@@ -42,8 +42,8 @@ The local installer/source/prerequisite/release regression selection passed
 168 tests. A subsequent 12-test desktop-cleanup/assertion-hygiene selection
 passed, including two added process-ownership regressions. Native installer
 regressions also run on Linux x64/ARM64, macOS Intel/ARM64 and Windows x64.
-[Five-host CI](https://github.com/davidludwik2370/Thor/actions/runs/45824265172)
-passed before the additional test-cleanup change.
+[Five-host CI](https://github.com/davidludwik2370/Thor/actions/runs/45832248302)
+passed with the final process-ownership cleanup regressions.
 
 The real desktop harness installs and reinstalls into temporary state, runs
 Doctor, tests checked and unchecked execution, verifies fresh ordinary-shell
@@ -61,7 +61,7 @@ No required setup, cleanup or runtime operation is hidden inside an assertion.
 
 | Existing desktop | Result | Cycle time |
 | --- | --- | ---: |
-| macOS ARM64, primary Mac | All desktop checks passed | 98.04 s |
+| macOS 15.6 ARM64, primary Mac | All desktop checks passed | 98.04 s |
 | macOS 13.5.1 ARM64, M1 MacBook Air | CLI, PATH, OLS/TLS hover/completion, colors and Run passed; repeated debugger check waiting for OS authorization | Pending |
 | Ubuntu 24.04 ARM64, Fusion | All desktop checks passed | 105.82 s |
 | Windows 11 x64, build 26200 | All desktop checks passed | 146.11 s |
@@ -88,9 +88,25 @@ container's test launcher; installed user settings and signature checks are not
 weakened.
 
 All eight [final candidate cases](https://github.com/davidludwik2370/Thor/actions/runs/45829839121)
-passed, including Fedora on both architectures. Candidate/public matrix results
-and archive digests are recorded in the
+passed, including Fedora on both architectures. After publication, all eight
+[public-install cases](https://github.com/davidludwik2370/Thor/actions/runs/45831669854)
+also passed the exact GitHub clone/bootstrap path with no local bundle override.
+Each installed Doctor log was checked for version 0.41.11, and each native
+editor/debugger result was independently checked for success. Candidate/public
+matrix results and archive digests are recorded in the
 [companion results](installer-compatibility-2026-11-26-results.json).
+
+A fresh public GitHub clone on macOS installed the published 0.41.11 release
+without a bundle override. Fresh login and interactive shells passed PATH and
+Doctor checks; repeated uninstall restored PATH and preserved the checkout.
+This separate toolchain-only cycle took 36.47 seconds.
+
+Only current release archives and small verification logs are retained locally.
+Nine obsolete archives were removed after matching their published digests
+(1,426 MiB reclaimed), along with the completed disposable container image and
+private Fusion validation checkout. User installations/projects were preserved.
+Physical-PC staging is retained until cleanup can occur without interfering with
+the user’s fullscreen application.
 
 ## Remaining scope
 

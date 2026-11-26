@@ -186,7 +186,189 @@
     ]
   },
   "public_matrix": {
-    "status": "not yet run"
+    "status": "success",
+    "run_id": 45831669854,
+    "url": "https://github.com/davidludwik2370/Thor/actions/runs/45831669854",
+    "no_bundle_override": true,
+    "actual_release_verified": "0.41.11",
+    "cases": [
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-debian12/debian12",
+        "success": true,
+        "image": "debian:12",
+        "image_id": "sha256:b3f742ca10c9f9178cec3a58f3497ad25e9f444afc71b8dc063db1164ea9caf1",
+        "seconds": 183.17,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-fedora/fedora",
+        "success": true,
+        "image": "fedora:latest",
+        "image_id": "sha256:e32fe0b8cd22f419d427a3411635a8ad683aff18dbb8e47bf2611bc3d599ed7b",
+        "seconds": 177.52,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-ubuntu22/ubuntu22",
+        "success": true,
+        "image": "ubuntu:22.04",
+        "image_id": "sha256:c6ba99469732c44e19b2d13750adde7d93a4e2a188caf797578c42356313280f",
+        "seconds": 194.39,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-ubuntu24/ubuntu24",
+        "success": true,
+        "image": "ubuntu:24.04",
+        "image_id": "sha256:7cf0c39cbf1f2d11eee47faaec04414d407cec919beca31f81b1ce9f9e75b8ce",
+        "seconds": 190.26,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-debian12/debian12",
+        "success": true,
+        "image": "debian:12",
+        "image_id": "sha256:a36824f1b4c6892ddfeb448726ace7f338ee14b4113288ecc813e266370d5c90",
+        "seconds": 157.02,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-fedora/fedora",
+        "success": true,
+        "image": "fedora:latest",
+        "image_id": "sha256:45bb669ea5ba47d1e7baf285d571723a26b78e7bb156030058ca08b2ee3c17eb",
+        "seconds": 281.15,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-ubuntu22/ubuntu22",
+        "success": true,
+        "image": "ubuntu:22.04",
+        "image_id": "sha256:4c738ec33362ed21d54f5e6ca4eadc9f2707fd6516cd7eb5be2a772dfdfaa938",
+        "seconds": 214.03,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-ubuntu24/ubuntu24",
+        "success": true,
+        "image": "ubuntu:24.04",
+        "image_id": "sha256:2b147973fd863c93ced60f325461fe0e262b91317b008e6a2d961f13e81af0e4",
+        "seconds": 208.73,
+        "editor_checks": [
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit"
+        ]
+      }
+    ]
   },
   "native_desktops": {
     "macos_15_6_arm64": {
@@ -367,11 +549,28 @@
       "tests": 12,
       "passed": true
     },
-    "native_five_host_ci": "https://github.com/davidludwik2370/Thor/actions/runs/45824265172"
+    "native_five_host_ci": "https://github.com/davidludwik2370/Thor/actions/runs/45832248302"
   },
   "deferred": {
     "windows10": "Dell identified; SSH setup pending",
     "fresh_windows11_first_msvc_install": "explicitly deferred by user",
     "further_physical_windows_pc_gui": "user fullscreen restriction"
+  },
+  "public_macos_cli": {
+    "success": true,
+    "checks": [
+      "public-github-clone",
+      "public-release-0.41.11-no-bundle-override",
+      "login-and-interactive-path-and-doctor",
+      "repeated-uninstall-path-restored-project-preserved"
+    ],
+    "seconds": 36.47
+  },
+  "cleanup": {
+    "obsolete_archives_verified_against_published_digests_removed_mib": 1426.0,
+    "completed_local_container_and_ubuntu_image_removed": true,
+    "fusion_private_validation_files_removed": true,
+    "user_projects_and_installations_preserved": true,
+    "physical_pc_staging_cleanup_deferred_to_avoid_gui_interference": true
   }
 }
