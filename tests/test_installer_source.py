@@ -325,6 +325,9 @@ class SourceSDKAcquisitionTests(unittest.TestCase):
                 flags=[a for a in tls if a.startswith('-minimum-os-version:')]
                 expected=['-minimum-os-version:'+(ROOT/'release/macos-minimum').read_text().strip()] if system=='Darwin' and portable else []
                 self.assertEqual(flags,expected)
+                if os.name!='nt':
+                    compiler_build=next(a for a in calls if a[0] in ('make','gmake'))
+                    self.assertEqual(compiler_build[-1],'release' if portable else 'release-native')
 
     def test_lfs_filters_are_scoped_to_the_disposable_checkout(self):
         import contextlib,json

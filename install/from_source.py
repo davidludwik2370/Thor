@@ -133,7 +133,10 @@ def build(work, forward, odin=None, export_bundle=None, portable=False):
             run(['cmd.exe', '/d', '/c', 'build.bat', 'release'], cwd=checkout, env=env)
         else:
             make = 'gmake' if platform.system() in ('FreeBSD', 'NetBSD', 'OpenBSD') else 'make'
-            run([make, 'release-native'], cwd=checkout, env=env)
+            # release-native can emit instructions specific to the build host
+            # (e.g. SVE on a hosted ARM runner). Shipped SDKs must use Odin's
+            # generic release target so other CPUs of this architecture work.
+            run([make, 'release' if portable else 'release-native'], cwd=checkout, env=env)
             source_tools.retain_llvm_notices(env['LLVM_CONFIG'], checkout)
         odin = checkout/('odin.exe' if os.name == 'nt' else 'odin')
         if portable and platform.system() in ('Linux','Darwin'):

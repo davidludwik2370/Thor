@@ -32,7 +32,9 @@ def main():
         return subprocess.check_output(['powershell.exe', '-NoProfile', '-Command',
             "[Environment]::GetEnvironmentVariable('Path','User')"], text=True).strip()
     original_user_path = user_path() if os.name == 'nt' else None
-    with tempfile.TemporaryDirectory(prefix='thor-desktop-install-') as temporary:
+    # macOS's default /var/folders temporary root can exceed Unix-domain socket
+    # path limits once VS Code appends its IPC socket name. Use a short root.
+    with tempfile.TemporaryDirectory(prefix='thor-desktop-', dir='/tmp' if os.sys.platform=='darwin' else None) as temporary:
         work = Path(temporary).resolve()
         home = work / 'home'
         home.mkdir()
@@ -113,7 +115,7 @@ def main():
                 if str(prefix / 'bin').lower() not in [part.lower() for part in updated.split(';')]:
                     raise RuntimeError('User PATH does not contain the installed command directory')
                 fresh = dict(env, PATH=updated + os.pathsep + env['PATH'])
-                run(['cmd.exe', '/d', '/c', 'where thor && thor version'], 'ordinary-terminal', child_env=fresh)
+                run(['cmd.exe', '/d', '/c', 'where thor && thor version'], 'ordinary-terminal', child_env=fresh, cwd=home)
                 if str(prefix / 'bin').lower() not in (output / 'ordinary-terminal.log').read_text().lower():
                     raise RuntimeError('Ordinary Windows terminal did not find the installed command')
                 result['checks'].append('ordinary-windows-terminal-path')
@@ -155,6 +157,9 @@ def main():
         except Exception as error:
             result['error'] = str(error)
         finally:
+            logs = data / 'logs'
+            if logs.is_dir() and not result['success']:
+                shutil.copytree(logs, output / 'editor-startup-logs', dirs_exist_ok=True)
             close_test_editor()
             try:
                 run([*launcher, *common, '--uninstall'], 'cleanup-uninstall')

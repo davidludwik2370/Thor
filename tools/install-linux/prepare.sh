@@ -16,5 +16,8 @@ printf 'thor ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/thor-validation
 chmod 440 /etc/sudoers.d/thor-validation
 # Only this test container needs the Electron user-namespace workaround.
 # A missing editor still fails --version, allowing automatic acquisition.
-printf '#!/bin/sh\nexec /usr/share/code/bin/code --no-sandbox "$@"\n' > /usr/local/bin/code
-chmod 755 /usr/local/bin/code
+# The official package removes old /usr/local/bin/code launchers. Keep this
+# container-only wrapper outside package-owned/historical launcher locations.
+mkdir -p /opt/thor-validation/bin
+printf '#!/bin/sh\nexec /usr/share/code/bin/code --no-sandbox "$@"\n' > /opt/thor-validation/bin/code
+chmod 755 /opt/thor-validation/bin/code

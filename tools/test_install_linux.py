@@ -32,7 +32,8 @@ def main():
         result['image_id']=subprocess.check_output(['docker','inspect','--format','{{.Image}}',name],text=True).strip()
         run(['docker','exec',name,'sh','/source/tools/install-linux/prepare.sh'],'prepare')
         run(['docker','exec','-d','--user','thor','-e','HOME=/home/thor',name,'Xvfb',':99','-screen','0','1280x800x24'],'display')
-        env=['-e','HOME=/home/thor','-e','DISPLAY=:99','-e','SHELL=/bin/bash']
+        env=['-e','HOME=/home/thor','-e','DISPLAY=:99','-e','SHELL=/bin/bash',
+             '-e','PATH=/opt/thor-validation/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin']
         if o.bundle:env+=['-e','THOR_INSTALL_BUNDLE=/artifacts/'+o.bundle.name]
         run(['docker','exec','--user','thor',*env,name,'sh','/source/tools/install-linux/validate.sh'],'validation',timeout=1200)
         result['success']=True
@@ -45,6 +46,8 @@ def main():
         if created:
             copied=subprocess.run(['docker','cp',name+':/home/thor/logs/.',str(o.output)],capture_output=True,text=True)
             if copied.returncode:result['log_copy_error']=copied.stderr
+            if not result['success']:
+                subprocess.run(['docker','cp',name+':/home/thor/.config/Code/logs',str(o.output/'editor-startup-logs')],capture_output=True)
             removed=subprocess.run(['docker','rm','-f',name],capture_output=True,text=True)
             if removed.returncode:result['cleanup_error']=removed.stderr
         if not previous and result.get('image_id'):
