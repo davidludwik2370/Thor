@@ -1,0 +1,16 @@
+{
+  "version": "3.31.6",
+  "checksum_source": "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-SHA-256.txt",
+  "targets": {
+    "linux-aarch64": {
+      "url": "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-aarch64.tar.gz",
+      "sha256": "b4cc788d63112b2749b40627e719eb5d3b8ed8f00c36d77189f4019cfe64bc9e",
+      "root": "cmake-3.31.6-linux-aarch64"
+    },
+    "linux-x86_64": {
+      "url": "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz",
+      "sha256": "5a1133ff103c71eb5120e2cc3de922733e7d8a26a98ae716397e8676adb367bf",
+      "root": "cmake-3.31.6-linux-x86_64"
+    }
+  }
+}

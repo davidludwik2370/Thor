@@ -176,6 +176,24 @@ def ensure_git_lfs(work, env, target):
     print('PASS: private Git LFS (no global Git configuration changes)',flush=True)
 
 
+def ensure_cmake(work, env, target):
+    try:
+        text=subprocess.check_output(['cmake','--version'],env=env,text=True,stderr=subprocess.DEVNULL)
+        found=re.search(r'cmake version (\d+\.\d+\.\d+)',text)
+        if found and tuple(map(int,found[1].split('.'))) >= (3,25,0):return
+    except (OSError,subprocess.CalledProcessError):
+        pass
+    config=json.loads(Path(__file__).with_name('cmake-source.json').read_text())
+    if target not in config['targets']:raise ValueError('Portable vendor builds require CMake 3.25 or newer')
+    item=config['targets'][target];archive=work/'cmake.tar.gz'
+    download(item['url'],archive,item['sha256'])
+    directory=extract_tar(archive,work/'private-cmake',item['root'])
+    archive.unlink();env['PATH']=str(directory/'bin')+os.pathsep+env['PATH']
+    text=subprocess.check_output(['cmake','--version'],env=env,text=True)
+    if text.splitlines()[0].strip()!='cmake version '+config['version']:raise ValueError('Private CMake failed its version check')
+    print('PASS: private prebuilt CMake (no build-tool dependency compilation)',flush=True)
+
+
 def ensure_node(work, env, target):
     env.setdefault('NODE_COMPILE_CACHE', str(work / 'node-compile-cache'))
     npm = 'npm.cmd' if os.name == 'nt' else 'npm'

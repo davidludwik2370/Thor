@@ -16,6 +16,10 @@ sys.path.insert(0,str(ROOT))
 from install import source_tools
 
 
+def source_file(path):
+    return len(path.parts)<=1 or path.parts[0] in ('src','cmake')
+
+
 def run(args,**kwargs):
     print('+ '+' '.join(map(str,args)),flush=True)
     subprocess.run(list(map(str,args)),check=True,**kwargs)
@@ -48,7 +52,7 @@ def build(sdk,work):
     for name in ('raylib','raygui'):
         item=config[name];archive=work/(name+'.tar.gz')
         source_tools.download(item['url'],archive,item['sha256'])
-        roots[name]=source_tools.extract_tar(archive,work/name,item['root'],select=lambda p:not p.parts or p.parts[0] in ('src','cmake','CMakeLists.txt','LICENSE'))
+        roots[name]=source_tools.extract_tar(archive,work/name,item['root'],select=source_file)
         archive.unlink()
     system=platform.system();arch=platform.machine();arm=arch in ('arm64','aarch64')
     if system not in ('Linux','Darwin'):raise ValueError('Portable vendor refresh supports only Linux/macOS')
@@ -58,6 +62,7 @@ def build(sdk,work):
     env=dict(os.environ)
     if system=='Darwin':env['MACOSX_DEPLOYMENT_TARGET']=(ROOT/'release/macos-minimum').read_text().strip()
     if system=='Linux':
+        source_tools.ensure_cmake(work,env,'linux-aarch64' if arm else 'linux-x86_64')
         for shared in (False,True):
             target=work/('raylib-shared' if shared else 'raylib-static')
             run(['cmake','-S',roots['raylib'],'-B',target,'-DCMAKE_BUILD_TYPE=Release','-DBUILD_EXAMPLES=OFF',

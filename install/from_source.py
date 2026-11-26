@@ -128,7 +128,7 @@ def build(work, forward, odin=None, export_bundle=None, portable=False):
         actual = run(['git', '-C', checkout, 'rev-parse', 'HEAD'], env=env, capture=True)
         if not actual.startswith(revision):
             raise ValueError('Downloaded Odin revision does not match the reviewed SDK')
-        run(['git','-C',checkout,'-c','lfs.concurrenttransfers=2','-c','lfs.activitytimeout=60','lfs','pull'],env={**env,'GIT_LFS_SKIP_SMUDGE':'0'})
+        run(['git','-C',checkout,'-c','lfs.storage='+str(checkout/'.git/lfs'),'-c','lfs.concurrenttransfers=2','-c','lfs.activitytimeout=60','lfs','pull'],env={**env,'GIT_LFS_SKIP_SMUDGE':'0'})
         if os.name == 'nt':
             run(['cmd.exe', '/d', '/c', 'build.bat', 'release'], cwd=checkout, env=env)
         else:

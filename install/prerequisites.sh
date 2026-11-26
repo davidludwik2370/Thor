@@ -173,7 +173,7 @@ if $source_build; then
     echo 'PASS: source-build prerequisites'
     if $portable_bundle && [ "$system" = Linux ]; then
         if command -v apt-get >/dev/null 2>&1; then
-            packages cmake pkg-config libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev
+            packages pkg-config libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev
         else
             echo 'Build portable Linux releases on the reviewed Ubuntu 22.04 baseline.' >&2; exit 1
         fi

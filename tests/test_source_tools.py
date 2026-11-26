@@ -263,3 +263,23 @@ class SDKPointerTests(unittest.TestCase):
             p=Path(temporary)/'library.a';p.write_bytes(b'version https://git-lfs.github.com/spec/v1\noid sha256:'+b'0'*64+b'\nsize 12345\n')
             with self.assertRaisesRegex(ValueError,'Unresolved Git LFS'):reject_lfs_pointer(p)
             p.write_bytes(b'!<arch>\nreal library payload');reject_lfs_pointer(p)
+
+class CMakeToolTests(unittest.TestCase):
+    def test_working_cmake_is_reused_without_acquisition(self):
+        with tempfile.TemporaryDirectory() as temporary,patch.object(tools.subprocess,'check_output',return_value='cmake version 3.31.6\n'),patch.object(tools,'download',side_effect=AssertionError('unexpected download')):
+            env={'PATH':'/original'};tools.ensure_cmake(Path(temporary),env,'linux-aarch64')
+            self.assertEqual(env['PATH'],'/original');self.assertEqual(list(Path(temporary).iterdir()),[])
+
+    def test_old_distribution_cmake_gets_a_private_binary(self):
+        config=json.loads(Path(tools.__file__).with_name('cmake-source.json').read_text())
+        for target,item in config['targets'].items():
+            with self.subTest(target=target),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary).resolve();blob=io.BytesIO()
+                with tarfile.open(fileobj=blob,mode='w:gz') as out:
+                    info=tarfile.TarInfo(item['root']+'/bin/cmake');info.size=6;info.mode=0o755;out.addfile(info,io.BytesIO(b'binary'))
+                def download(url,path,digest):
+                    self.assertEqual(url,item['url']);self.assertEqual(digest,item['sha256']);path.write_bytes(blob.getvalue())
+                env={'PATH':'/original'}
+                with patch.object(tools,'download',side_effect=download),patch.object(tools.subprocess,'check_output',side_effect=['cmake version 3.22.1\n','cmake version '+config['version']+'\n']):tools.ensure_cmake(root,env,target)
+                self.assertTrue(env['PATH'].startswith(str(root/'private-cmake'/item['root']/'bin')+os.pathsep))
+                self.assertFalse((root/'cmake.tar.gz').exists())

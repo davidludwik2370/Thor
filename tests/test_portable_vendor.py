@@ -2,10 +2,16 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-from tools.build_portable_vendor import raygui_arm_binding
+from tools.build_portable_vendor import raygui_arm_binding, source_file
+from pathlib import PurePosixPath
 from install import from_source
 
 class PortableVendorTests(unittest.TestCase):
+    def test_upstream_root_build_metadata_is_retained(self):
+        for name in ['CMakeLists.txt','CMakeOptions.txt','raylib.pc.in','cmake/GlfwImport.cmake','src/external/glfw/src/platform.c']:
+            self.assertTrue(source_file(PurePosixPath(name)),name)
+        self.assertFalse(source_file(PurePosixPath('examples/assets/huge.png')))
+
     def test_arm_adapter_preserves_other_platforms_and_procedure_declarations(self):
         text='''package raylib
 when ODIN_OS == .Windows {
