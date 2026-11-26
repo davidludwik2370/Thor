@@ -158,8 +158,11 @@ reinstall and uninstall, and preserve default editor preferences. Their small
 logs are retained temporarily; containers and their new images are removed.
 For an existing desktop, maintainers can run `tools/test_install_desktop.py`
 with `--code PATH --output DIR` and optionally `--bundle ARCHIVE`. This uses an
-isolated HOME/editor profile and closes only its own test windows. On Windows,
-run it in the logged-in desktop session, rather than directly inside SSH.
+isolated installer state/editor profile and closes only its own test windows.
+On macOS, GUI processes use the real account home for Keychain access; the
+original installation discovery record is backed up and restored after the
+isolated editor check. On Windows, run it in the logged-in desktop session,
+rather than directly inside SSH.
 
 Linux setup no longer installs Node/npm through the OS package manager. BSD
 continues to use native binary packages for Node, Rust and LLVM. Reusing Odin

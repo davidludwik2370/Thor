@@ -3,7 +3,9 @@
 
 Run as the logged-in desktop user (Windows SSH requires an interactive scheduled
 task). The test keeps logs but removes its private toolchain/editor directories.
-It does not close or modify the user's VS Code windows or configuration.
+On macOS, only editor processes retain the real HOME for Keychain access; a
+backed-up discovery record is temporarily selected and restored afterward.
+The user's VS Code windows and settings are left alone.
 """
 import argparse
 import json
@@ -11,11 +13,55 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import shlex
 import subprocess
 import tempfile
 import time
+from contextlib import contextmanager
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def mac_editor_registration(private_home, recovery_root):
+    """Mac VS Code's native document service needs the actual account HOME.
+
+    Substitute only the discovery record while the isolated editor test runs;
+    restore its original bytes, mode and timestamps; preserve concurrent edits.
+    No original installed files or editor settings are changed.
+    """
+    target = Path.home()/'Library/Application Support/Thor/installation.json'
+    if target.is_symlink():
+        raise RuntimeError('Refusing to substitute a symlinked installation record')
+    info = target.stat() if target.exists() else None
+    before = target.read_bytes() if info is not None else None
+    value = (private_home/'Library/Application Support/Thor/installation.json').read_bytes()
+    recovery = Path(tempfile.mkdtemp(prefix='macos-record-recovery-',dir=recovery_root))
+    (recovery/'metadata.json').write_text(json.dumps({'target':str(target),'existed':info is not None,
+        'mode':info.st_mode & 0o777 if info else None,'atime_ns':info.st_atime_ns if info else None,
+        'mtime_ns':info.st_mtime_ns if info else None}))
+    if before is not None:
+        (recovery/'original.json').write_bytes(before)
+        (recovery/'original.json').chmod(0o600)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    def replace(data):
+        with tempfile.NamedTemporaryFile(dir=target.parent,prefix='.thor-validation-',delete=False) as stream:
+            staged=Path(stream.name)
+            stream.write(data)
+        staged.chmod(info.st_mode & 0o777 if info else 0o600)
+        staged.replace(target)
+    replace(value)
+    try:
+        yield
+    finally:
+        if not target.exists() or target.read_bytes()!=value:
+            raise RuntimeError('Installation record changed during the test; concurrent changes were preserved. Original backup: '+str(recovery))
+        if before is None:
+            target.unlink()
+        else:
+            replace(before)
+            os.utime(target,ns=(info.st_atime_ns,info.st_mtime_ns))
+        shutil.rmtree(recovery)
 
 
 def main():
@@ -65,7 +111,15 @@ def main():
         if os.name == 'nt':
             launcher = ['cmd.exe', '/d', '/c', str(ROOT / 'thor-install.cmd')]
         common = ['--prefix', str(prefix)]
-        install = [*common, '--vscode', '--profile', 'Thor', '--path', '--code', str(args.code.resolve()),
+        code = args.code.resolve()
+        if os.sys.platform=='darwin':
+            # Even profile creation can access the Keychain. Keep native Code
+            # in the real account HOME; only installer state uses private HOME.
+            wrapper=work/'code-cli'
+            wrapper.write_text('#!/bin/sh\nHOME='+shlex.quote(str(Path.home()))+'\nexport HOME\nexec '+shlex.quote(str(code))+' "$@"\n')
+            wrapper.chmod(0o700)
+            code=wrapper
+        install = [*common, '--vscode', '--profile', 'Thor', '--path', '--code', str(code),
                    '--code-user-data', str(data), '--extensions-dir', str(extensions)]
         if args.bundle:
             install += ['--bundle', str(args.bundle.resolve(strict=True))]
@@ -144,26 +198,22 @@ def main():
             verification = work / 'verification'
             shutil.copytree(ROOT / 'tools/install-ubuntu/verification-extension', verification)
             editor_env = dict(env, THOR_INSTALL_GUI_RESULT=str(output / 'editor-result.json'))
-            editor_data, editor_extensions, profile_args = data, extensions, ['--profile', 'Thor']
-            if os.sys.platform == 'darwin':
-                # Keep the installer-created named profile intact. Use its exact
-                # settings and installed packages in a fresh extension-test host.
-                editor_data, editor_extensions, profile_args = work/'editor-data', work/'editor-extensions', []
-                storage=json.loads((data/'User/globalStorage/storage.json').read_text())
-                profiles=storage['userDataProfiles']
-                if isinstance(profiles,str):profiles=json.loads(profiles)
-                profile=next(item for item in profiles if item['name']=='Thor')
-                source=data/'User/profiles'/profile['location']
-                (editor_data/'User').mkdir(parents=True)
-                for name in ('settings.json','keybindings.json'):
-                    if (source/name).is_file():shutil.copy2(source/name,editor_data/'User'/name)
-                editor_extensions.mkdir()
-                for package in extensions.iterdir():
-                    if package.is_dir(): (editor_extensions/package.name).symlink_to(package,target_is_directory=True)
-            run([args.code.resolve(), '--wait', '--new-window', *profile_args, '--user-data-dir', editor_data,
-                 '--extensions-dir', editor_extensions, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes',
+            if os.sys.platform.startswith('linux'):
+                editor_env['DONT_PROMPT_WSL_INSTALL']='1'
+            command=[args.code.resolve(), '--wait', '--new-window', '--profile', 'Thor', '--user-data-dir', data,
+                 '--extensions-dir', extensions, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes',
                  '--extensionDevelopmentPath=' + str(verification),
-                 '--extensionTestsPath=' + str(verification / 'test.js'), fixture], 'editor', timeout=240, child_env=editor_env)
+                 '--extensionTestsPath=' + str(verification / 'test.js'), fixture]
+            if os.sys.platform=='darwin':
+                editor_env['HOME']=str(Path.home())
+                with mac_editor_registration(home,output):
+                    try:
+                        run(command,'editor',timeout=240,child_env=editor_env)
+                    finally:
+                        close_test_editor()
+                result['checks'].append('original-installation-record-restored')
+            else:
+                run(command,'editor',timeout=240,child_env=editor_env)
             editor = json.loads((output / 'editor-result.json').read_text())
             if not editor.get('success'):
                 raise RuntimeError('Installed editor check failed: ' + editor.get('error', 'unknown'))
