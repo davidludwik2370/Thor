@@ -223,8 +223,10 @@ def relocate_odin(stage, original_odin=None):
             subprocess.run(['codesign', '--force', '--sign', '-', str(file)], check=True)
 
 
-def stage_macos_tools(stage):
-    symbolizer=shutil.which('llvm-symbolizer') or next((str(p) for p in [Path('/opt/homebrew/opt/llvm/bin/llvm-symbolizer'),Path('/usr/local/opt/llvm/bin/llvm-symbolizer')] if p.is_file()),None)
+def stage_macos_tools(stage, sdk=None):
+    bundled=Path(sdk)/'libexec/llvm-symbolizer' if sdk else None
+    reused=bundled is not None and bundled.is_file()
+    symbolizer=str(bundled) if reused else (shutil.which('llvm-symbolizer') or next((str(p) for p in [Path('/opt/homebrew/opt/llvm/bin/llvm-symbolizer'),Path('/usr/local/opt/llvm/bin/llvm-symbolizer')] if p.is_file()),None))
     if not symbolizer:raise ValueError('A macOS distribution needs llvm-symbolizer for native source-mapped ASan reports.')
     symbolizer=Path(symbolizer).resolve()
     dsymutil=symbolizer.with_name('dsymutil')
@@ -233,8 +235,8 @@ def stage_macos_tools(stage):
     # Keep these tools private; compiler children select them for debug builds.
     copy(symbolizer,stage/'odin/libexec/llvm-symbolizer')
     copy(dsymutil,stage/'odin/libexec/dsymutil')
-    resources=symbolizer.parents[1]/'lib/clang'
-    candidates=sorted(p for p in resources.glob('*/lib/darwin') if (p/'libclang_rt.asan_osx_dynamic.dylib').is_file())
+    resources=Path(sdk)/'clang-resource/lib/darwin' if reused else symbolizer.parents[1]/'lib/clang'
+    candidates=([resources] if (resources/'libclang_rt.asan_osx_dynamic.dylib').is_file() else []) if reused else sorted(p for p in resources.glob('*/lib/darwin') if (p/'libclang_rt.asan_osx_dynamic.dylib').is_file())
     if not candidates:raise ValueError('LLVM must include the macOS compiler-rt sanitizer runtime.')
     tree(candidates[-1],stage/'odin/clang-resource/lib/darwin')
 
@@ -264,7 +266,7 @@ def build(options):
             tree(ROOT/name, stage/name)
         if os.name!='nt':copy(ROOT/'llvm-symbolizer-thor',stage/'llvm-symbolizer-thor')
         if system=='macos':
-            stage_macos_tools(stage)
+            stage_macos_tools(stage,sdk)
         tree(ROOT/'tls/builtin', stage/'tls/builtin')
         stage_source(stage/'ols',options.ols_source)
         # Odin invokes helpers relative to its own root (notably radlink on

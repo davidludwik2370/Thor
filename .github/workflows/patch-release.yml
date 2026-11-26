@@ -1,0 +1,92 @@
+name: Verified SDK patch release
+on:
+  workflow_dispatch:
+    inputs:
+      base_source:
+        description: Reviewed source commit of the reusable published compiler implementation
+        required: true
+        default: d1a8fbf42cb977a557856f884efd26667be84585
+        type: string
+      base_tag:
+        description: Published and verified base release
+        required: true
+        default: v0.41.11
+        type: string
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify unchanged compiler implementation, SDK and dependencies
+        env:
+          BASE_SOURCE: ${{ inputs.base_source }}
+          BASE_TAG: ${{ inputs.base_tag }}
+        run: python3 tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --guard-only
+      - name: Prepare only an unpublished release for this exact source
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          tag='v'+Path('release/version').read_text().strip()
+          previous=subprocess.run(['gh','release','view',tag,'--json','isDraft,targetCommitish'],capture_output=True,text=True)
+          if previous.returncode:
+              subprocess.run(['gh','release','create',tag,'--draft','--target',os.environ['GITHUB_SHA'],'--title','Thor '+tag[1:],'--notes','Validation in progress; not published.'],check=True)
+          else:
+              release=json.loads(previous.stdout)
+              if not release['isDraft'] or release['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Existing release is published or belongs to another source')
+          PY
+  native:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      BASE_SOURCE: ${{ inputs.base_source }}
+      BASE_TAG: ${{ inputs.base_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the small Linux relocation helper
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends patchelf
+      - name: Build version-only compiler and fixed installer with the verified SDK and TLS
+        shell: bash
+        run: python tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --output "$RUNNER_TEMP/thor-patch-release"
+      - name: Upload only this source commit's unpublished draft
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          tag='v'+Path('release/version').read_text().strip()
+          release=json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft,targetCommitish'],text=True))
+          if not release['isDraft'] or release['targetCommitish']!=os.environ['GITHUB_SHA']:raise RuntimeError('Refusing to overwrite a published or different release')
+          archives=list((Path(os.environ['RUNNER_TEMP'])/'thor-patch-release').glob('*.tar.gz'))
+          if len(archives)!=1:raise RuntimeError('Expected one native archive')
+          archive=archives[0];sidecar=archive.with_name(archive.name+'.sha256')
+          digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+          if sidecar.read_text().split()!=[digest,archive.name]:raise RuntimeError('Checksum sidecar differs')
+          subprocess.run(['gh','release','upload',tag,str(archive),str(sidecar),'--clobber'],check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patch-release-${{ matrix.os }}
+          path: ${{ runner.temp }}/thor-patch-release/*.json
+          retention-days: 3

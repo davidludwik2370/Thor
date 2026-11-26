@@ -91,21 +91,24 @@ pub(super) fn cli(code: &Path,o: &Options,bin: &Path,root:&Path) -> Result<Comma
     if let Some(extensions)=&o.extensions {cmd.arg("--extensions-dir").arg(extensions);}
     Ok(cmd)
 }
-fn profiles(data: &Path) -> Result<Vec<(String,PathBuf)>> {
+fn profile_directory(data: &Path, requested: &str) -> Result<Option<PathBuf>> {
     let path=data.join("User/globalStorage/storage.json");
-    let value=match read_json(&path) {Ok(v)=>v,Err(_) if !path.exists()=>return Ok(vec![]),Err(e)=>return Err(e)};
+    let value=match read_json(&path) {Ok(v)=>v,Err(_) if !path.exists()=>return Ok(None),Err(e)=>return Err(e)};
     let entries=match &value["userDataProfiles"] {
-        Value::Null=>return Ok(vec![]),Value::String(s)=>serde_json::from_str::<Value>(s).map_err(err)?,v=>v.clone()
+        Value::Null=>return Ok(None),Value::String(s)=>serde_json::from_str::<Value>(s).map_err(err)?,v=>v.clone()
     };
     let list=entries.as_array().ok_or("VS Code profile registry has an unknown format; it was left unchanged")?;
-    let mut result=vec![];
+    let mut result=None;
     for item in list {
-        let name=field(item,"name")?;
+        // Built-in and future profiles can use a different location format.
+        // They are unrelated to the requested profile and must remain untouched.
+        if item["name"].as_str()!=Some(requested) {continue;}
+        if result.is_some() {return Err("duplicate requested VS Code profile; settings were left unchanged".into());}
         let location=field(item,"location")?;
         // VS Code stores an ID relative to User/profiles. Do not follow paths or
         // URLs supplied by an unsupported future registry format.
         if !component(location) {return Err("unsupported VS Code profile location; settings were left unchanged".into());}
-        result.push((name.to_owned(),data.join("User/profiles").join(location)));
+        result=Some(data.join("User/profiles").join(location));
     }
     Ok(result)
 }
@@ -115,13 +118,13 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     let bin=PathBuf::from(field(&record,"bin")?);
     let prefix=PathBuf::from(field(&record,"prefix")?);
     if let Some(name)=&o.profile {
-        let existing=profiles(&data)?.into_iter().find(|(n,_)|n==name);
+        let existing=profile_directory(&data,name)?;
         if existing.is_none() {
             println!("Creating profile {name}; VS Code may open a new window.");
             let mut cmd=cli(code,o,&bin,root)?;cmd.args(["--profile",name,"--new-window"]); command(cmd)?;
             let mut directory=None;
             for _ in 0..100 {
-                directory=profiles(&data)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p);
+                directory=profile_directory(&data,name)?;
                 if directory.is_some(){break;}
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
@@ -162,7 +165,7 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     lifecycle::save(&prefix,&state)?;
     {
         let directory=if let Some(name)=&o.profile {
-            profiles(&data)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile not found")?
+            profile_directory(&data,name)?.ok_or("VS Code profile not found")?
         } else {data.join("User")};
         ols::configure(root,Path::new(field(&registered()?,"prefix")?),&directory.join("settings.json"))?;
     }
@@ -231,7 +234,7 @@ pub(super) fn verify_editors(record:&Value)->Result<()> {
         locate.args(["--locate-extension","thor-local.thor-language"]);
         let output=locate.output().map_err(err)?;
         if !output.status.success(){return Err("could not locate the installed Thor extension".into());}
-        let directory=if let Some(name)=&o.profile {profiles(&data_dir(&o)?)?.into_iter().find(|(n,_)|n==name).map(|(_,p)|p).ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
+        let directory=if let Some(name)=&o.profile {profile_directory(&data_dir(&o)?,name)?.ok_or("VS Code profile disappeared")?}else{data_dir(&o)?.join("User")};
         let located=String::from_utf8_lossy(&output.stdout).trim().to_owned();
         // Some VS Code versions locate extensions only in the default profile,
         // even when --profile was supplied. Read the selected profile's own
@@ -275,4 +278,55 @@ fn verify_node_package(directory:&Path,root:&Path,seen:&mut BTreeSet<PathBuf>)->
         let dependency=found.ok_or_else(||format!("editor runtime dependency missing: {name}"))?;
         verify_node_package(&dependency,root,seen)?;
     }}Ok(())
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize,Ordering};
+    static NEXT: AtomicUsize=AtomicUsize::new(0);
+    struct Fixture(PathBuf);
+    impl Fixture {
+        fn new(entries:Value)->Self {
+            let root=env::temp_dir().join(format!("thor-profile-registry-{}-{}",std::process::id(),NEXT.fetch_add(1,Ordering::Relaxed)));
+            fs::create_dir_all(root.join("User/globalStorage")).unwrap();
+            let bytes=serde_json::to_vec(&json!({"userDataProfiles":entries})).unwrap();
+            fs::write(root.join("User/globalStorage/storage.json"),bytes).unwrap();
+            Self(root)
+        }
+        fn bytes(&self)->Vec<u8> {fs::read(self.0.join("User/globalStorage/storage.json")).unwrap()}
+    }
+    impl Drop for Fixture {fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
+    #[test] fn unrelated_builtin_and_future_profiles_are_untouched() {
+        let entries=json!([{"name":"Agents","location":"builtin/agents"},{"name":"Other","location":"../../outside"},{"future":true},{"name":"Thor","location":"valid-id"}]);
+        for value in [entries.clone(),json!(entries.to_string())] {
+            let fixture=Fixture::new(value);let before=fixture.bytes();
+            let found=profile_directory(&fixture.0,"Thor").unwrap();
+            let after=fixture.bytes();
+            assert_eq!(found,Some(fixture.0.join("User/profiles/valid-id")));
+            assert_eq!(before,after);
+        }
+    }
+    #[test] fn unrelated_profiles_do_not_prevent_creating_a_named_profile() {
+        let fixture=Fixture::new(json!([{"name":"Agents","location":"builtin/agents"}]));
+        let found=profile_directory(&fixture.0,"Thor").unwrap();
+        assert_eq!(found,None);
+    }
+    #[test] fn requested_unsupported_locations_still_fail_without_writes() {
+        for location in ["../escape","/outside","C:\\outside","file:///outside","builtin/agents",".",".."] {
+            let fixture=Fixture::new(json!([{"name":"Thor","location":location}]));let before=fixture.bytes();
+            let result=profile_directory(&fixture.0,"Thor");let after=fixture.bytes();
+            assert!(result.is_err());assert_eq!(before,after);
+        }
+    }
+    #[test] fn duplicate_requested_profile_is_rejected_without_writes() {
+        let fixture=Fixture::new(json!([{"name":"Thor","location":"one"},{"name":"Thor","location":"two"}]));let before=fixture.bytes();
+        let result=profile_directory(&fixture.0,"Thor");let after=fixture.bytes();
+        assert!(result.is_err());assert_eq!(before,after);
+    }
+    #[test] fn unsupported_registry_shape_remains_an_error() {
+        let fixture=Fixture::new(json!({"future":"format"}));
+        let result=profile_directory(&fixture.0,"Thor");
+        assert!(result.is_err());
+    }
 }
