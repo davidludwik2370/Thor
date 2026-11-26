@@ -144,7 +144,7 @@ def main():
                 subprocess.run(['powershell.exe', '-NoProfile', '-Command', script], capture_output=True, timeout=30)
             else:
                 def owned_roots():
-                    rows = subprocess.check_output(['ps', '-ax', '-o', 'pid=,command='], text=True)
+                    rows = subprocess.check_output(['ps', '-axww', '-o', 'pid=,command='], text=True)
                     return [int(row.strip().split(None, 1)[0]) for row in rows.splitlines()
                             if str(work) in row and '--user-data-dir' in row and '--type=' not in row]
                 for pid in owned_roots():
