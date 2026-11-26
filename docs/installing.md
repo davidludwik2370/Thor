@@ -52,8 +52,9 @@ glibc 2.35 and libstdc++ ABI GLIBCXX 3.4.30. Release packaging checks the actual
 native executables and shared libraries, including native vendor libraries.
 Linux support here means glibc-based systems; Alpine/musl is a separate,
 unvalidated configuration. The macOS ARM64 baseline is macOS 13 (tested on
-13.5.1); Windows desktop validation currently covers Windows 11 x64. Windows 10
-validation is pending on an identified test machine. See `release/linux-compatibility.json` and
+13.5.1); Windows desktop validation covers Windows 11 x64 and Windows 10 Pro
+22H2 x64 (build 19045), including first-time MSVC/SDK acquisition on the Dell.
+See the [Windows and Linux follow-up results](validation/windows10-dell-2026-11-26.md). See `release/linux-compatibility.json` and
 `release/macos-minimum` for the enforced release bounds.
 
 

@@ -67,8 +67,9 @@ No required setup, cleanup or runtime operation is hidden inside an assertion.
 | Windows 11 x64, build 26200 | All desktop checks passed | 146.11 s |
 | Ubuntu 24.04 x64, WSL2 | All desktop checks passed | 109.65 s |
 
-Windows and WSL desktop checks finished before the user's fullscreen restriction.
-Further physical-PC GUI runs are deferred until the user lifts that restriction.
+Windows and WSL checks were repeated after the user lifted the fullscreen
+restriction. The [Windows 10/0.41.12 follow-up](windows10-dell-2026-11-26.md) records
+the Dell cycle, resumed Windows 11/WSL tests, fixes and public-release checks.
 These are isolated checks on provisioned desktops, not clean OS installations.
 
 The Air’s repeat debugger check exposed a test-orchestration issue: direct SSH
@@ -114,14 +115,14 @@ Only current release archives and small verification logs are retained locally.
 Nine obsolete archives were removed after matching their published digests
 (1,426 MiB reclaimed), along with the completed disposable container image and
 private Fusion validation checkout. User installations/projects were preserved.
-Physical-PC staging is retained until cleanup can occur without interfering with
-the user’s fullscreen application.
+Physical-PC staging was subsequently cleaned after the resumed tests; the final
+user installations were preserved (see the follow-up report).
 
 ## Remaining scope
 
-Windows 10 was initially deferred; the user has now identified a Dell test PC,
-and access/setup is pending. First-time MSVC installation on a clean Windows 11
-VM remains explicitly deferred. macOS Intel and BSD source-install paths have
+Windows 10 testing on the Dell is complete, including first-time MSVC/SDK
+acquisition, editor/debugger checks and repeated uninstall/reinstall. First-time
+MSVC installation on a clean Windows 11 VM remains explicitly deferred. macOS Intel and BSD source-install paths have
 less direct desktop coverage than the configurations above. Container results
 verify real native application APIs; they do not assess display scaling, visual
 spacing or every desktop compositor. No universal claim about arbitrary OS,

@@ -1,0 +1,696 @@
+{
+  "date": "2026-11-26",
+  "release": "0.41.12",
+  "release_url": "https://github.com/davidludwik2370/Thor/releases/tag/v0.41.12",
+  "package_build_source": "96bf2f95aa3c9f0dccebe1e7246714a3ac8f8ea9",
+  "release_tag_source": "c9f55ed323277eba317e0a319cd5c6dbc0d8cbb1",
+  "source_note": "Tag includes test fixture and harness corrections after the installer build; production installer code is unchanged.",
+  "scope": "Installer, native editor/debugger and checked/unchecked smoke tests; entire language suite recorded separately.",
+  "native_ci": {
+    "run_id": 45861122535,
+    "success": true,
+    "hosts": [
+      "windows-2025",
+      "ubuntu-24.04",
+      "ubuntu-24.04-arm",
+      "macos-15",
+      "macos-15-intel"
+    ],
+    "windows_rust_tests": 17,
+    "other_rust_tests": 15
+  },
+  "package_refresh_run": 45860289969,
+  "local_tests": {
+    "initial_selection": 188,
+    "subsequent_repack_desktop_assertion_selection": 18,
+    "cold_gui_desktop_assertion_selection": 13
+  },
+  "assets": [
+    {
+      "name": "thor-0.41.12-linux-aarch64.tar.gz",
+      "sha256": "f268e716958f1e980b7a2d709f1bf531d60804e9769de795e7dbf28208c34a51",
+      "files_verified": 2673,
+      "changes_from_first_candidate": [
+        "thor-install"
+      ],
+      "required": {
+        "glibc": "2.35",
+        "glibcxx": "3.4.30",
+        "cxxabi": "1.3.13"
+      }
+    },
+    {
+      "name": "thor-0.41.12-linux-x86_64.tar.gz",
+      "sha256": "be43491bb9b3ab73572fcc0775363ca3c8559ee0b2054289d74e3efba07fabfc",
+      "files_verified": 2671,
+      "changes_from_first_candidate": [
+        "thor-install"
+      ],
+      "required": {
+        "glibc": "2.35",
+        "glibcxx": "3.4.30",
+        "cxxabi": "1.3.13"
+      }
+    },
+    {
+      "name": "thor-0.41.12-macos-aarch64.tar.gz",
+      "sha256": "d073b21dd5bcf47951ce8be816da0ed6dce55365b1748c10083462f4e46f0a61",
+      "files_verified": 2704,
+      "changes_from_first_candidate": [
+        "thor-install"
+      ],
+      "required": {
+        "macos": "13.0"
+      }
+    },
+    {
+      "name": "thor-0.41.12-windows-x86_64.tar.gz",
+      "sha256": "20f720d0a36d02c301bcaf64ab60c8339bb6321cc528f58838a400b934eb7688",
+      "files_verified": 3412,
+      "changes_from_first_candidate": [
+        "thor-install.exe"
+      ]
+    }
+  ],
+  "dell": {
+    "os": "Windows 10 Pro 22H2 x64 build 19045",
+    "cpu": "Intel Core i5-4590S",
+    "ram_gb": 8,
+    "disk": "HDD",
+    "vscode_initial": "1.121.0",
+    "vscode_final": "1.148.0",
+    "first_msvc_sdk_installation": true,
+    "lifecycle": {
+      "success": true,
+      "checks": [
+        "candidate-default-profile-install",
+        "standalone-native-editor-setup-with-default-client-policy",
+        "candidate-editor-debugger-and-private-lifecycle",
+        "default-uninstall-repeated",
+        "original-user-path-restored",
+        "default-preferences-and-existing-extensions-preserved",
+        "candidate-default-reinstall",
+        "final-doctor",
+        "ordinary-command-prompt-path"
+      ],
+      "desktop": {
+        "success": true,
+        "platform": "win32",
+        "checks": [
+          "install-reinstall-doctor",
+          "ordinary-windows-terminal-path",
+          "checked-and-unchecked-execution",
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit",
+          "default-profile-preserved",
+          "repeated-uninstall-project-preserved"
+        ],
+        "seconds": 428.27
+      },
+      "seconds": 862.46
+    },
+    "editor": {
+      "success": true,
+      "checks": [
+        "installed-extension-activation",
+        "native-odin-fixture-present",
+        "native-odin-document-opened",
+        "standard-ols-owns-odin-language-grammar-and-icons",
+        "automatic-native-ols-build-and-language-services",
+        "terminal-path-without-shell-profile",
+        "tls-hover-private-sdk",
+        "tls-field-completion",
+        "profile-theme-and-thor-only-colors",
+        "optional-color-enable-and-restore",
+        "run-without-shell-path",
+        "codelldb-source-breakpoint",
+        "debug-clean-exit"
+      ],
+      "timings": {
+        "automatic native OLS hover": 485,
+        "automatic native OLS semantic tokens": 20,
+        "automatic native OLS completion": 14,
+        "terminal PATH": 1458,
+        "terminal PATH probe close": 202,
+        "TLS hover": 869,
+        "TLS fields": 12,
+        "optional colors": 0,
+        "color preset enable": 1,
+        "color preset restore": 0,
+        "Cmd+R program": 36535,
+        "mapped source breakpoint": 424,
+        "debug program exit": 201
+      }
+    },
+    "public": {
+      "success": true,
+      "checks": [
+        "exact-public-bootstrap-without-bundle-or-release-base",
+        "installed-public-doctor",
+        "ordinary-terminal-path",
+        "checked-parallel-polymorphic-callbacks-comptime-pointers-and-results",
+        "unchecked-parallel-polymorphic-callbacks-comptime-pointers-and-results",
+        "persistent-execution-policy-preserved"
+      ],
+      "seconds": 79.65
+    }
+  },
+  "windows11_and_wsl": {
+    "candidate": {
+      "windows": {
+        "success": true,
+        "platform": "win32",
+        "checks": [
+          "install-reinstall-doctor",
+          "ordinary-windows-terminal-path",
+          "checked-and-unchecked-execution",
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit",
+          "default-profile-preserved",
+          "repeated-uninstall-project-preserved"
+        ],
+        "seconds": 133.36
+      },
+      "windowsWorker": {
+        "exit_code": 0,
+        "finished": 1795709650.7505558
+      },
+      "linux": {
+        "success": true,
+        "platform": "linux",
+        "checks": [
+          "install-reinstall-doctor",
+          "ordinary-login-and-interactive-shell-path",
+          "checked-and-unchecked-execution",
+          "installed-extension-activation",
+          "native-odin-fixture-present",
+          "native-odin-document-opened",
+          "standard-ols-owns-odin-language-grammar-and-icons",
+          "automatic-native-ols-build-and-language-services",
+          "terminal-path-without-shell-profile",
+          "tls-hover-private-sdk",
+          "tls-field-completion",
+          "profile-theme-and-thor-only-colors",
+          "optional-color-enable-and-restore",
+          "run-without-shell-path",
+          "codelldb-source-breakpoint",
+          "debug-clean-exit",
+          "default-profile-preserved",
+          "repeated-uninstall-project-preserved"
+        ],
+        "seconds": 101.88
+      },
+      "linuxWorker": {
+        "exit_code": 0,
+        "finished": 1795709622.4873385
+      }
+    },
+    "public": {
+      "windows": {
+        "success": true,
+        "checks": [
+          "exact-public-bootstrap-without-bundle-or-release-base",
+          "installed-public-doctor",
+          "ordinary-terminal-path",
+          "checked-parallel-polymorphic-callbacks-comptime-pointers-and-results",
+          "unchecked-parallel-polymorphic-callbacks-comptime-pointers-and-results",
+          "persistent-execution-policy-preserved"
+        ],
+        "seconds": 61.07
+      },
+      "linux": {
+        "success": true,
+        "checks": [
+          "actual-public-upgrade",
+          "actual-doctor",
+          "ordinary-login-and-interactive-path"
+        ],
+        "seconds": 52.62
+      },
+      "linuxWorker": {
+        "exit_code": 0,
+        "time": 1795712911.7644005
+      }
+    }
+  },
+  "public_linux_matrix": {
+    "run_id": 45864993493,
+    "success": true,
+    "cases": [
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-debian12",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "debian:12",
+          "success": true,
+          "image_id": "sha256:b3f742ca10c9f9178cec3a58f3497ad25e9f444afc71b8dc063db1164ea9caf1",
+          "temporary_image_removed": true,
+          "seconds": 238.99
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 400,
+            "automatic native OLS semantic tokens": 51,
+            "automatic native OLS completion": 56,
+            "terminal PATH": 604,
+            "terminal PATH probe close": 202,
+            "TLS hover": 305,
+            "TLS fields": 91,
+            "optional colors": 0,
+            "color preset enable": 0,
+            "color preset restore": 1,
+            "Cmd+R program": 1269,
+            "mapped source breakpoint": 0,
+            "debug program exit": 200
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-fedora",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "fedora:latest",
+          "success": true,
+          "image_id": "sha256:45bb669ea5ba47d1e7baf285d571723a26b78e7bb156030058ca08b2ee3c17eb",
+          "temporary_image_removed": true,
+          "seconds": 219.78
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 599,
+            "automatic native OLS semantic tokens": 7,
+            "automatic native OLS completion": 21,
+            "terminal PATH": 633,
+            "terminal PATH probe close": 201,
+            "TLS hover": 301,
+            "TLS fields": 112,
+            "optional colors": 2,
+            "color preset enable": 0,
+            "color preset restore": 0,
+            "Cmd+R program": 2252,
+            "mapped source breakpoint": 200,
+            "debug program exit": 201
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-debian12",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "debian:12",
+          "success": true,
+          "image_id": "sha256:a36824f1b4c6892ddfeb448726ace7f338ee14b4113288ecc813e266370d5c90",
+          "temporary_image_removed": true,
+          "seconds": 231.38
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 339,
+            "automatic native OLS semantic tokens": 59,
+            "automatic native OLS completion": 113,
+            "terminal PATH": 820,
+            "terminal PATH probe close": 201,
+            "TLS hover": 370,
+            "TLS fields": 105,
+            "optional colors": 0,
+            "color preset enable": 2,
+            "color preset restore": 1,
+            "Cmd+R program": 2633,
+            "mapped source breakpoint": 0,
+            "debug program exit": 201
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-ubuntu24",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "ubuntu:24.04",
+          "success": true,
+          "image_id": "sha256:2b147973fd863c93ced60f325461fe0e262b91317b008e6a2d961f13e81af0e4",
+          "temporary_image_removed": true,
+          "seconds": 178.37
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 316,
+            "automatic native OLS semantic tokens": 21,
+            "automatic native OLS completion": 20,
+            "terminal PATH": 641,
+            "terminal PATH probe close": 201,
+            "TLS hover": 202,
+            "TLS fields": 23,
+            "optional colors": 0,
+            "color preset enable": 0,
+            "color preset restore": 0,
+            "Cmd+R program": 1890,
+            "mapped source breakpoint": 0,
+            "debug program exit": 200
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-ubuntu22",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "ubuntu:22.04",
+          "success": true,
+          "image_id": "sha256:c6ba99469732c44e19b2d13750adde7d93a4e2a188caf797578c42356313280f",
+          "temporary_image_removed": true,
+          "seconds": 209.48
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 298,
+            "automatic native OLS semantic tokens": 11,
+            "automatic native OLS completion": 8,
+            "terminal PATH": 637,
+            "terminal PATH probe close": 205,
+            "TLS hover": 303,
+            "TLS fields": 74,
+            "optional colors": 1,
+            "color preset enable": 0,
+            "color preset restore": 0,
+            "Cmd+R program": 1402,
+            "mapped source breakpoint": 0,
+            "debug program exit": 200
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-ubuntu24",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "ubuntu:24.04",
+          "success": true,
+          "image_id": "sha256:7cf0c39cbf1f2d11eee47faaec04414d407cec919beca31f81b1ce9f9e75b8ce",
+          "temporary_image_removed": true,
+          "seconds": 182.7
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 300,
+            "automatic native OLS semantic tokens": 73,
+            "automatic native OLS completion": 19,
+            "terminal PATH": 620,
+            "terminal PATH probe close": 201,
+            "TLS hover": 210,
+            "TLS fields": 72,
+            "optional colors": 0,
+            "color preset enable": 0,
+            "color preset restore": 0,
+            "Cmd+R program": 1404,
+            "mapped source breakpoint": 0,
+            "debug program exit": 201
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-ubuntu22",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "ubuntu:22.04",
+          "success": true,
+          "image_id": "sha256:4c738ec33362ed21d54f5e6ca4eadc9f2707fd6516cd7eb5be2a772dfdfaa938",
+          "temporary_image_removed": true,
+          "seconds": 223.75
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 402,
+            "automatic native OLS semantic tokens": 163,
+            "automatic native OLS completion": 11,
+            "terminal PATH": 602,
+            "terminal PATH probe close": 206,
+            "TLS hover": 291,
+            "TLS fields": 38,
+            "optional colors": 0,
+            "color preset enable": 11,
+            "color preset restore": 0,
+            "Cmd+R program": 1804,
+            "mapped source breakpoint": 0,
+            "debug program exit": 200
+          }
+        }
+      },
+      {
+        "case": "installer-compatibility-ubuntu-22.04-arm-fedora",
+        "success": true,
+        "version_confirmed": "0.41.12",
+        "host": {
+          "image": "fedora:latest",
+          "success": true,
+          "image_id": "sha256:e32fe0b8cd22f419d427a3411635a8ad683aff18dbb8e47bf2611bc3d599ed7b",
+          "temporary_image_removed": true,
+          "seconds": 269.46
+        },
+        "editor": {
+          "success": true,
+          "checks": [
+            "installed-extension-activation",
+            "native-odin-fixture-present",
+            "native-odin-document-opened",
+            "standard-ols-owns-odin-language-grammar-and-icons",
+            "automatic-native-ols-build-and-language-services",
+            "terminal-path-without-shell-profile",
+            "tls-hover-private-sdk",
+            "tls-field-completion",
+            "profile-theme-and-thor-only-colors",
+            "optional-color-enable-and-restore",
+            "run-without-shell-path",
+            "codelldb-source-breakpoint",
+            "debug-clean-exit"
+          ],
+          "timings": {
+            "automatic native OLS hover": 290,
+            "automatic native OLS semantic tokens": 23,
+            "automatic native OLS completion": 23,
+            "terminal PATH": 601,
+            "terminal PATH probe close": 200,
+            "TLS hover": 258,
+            "TLS fields": 51,
+            "optional colors": 1,
+            "color preset enable": 0,
+            "color preset restore": 0,
+            "Cmd+R program": 1261,
+            "mapped source breakpoint": 0,
+            "debug program exit": 201
+          }
+        }
+      }
+    ]
+  },
+  "deferred": [
+    "First-time MSVC/SDK installation on a clean Windows 11 VM",
+    "Universal compatibility outside the tested OS/CPU/editor combinations"
+  ],
+  "post_cleanup": {
+    "dell": {
+      "cleanup": {
+        "success": true,
+        "removed_tasks": [
+          "Thor-Win10-Close-Test-Profile-20261126",
+          "Thor-Win10-Desktop-20261126",
+          "Thor-Win10-Final-20261126",
+          "Thor-Win10-GUI-Probe-20261126",
+          "Thor-Win10-Initial-20261126",
+          "Thor-Win10-Patch-20261126",
+          "Thor-Win10-Prereqs-20261126",
+          "Thor-Win10-Public-20261126"
+        ],
+        "removed_directories": [
+          "python",
+          "source",
+          "source-public-final",
+          "source-public-patch",
+          "source-public-release",
+          "source-patch-unpack",
+          "public-release-unpack",
+          "candidate-final",
+          "candidate-published",
+          "gui-only-probe",
+          "public-runtime-smoke"
+        ],
+        "installation_preserved": true
+      },
+      "doctor_passed": true,
+      "registered_version": "0.41.12",
+      "remaining_owned_tasks": 0
+    },
+    "pc": {
+      "cleanup": {
+        "success": true,
+        "removed_tasks": [
+          "Thor-Compatibility-Desktop-20261126",
+          "Thor-Compatibility-Desktop-Final-20261126",
+          "Thor-Compatibility-Desktop-Patch-20261126",
+          "Thor-Compatibility-Desktop-Public-20261126",
+          "Thor-Compatibility-WSL-20261126",
+          "Thor-Compatibility-WSL-Final-20261126",
+          "Thor-Compatibility-WSL-Patch-20261126",
+          "Thor-Compatibility-WSL-Public-20261126"
+        ],
+        "removed_directories": [
+          "source",
+          "public-runtime-smoke"
+        ],
+        "installation_preserved": true
+      },
+      "doctor_passed": true,
+      "registered_version": "0.41.12",
+      "remaining_owned_tasks": 0
+    },
+    "wsl": {
+      "doctor_passed": true,
+      "cleanup": {
+        "success": true,
+        "removed": [
+          "source"
+        ],
+        "installation_preserved": true
+      }
+    }
+  },
+  "obsolete_local_archives_removed_mib": 1487.8
+}
