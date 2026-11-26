@@ -595,3 +595,23 @@ test('scoped ownership suffix preserves variable names and xor syntax',()=>{
     assert.ok(tokens.some(t=>t.text.includes('~')));
     assert.ok(!tokens.some(t=>t.scopes.includes('meta.definition.variable.scoped.thor')));
 });
+
+
+test('hover namespace labels consume keyword fragments as one namespace',()=>{
+    for(const label of ['or-else-lists','else','my app.v1','switch-results','123-project']) {
+        for(const declaration of ['default_text :: proc() -> string','answer: int']) {
+            const source=label+'.'+declaration;
+            check(source,label,'variable.other.namespace');
+            const tokens=tokenize(source)[0];
+            assert.ok(!tokens.some(t=>t.scopes.includes('keyword.control.thor')&&label.includes(t.text)));
+            assert.ok(themedTokens(source)[0].slice(0,label.length).every(t=>t.color==='#9CDCFE'));
+        }
+    }
+});
+
+test('hover namespace labels do not change source subtraction, cases, map keys or strings',()=>{
+    for(const source of ['value := left-right.field','return left-right.field','case left-right.field: return','items := map[int]int{\nleft-right.field: 1,\n}','text := "or-else-lists.default_text :: proc()"']) {
+        const tokens=tokenize(source).flat();
+        assert.ok(!tokens.some(t=>t.scopes.includes('variable.other.namespace.thor')&&t.text.includes('-')),source);
+    }
+});

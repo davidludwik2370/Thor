@@ -252,6 +252,75 @@ fi
         self.assertIn('export CUSTOM=kept',first.decode())
         self.assertEqual(len(list(self.home.glob('.profile.thor-backup-*'))),1)
 
+    def shell_path(self, shell, mode, *, extra_env=None):
+        environment={**self.env,**(extra_env or {})}
+        result=subprocess.run([shell,mode,'command -v thor; printf "%s\\n" "$PATH"'],
+            env=environment,capture_output=True,text=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        lines=result.stdout.splitlines()
+        self.assertEqual(lines[0],str(self.prefix/'bin/thor'),result.stdout+result.stderr)
+        self.assertEqual(lines[-1].split(os.pathsep).count(str(self.prefix/'bin')),1)
+
+    def test_zsh_login_and_nonlogin_shells_find_thor_without_duplicate_path(self):
+        shell=shutil.which('zsh')
+        if not shell:self.skipTest('zsh is not installed on this host')
+        self.env['SHELL']=shell
+        profile=self.home/'.zprofile';rc=self.home/'.zshrc'
+        original='# custom startup\nexport MY_SETTING=kept\n'
+        profile.write_text(original);rc.write_text(original)
+        self.invoke(self.bundle(),'--path')
+        self.shell_path(shell,'-lic');self.shell_path(shell,'-ic')
+        self.invoke(None,'--uninstall')
+        self.assertEqual(profile.read_text(),original)
+        self.assertEqual(rc.read_text(),original)
+
+    def test_bash_uses_existing_login_override_and_interactive_rc(self):
+        shell=shutil.which('bash')
+        if not shell:self.skipTest('bash is not installed on this host')
+        self.env['SHELL']=shell
+        profile=self.home/'.profile';profile.write_text('# inactive login file\n')
+        login=self.home/'.bash_profile';login.write_text('# chosen login file\n')
+        rc=self.home/'.bashrc';rc.write_text('# interactive config\n')
+        self.invoke(self.bundle(),'--path')
+        self.shell_path(shell,'-lic');self.shell_path(shell,'-ic')
+        self.assertEqual(profile.read_text(),'# inactive login file\n')
+        self.invoke(None,'--uninstall')
+        self.assertEqual(login.read_text(),'# chosen login file\n')
+        self.assertEqual(rc.read_text(),'# interactive config\n')
+
+    def test_zsh_respects_exported_zdotdir(self):
+        shell=shutil.which('zsh')
+        if not shell:self.skipTest('zsh is not installed on this host')
+        self.env['SHELL']=shell;directory=self.home/'custom zsh';directory.mkdir()
+        self.env['ZDOTDIR']=str(directory)
+        self.invoke(self.bundle(),'--path')
+        self.shell_path(shell,'-lic');self.shell_path(shell,'-ic')
+        self.assertFalse((self.home/'.zprofile').exists())
+        self.invoke(None,'--uninstall')
+        self.assertFalse((directory/'.zprofile').exists())
+        self.assertFalse((directory/'.zshrc').exists())
+
+    def test_path_marker_conflict_preflights_both_startup_files(self):
+        self.env['SHELL']='/bin/zsh'
+        profile=self.home/'.zprofile';profile.write_text('# keep this\n')
+        rc=self.home/'.zshrc';rc.write_text('# >>> thor-install PATH >>>\n# user-edited block\n')
+        result=self.invoke(self.bundle(),'--path',ok=False)
+        self.assertIn('existing managed PATH block preserved',result.stderr)
+        self.assertEqual(profile.read_text(),'# keep this\n')
+        self.assertEqual(rc.read_text(),'# >>> thor-install PATH >>>\n# user-edited block\n')
+
+    def test_known_legacy_path_block_upgrades_and_still_restores_original_file(self):
+        self.env['SHELL']='/bin/bash';profile=self.home/'.profile'
+        profile.write_text('# original config\n');bundle=self.bundle();self.invoke(bundle,'--path')
+        legacy="# >>> thor-install PATH >>>\nexport PATH='"+str(self.prefix/'bin')+"':\"$PATH\"\n# <<< thor-install PATH <<<"
+        current=profile.read_text();a=current.index('# >>> thor-install PATH >>>');b=current.index('# <<< thor-install PATH <<<')+len('# <<< thor-install PATH <<<')
+        text=current[:a]+legacy+current[b:];profile.write_text(text)
+        state_file=self.prefix/'setup-state.json';state=json.loads(state_file.read_text());state['files'][str(profile)]['after']=text;state_file.write_text(json.dumps(state))
+        self.invoke(bundle,'--path')
+        self.assertIn('case ":${PATH-}:" in',profile.read_text())
+        self.invoke(None,'--uninstall')
+        self.assertEqual(profile.read_text(),'# original config\n')
+
     def test_profile_requires_vscode_and_color_changes_require_named_new_profile(self):
         for args in [('--profile','Thor'),('--colors',),('--vscode','--profile','')]:
             self.invoke(None,*args,ok=False)

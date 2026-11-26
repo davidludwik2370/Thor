@@ -398,3 +398,14 @@ prebuilt installation with Rust, Cargo, Node and Python absent from user PATH.
 VS Code's private Node and CodeLLDB's private Python are their own components.
 Xvfb enables editor testing; this container check does not replace a hardware or
 full desktop VM test.
+
+### PATH in regular terminal windows
+
+`--path` configures login and interactive startup files for zsh and bash. Zsh
+uses `.zprofile` and `.zshrc` (including an exported `ZDOTDIR`). Bash uses its
+first existing login file (`.bash_profile`, `.bash_login`, or `.profile`) and
+`.bashrc`. The managed block adds Thor only when its command directory is absent
+from PATH, so loading both files does not duplicate it. Existing contents are
+retained; uninstall restores the owned edits. Open a new terminal tab after setup
+to load the updated startup configuration. VS Code also supplies Thor's command
+directory to its own terminals independently.

@@ -3,6 +3,8 @@ mod vscode;
 mod jsonc;
 mod ols;
 mod lifecycle;
+#[cfg(unix)]
+mod shell_path;
 mod verify;
 
 use flate2::read::GzDecoder;
@@ -484,27 +486,8 @@ fn add_path(bin: &Path) -> Result<()> {
     if bin.to_string_lossy().contains(if cfg!(windows) {';'}else{':'}) {
         return Err(format!("{} contains a PATH separator; use the absolute compiler path instead",bin.display()));
     }
-    #[cfg(unix)] {
-        let shell = env::var("SHELL").unwrap_or_default();
-        if shell.ends_with("fish") { return Err(format!("PATH was not edited. In fish, run: fish_add_path {}",shell_quote(bin))); }
-        let file = home()?.join(if shell.ends_with("zsh") {".zprofile"} else {".profile"});
-        let start = "# >>> thor-install PATH >>>"; let end = "# <<< thor-install PATH <<<";
-        let existed=file.exists();
-        let text = match fs::read_to_string(&file) { Ok(s) => s, Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(), Err(e) => return Err(err(e)) };
-        let block = format!("{start}\nexport PATH={}:\"$PATH\"\n{end}",shell_quote(bin));
-        if text.contains(start) {
-            if !text.contains(&block) { return Err(format!("existing managed PATH block preserved in {}; update it manually for this prefix",file.display())); }
-        } else {
-            if file.exists() { let backup=file.with_file_name(format!("{}.thor-backup-{}",file.file_name().unwrap().to_string_lossy(),unique())); fs::copy(&file,&backup).map_err(err)?;
-                lifecycle::track_artifact(Path::new(field(&registered()?,"prefix")?),&backup)?; }
-            let mut output=fs::OpenOptions::new().create(true).append(true).open(&file).map_err(err)?;
-            writeln!(output,"\n{block}\n").map_err(err)?;
-            drop(output);
-            lifecycle::track_file(Path::new(field(&registered()?,"prefix")?),&file,
-                if existed {Some(text)}else{None},&fs::read_to_string(&file).map_err(err)?)?;
-        }
-        println!("PATH configured in {} (existing content retained).",file.display());
-    }
+    #[cfg(unix)]
+    shell_path::add(bin)?;
     #[cfg(windows)] {
         let value=bin.to_string_lossy().replace('\'',"''");
         let script=format!("$p=[Environment]::GetEnvironmentVariable('Path','User'); $b='{value}'; if (($p -split ';') -notcontains $b) {{ [Environment]::SetEnvironmentVariable('Path',($b+';'+$p),'User'); Write-Output added }}");

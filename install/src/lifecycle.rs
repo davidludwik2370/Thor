@@ -138,14 +138,15 @@ pub(super) fn uninstall(o:&Options)->Result<()> {
     vscode::uninstall(&state,&record,o.dry)?;
     restore_files(&state,o.dry)?;
     #[cfg(unix)]
-    for name in [".profile",".zprofile"] {
-        let file=home()?.join(name);
+    for file in shell_path::legacy_candidates()? {
         if state["files"].get(file.to_string_lossy().as_ref()).is_some() || file.is_symlink(){continue;}
-        if let Ok(text)=fs::read_to_string(&file) {
-            let block=format!("# >>> thor-install PATH >>>\nexport PATH={}:\"$PATH\"\n# <<< thor-install PATH <<<",shell_quote(Path::new(field(&record,"bin")?)));
-            if text.matches(&block).count()==1 {
-                println!("Remove matching legacy managed PATH block: {}",file.display());
-                if !o.dry {atomic_write(&file,text.replacen(&block,"",1).as_bytes())?;}
+        if let Ok(mut text)=fs::read_to_string(&file) {
+            for block in shell_path::managed_blocks(Path::new(field(&record,"bin")?)) {
+                if text.matches(&block).count()==1 {
+                    println!("Remove matching legacy managed PATH block: {}",file.display());
+                    text=text.replacen(&block,"",1);
+                    if !o.dry {atomic_write(&file,text.as_bytes())?;}
+                }
             }
         }
     }

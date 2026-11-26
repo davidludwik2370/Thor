@@ -12,11 +12,24 @@
     {
       "include": "#import-declaration"
     },
+    {"include": "#qualified-display-prefix"},
     {
       "include": "#statements"
     }
   ],
   "repository": {
+    "qualified-display-prefix": {
+      "comment": "Hover signatures qualify declarations with directory names, which can contain keyword fragments, spaces and hyphens. Only root-level qualified declarations use this display syntax; source expressions keep their ordinary tokenization.",
+      "match": "^(?!case[ \t])([\\w][\\w .-]*)(\\.)(?=[A-Za-z_]\\w*\\s*:(?::|\\s))",
+      "captures": {
+        "1": {
+          "name": "variable.other.namespace.thor"
+        },
+        "2": {
+          "name": "punctuation.accessor.thor"
+        }
+      }
+    },
     "file-tags": {
       "name": "comment.line.double-slash.thor",
       "begin": "#\\+[A-Za-z_][A-Za-z0-9_\\-]*",
