@@ -15,6 +15,7 @@ import shutil
 import signal
 import shlex
 import plistlib
+import re
 import subprocess
 import tempfile
 import time
@@ -39,10 +40,13 @@ def owned_editor_pids(work, rows):
         processes[pid] = parent
         if work not in command:
             continue
-        if ('--user-data-dir' in command and '--type=' not in command
-                or '--database='+work+'/home/code-data/Crashpad' in command
+        def argument(flag, value):
+            return re.search(r'(?:^|\s)'+re.escape(flag)+r'(?:=|\s+)'+re.escape(value)+r'(?=\s|$)', command)
+        debug = work+'/project/.vscode/bin/debug'
+        if (argument('--user-data-dir', work+'/home/code-data') and '--type=' not in command
+                or argument('--database', work+'/home/code-data/Crashpad')
                 or command.startswith(work+'/home/.vscode/extensions/') and '/adapter/codelldb ' in command
-                or command.startswith(work+'/project/.vscode/bin/debug')):
+                or command == debug or command.startswith(debug+' ')):
             owned.add(pid)
     while True:
         children = {pid for pid, parent in processes.items() if parent in owned}

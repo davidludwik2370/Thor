@@ -26,7 +26,13 @@ class DesktopRegistrationTests(unittest.TestCase):
         self.assertEqual(owned_editor_pids('/tmp/test', rows), [100, 101, 102, 300, 301, 400, 600])
 
     def test_cleanup_does_not_match_neighboring_temporary_directory(self):
-        rows = '100 1 /tmp/test-other/project/.vscode/bin/debug\n200 1 /tmp/test-other/home/.vscode/extensions/x/adapter/codelldb --connect 1'
+        rows = '''100 1 /tmp/test-other/project/.vscode/bin/debug
+200 1 /tmp/test-other/home/.vscode/extensions/x/adapter/codelldb --connect 1
+300 1 /Applications/Code --user-data-dir /tmp/test-other/home/code-data
+400 1 /Applications/Code --user-data-dir /Users/david/Code /tmp/test/project
+500 1 /tmp/test/project/.vscode/bin/debug-other
+600 1 crashpad --database=/tmp/test/home/code-data/Crashpad-other
+'''
         self.assertEqual(owned_editor_pids('/tmp/test', rows), [])
 
     def fixture(self, root):
