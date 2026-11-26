@@ -2,6 +2,7 @@
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import random
 import struct
@@ -183,32 +184,48 @@ class RustEvaluationCacheTests(unittest.TestCase):
         temporary_files=list((directory/'eval-v1').glob('.entry-*'))
         self.assertEqual(temporary_files,[])
 
-    def test_clear_preserves_unrelated_files_directories_and_symlinks(self):
+    def test_clear_preserves_unrelated_files_and_directories(self):
         directory=self.root/'clear'
         self.run_native([{'op':'put','key':self.key,'value':{'kind':'integer','value':'7'}},
                          {'op':'write_record','key':self.target,'namespace':'scalar-v1','data':{'n':3}}],directory)
         (directory/'eval-v1').mkdir(exist_ok=True)
         keep=directory/'eval-v1/keep.json';keep.write_text('keep')
         outside=directory/'outside';outside.write_text('outside')
-        link=directory/'eval-v1'/('c'*64+'.json');link.symlink_to(outside)
         folder=directory/'eval-v1'/('d'*64+'.json');folder.mkdir()
+        scalar_record=record(directory,'scalar-v1',self.target)
         self.run_native([{'op':'clear'}],directory)
         contents=keep.read_text()
         self.assertEqual(contents,'keep')
-        self.assertTrue(link.is_symlink())
         self.assertTrue(folder.is_dir())
         contents=outside.read_text()
         self.assertEqual(contents,'outside')
-        self.assertFalse((directory/'scalar-v1'/(self.target+'.json')).exists())
+        self.assertFalse(scalar_record.exists())
+
+    def test_clear_preserves_external_file_symlinks_where_supported(self):
+        directory=self.root/'clear-links';(directory/'eval-v1').mkdir(parents=True)
+        outside=self.root/'outside';outside.write_text('preserve')
+        link=directory/'eval-v1'/('c'*64+'.json')
+        try:link.symlink_to(outside)
+        except OSError as error:
+            if os.name=='nt' and error.winerror==1314:self.skipTest('This account cannot create file symlinks; ordinary cache cleanup is tested separately.')
+            raise
+        self.run_native([{'op':'clear'}],directory)
+        self.assertTrue(link.is_symlink());self.assertEqual(outside.read_text(),'preserve')
 
     def test_clear_does_not_follow_legacy_namespace_directory_links(self):
         directory=self.root/'linked';directory.mkdir()
         outside=self.root/'outside-records';outside.mkdir()
         record=outside/(self.key+'.json');record.write_text('preserve')
-        (directory/'eval-v1').symlink_to(outside,target_is_directory=True)
+        alias=directory/'eval-v1'
+        if os.name=='nt':
+            # Junctions provide the same directory-alias check without enabling
+            # Developer Mode or granting symbolic-link privileges.
+            created=subprocess.run(['cmd.exe','/d','/c','mklink','/J',str(alias),str(outside)],capture_output=True,text=True,timeout=10)
+            self.assertEqual(created.returncode,0,created.stdout+created.stderr)
+        else:alias.symlink_to(outside,target_is_directory=True)
         self.run_native([{'op':'clear'}],directory)
         self.assertEqual(record.read_text(),'preserve')
-        self.assertTrue((directory/'eval-v1').is_symlink())
+        self.assertEqual(alias.resolve(),outside.resolve())
 
 
 if __name__=='__main__':
