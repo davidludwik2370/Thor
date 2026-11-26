@@ -246,7 +246,7 @@ pub(super) fn points_to(path:&Path,target:&Path)->bool {
             }
             // A different-volume/read-only source may require an independent
             // file copy. Certify its bytes, never just a timestamp or pathname.
-            return fs::read(path).ok().zip(fs::read(target).ok()).is_some_and(|(a,b)|a==b);
+            return crate::platform_io::read(path).ok().zip(crate::platform_io::read(target).ok()).is_some_and(|(a,b)|a==b);
         }
     }
     false

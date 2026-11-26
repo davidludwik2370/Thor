@@ -22,7 +22,7 @@ pub(super) fn debug_aliases(root:&Path,view:&Path)->Result<Vec<Value>> {
         if relative.components().count()<2 {continue;}
         let generated=view.join(relative);
         if crate::project::canonicalize(&generated)?==crate::project::canonicalize(&original)?{continue;}
-        let bytes=fs::read(&generated)?;let original_bytes=fs::read(&original)?;
+        let bytes=crate::platform_io::read(&generated)?;let original_bytes=crate::platform_io::read(&original)?;
         let offset=if bytes==original_bytes {0} else if bytes.strip_prefix(b"#+vet !tabs\n")==Some(original_bytes.as_slice()){b"#+vet !tabs\n".len()}else {
             return Err(Error::new(format!("Native runtime view differs from its source: {}. Rebuild the runtime view.",generated.display())));
         };
@@ -68,15 +68,22 @@ pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
     }
     #[cfg(windows)]
     let file_identities=links.values().filter(|path|path.is_file()).map(|path| {
-        let signature=match crate::evaluationinputs::signature(path) {
-            Ok(value)=>value,
-            Err(error) if error.kind()==std::io::ErrorKind::Unsupported=>Some(json!(["contents",sha256(&fs::read(path)?)])),
-            Err(error)=>return Err(error.into()),
-        };
-        // Only filtered package files need this small Windows-only read.
-        // Independent copies must also follow same-size edits with restored
-        // timestamps; identity alone only detects atomic source replacement.
-        Ok((path,signature,sha256(&fs::read(path)?)))
+        let (signature,digest)=crate::platform_io::retry_sharing(|| {
+            let mut contents_only=false;
+            let signature=match crate::evaluationinputs::signature(path) {
+                Ok(value)=>value,
+                Err(error) if error.kind()==std::io::ErrorKind::Unsupported=>{contents_only=true;None},
+                Err(error)=>return Err(error),
+            };
+            // Keep both identity and contents, including edits with restored
+            // timestamps. A native editor can briefly open a support file
+            // exclusively; retry that failed snapshot without repeating a read
+            // that already succeeded.
+            let digest=sha256(&fs::read(path)?);
+            let signature=if contents_only{Some(json!(["contents",digest.clone()]))}else{signature};
+            Ok((signature,digest))
+        }).map_err(|error|Error::new(format!("Cannot fingerprint native support source {}: {error}",path.display())))?;
+        Ok((path,signature,digest))
     }).collect::<Result<Vec<_>>>()?;
     let layout = if tabs {
         #[cfg(windows)]
@@ -97,7 +104,7 @@ pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
     let manifest = json!({"engine":"rust","shared_runtime":layout});
     let valid = || -> bool {
         !sdkmirror::is_link(&directory)
-            && fs::read(directory.join("thor-manifest.json"))
+            && crate::platform_io::read(directory.join("thor-manifest.json"))
                 .ok()
                 .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
                 .as_ref()
@@ -106,7 +113,7 @@ pub(super) fn prepare(root: &Path, tabs: bool) -> Result<PathBuf> {
                 sdkmirror::points_to(&directory.join(relative),target)
             })
             && copies.iter().all(|(relative, bytes)| {
-                fs::read(directory.join(relative)).ok().as_ref() == Some(bytes)
+                crate::platform_io::read(directory.join(relative)).ok().as_ref() == Some(bytes)
             })
     };
     if directory.exists() || sdkmirror::is_link(&directory) {
@@ -186,7 +193,7 @@ fn collect_tab_views(
             .is_some_and(|extension| extension == "odin")
         {
             let mut bytes = b"#+vet !tabs\n".to_vec();
-            bytes.extend(fs::read(&path)?);
+            bytes.extend(crate::platform_io::read(&path)?);
             copies.insert(relative, bytes);
         } else {
             links.insert(relative, path);
@@ -197,6 +204,25 @@ fn collect_tab_views(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn support_snapshots_wait_for_exclusive_native_editor_reads() {
+        use super::*;
+        use std::os::windows::fs::OpenOptionsExt;
+        let root=std::env::temp_dir().join(format!("thor-native-support-reader-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join("runtime/sample")).unwrap();
+        let source=root.join("runtime/sample/input.odin");let original=b"package sample\nVALUE :: 1\n";
+        fs::write(&source,original).unwrap();fs::write(root.join("runtime/sample/input_test.odin"),b"package sample\n").unwrap();
+        for tabs in [false,true] {
+            let held=fs::OpenOptions::new().read(true).share_mode(0).open(&source).unwrap();
+            let owner=root.clone();let (sender,receiver)=std::sync::mpsc::channel();
+            let worker=std::thread::spawn(move||{sender.send(()).unwrap();prepare(&owner,tabs)});
+            receiver.recv().unwrap();std::thread::sleep(std::time::Duration::from_millis(40));drop(held);
+            let view=worker.join().unwrap().unwrap();let bytes=fs::read(view.join("sample/input.odin")).unwrap();
+            if !bytes.ends_with(original) {panic!("native support snapshot changed its authoritative bytes");}
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
     use super::*;
     #[test]
     fn copied_native_debug_aliases_are_byte_verified_and_preserve_policy_prefixes() {
@@ -285,7 +311,7 @@ mod tests {
         fs::write(&source,b"modified").unwrap();
         fs::OpenOptions::new().write(true).open(&source).unwrap().set_times(fs::FileTimes::new().set_modified(original_time)).unwrap();
         fs::set_permissions(&source,readonly).unwrap();
-        let after=prepare(&root,false).unwrap();let bytes=fs::read(after.join("sample/asset.txt")).unwrap();
+        let after=prepare(&root,false).unwrap();let bytes=crate::platform_io::read(after.join("sample/asset.txt")).unwrap();
         fs::set_permissions(&source,permissions).unwrap();fs::remove_dir_all(&root).unwrap();
         if before==after||bytes!=b"modified"{panic!("runtime view reused stale copied support bytes");}
     }

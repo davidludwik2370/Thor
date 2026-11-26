@@ -178,23 +178,7 @@ impl HelperProcess {
             use std::os::unix::process::CommandExt;
             command.process_group(0);
         }
-        #[cfg(not(windows))]
-        let child=command.spawn()?;
-        #[cfg(windows)]
-        let child={
-            let mut attempt=0;
-            loop {
-                match command.spawn() {
-                    Err(error) if matches!(error.raw_os_error(),Some(5|32|33))&&attempt<10 => {
-                        // A freshly linked image can still have a writer open.
-                        // Failed CreateProcess calls have not started a child.
-                        thread::sleep(Duration::from_millis(2<<attempt.min(5)));
-                        attempt+=1;
-                    }
-                    result=>break result?,
-                }
-            }
-        };
+        let child=crate::platform_io::retry_sharing(||command.spawn())?;
         Ok(Self {child,stopped:false})
     }
     fn stop(&mut self) {

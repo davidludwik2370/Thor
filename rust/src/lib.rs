@@ -22,6 +22,7 @@ pub mod evaluationinputs;
 mod extremaplan;
 mod fallbacks;
 mod file_alias;
+mod platform_io;
 pub mod formatting;
 pub mod frontend;
 pub mod kind;
