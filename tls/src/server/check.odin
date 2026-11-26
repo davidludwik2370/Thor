@@ -428,7 +428,14 @@ compiler_error_fallback_path :: proc(check_paths: []string, buffers: []Check_Buf
 stop_check_processes :: proc(processes:[]CheckProcess) {
 	for &p in processes {
 		if p.finished {continue}
-		_ = os.process_terminate(p.process)
+		// Odin's Windows terminate helper can broadcast CTRL_C_EVENT to the
+		// shared console. Compiler checks are disposable children; terminate
+		// that handle directly without interrupting TLS, its editor or caller.
+		when ODIN_OS == .Windows {
+			_ = os.process_kill(p.process)
+		} else {
+			_ = os.process_terminate(p.process)
+		}
 		state,err:=os.process_wait(p.process,2*time.Second)
 		if err!=nil || !state.exited {
 			_ = os.process_kill(p.process)

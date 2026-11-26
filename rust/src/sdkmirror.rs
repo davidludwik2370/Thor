@@ -205,8 +205,12 @@ impl SdkMirror {
                 .ok_or_else(|| Error::new("SDK link has no output root"))?;
             let target = path
                 .strip_prefix(&self.runtime)
+                .ok()
+                // Root metadata (for example runtime/README.md) is not part
+                // of the filtered package view. Keep its original authority.
+                .filter(|suffix|suffix.components().count()>1||path.is_dir())
                 .map(|suffix| self.backend_runtime.join(suffix))
-                .unwrap_or_else(|_| path.to_path_buf());
+                .unwrap_or_else(|| path.to_path_buf());
             self.links.insert(output, target);
         }
         Ok(())
@@ -297,13 +301,14 @@ pub(super) fn write_link(path:&Path,target:&Path)->Result<()> {
     #[cfg(windows)] {
         use std::sync::atomic::{AtomicBool,Ordering};
         static MISSING_PRIVILEGE:AtomicBool=AtomicBool::new(false);
-        if MISSING_PRIVILEGE.load(Ordering::Relaxed){unprivileged_link(path,target)?;}
+        let fallback=||unprivileged_link(path,target).map_err(|error|Error::new(format!("Cannot create native library alias {} -> {}: {error}",path.display(),target.display())));
+        if MISSING_PRIVILEGE.load(Ordering::Relaxed){fallback()?;}
         else {
             let result=if target.is_dir(){std::os::windows::fs::symlink_dir(target,path)}else{std::os::windows::fs::symlink_file(target,path)};
             if let Err(error)=result {
                 if error.raw_os_error()==Some(1314){MISSING_PRIVILEGE.store(true,Ordering::Relaxed);}
                 else if !matches!(error.kind(),std::io::ErrorKind::PermissionDenied|std::io::ErrorKind::Unsupported){return Err(error.into());}
-                unprivileged_link(path,target)?;
+                fallback()?;
             }
         }
     }
@@ -315,6 +320,27 @@ pub(super) fn write_link(path:&Path,target:&Path)->Result<()> {
 #[cfg(all(test, any(unix, windows)))]
 mod link_tests {
     use super::*;
+
+    #[test]
+    fn sparse_runtime_mirrors_keep_root_assets_and_filtered_package_targets() {
+        let root=std::env::temp_dir().join(format!("thor-sdk-runtime-assets-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let runtime=root.join("runtime");let view=root.join("view");let output=root.join("output");
+        fs::create_dir_all(runtime.join("sample")).unwrap();fs::create_dir_all(view.join("sample")).unwrap();
+        fs::write(runtime.join("README.md"),b"root asset").unwrap();
+        fs::write(runtime.join("sample/code.odin"),b"package sample").unwrap();
+        fs::write(runtime.join("sample/asset.txt"),b"authoritative").unwrap();
+        fs::write(view.join("sample/asset.txt"),b"filtered view").unwrap();
+        fs::write(runtime.join("sample/code_test.odin"),b"excluded").unwrap();
+        let mut mirror=SdkMirror{runtime:runtime.clone(),backend_runtime:view.clone(),..SdkMirror::default()};
+        mirror.roots.insert(runtime.clone(),output.clone());mirror.changed.insert(runtime.join("sample/code.odin"));
+        mirror.include(&runtime).unwrap();
+        let root_target=mirror.links.get(&output.join("README.md")).cloned();
+        let package_target=mirror.links.get(&output.join("sample/asset.txt")).cloned();
+        let excluded=mirror.links.contains_key(&output.join("sample/code_test.odin"));
+        for (path,target) in &mirror.links {write_link(path,target).unwrap();}
+        let bytes=fs::read(output.join("README.md")).unwrap();fs::remove_dir_all(&root).unwrap();
+        if root_target!=Some(runtime.join("README.md"))||package_target!=Some(view.join("sample/asset.txt"))||excluded||bytes!=b"root asset"{panic!("sparse runtime mirror used a missing or unfiltered support target");}
+    }
 
     #[test]
     fn replacing_owned_links_preserves_targets_and_handles_dangling_directories() {
