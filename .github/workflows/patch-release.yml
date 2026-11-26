@@ -8,10 +8,14 @@ on:
         default: d1a8fbf42cb977a557856f884efd26667be84585
         type: string
       base_tag:
-        description: Published and verified base release
+        description: Verified published base, or current draft for an installer-only refresh
         required: true
         default: v0.41.11
         type: string
+      reuse_compiler:
+        description: Refresh only an identical-version unpublished installer, retaining the compiler binary
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -29,7 +33,11 @@ jobs:
         env:
           BASE_SOURCE: ${{ inputs.base_source }}
           BASE_TAG: ${{ inputs.base_tag }}
-        run: python3 tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --guard-only
+          REUSE_COMPILER: ${{ inputs.reuse_compiler }}
+        run: |
+          args=()
+          if [ "$REUSE_COMPILER" = true ]; then args+=(--reuse-compiler); fi
+          python3 tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --guard-only "${args[@]}"
       - name: Prepare only an unpublished release for this exact source
         run: |
           python3 - <<'PY'
@@ -58,6 +66,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: '13.0'
       BASE_SOURCE: ${{ inputs.base_source }}
       BASE_TAG: ${{ inputs.base_tag }}
+      REUSE_COMPILER: ${{ inputs.reuse_compiler }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,9 +74,12 @@ jobs:
       - name: Install the small Linux relocation helper
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends patchelf
-      - name: Build version-only compiler and fixed installer with the verified SDK and TLS
+      - name: Build fixed installer with the verified compiler implementation, SDK and TLS
         shell: bash
-        run: python tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --output "$RUNNER_TEMP/thor-patch-release"
+        run: |
+          args=()
+          if [ "$REUSE_COMPILER" = true ]; then args+=(--reuse-compiler); fi
+          python tools/rebuild_patch_release.py --base-source "$BASE_SOURCE" --base-tag "$BASE_TAG" --output "$RUNNER_TEMP/thor-patch-release" "${args[@]}"
       - name: Upload only this source commit's unpublished draft
         shell: bash
         run: |

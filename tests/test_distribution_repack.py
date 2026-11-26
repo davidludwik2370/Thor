@@ -56,6 +56,14 @@ class BorrowedMacToolsTests(unittest.TestCase):
 
 
 class VersionOnlyPatchTests(unittest.TestCase):
+    def test_installer_refresh_cannot_replace_a_published_or_other_sources_release(self):
+        from tools.rebuild_patch_release import validate_base_release
+        source='a'*40
+        validate_base_release({'isDraft':True,'targetCommitish':source},True,source)
+        for release in ({'isDraft':False,'targetCommitish':source},{'isDraft':True,'targetCommitish':'b'*40}):
+            with self.assertRaisesRegex(ValueError,'unpublished draft'):validate_base_release(release,True,source)
+        with self.assertRaisesRegex(ValueError,'published'):validate_base_release({'isDraft':True},False,source)
+
     def test_only_the_unique_package_version_may_change(self):
         from tools.rebuild_patch_release import version_only
         previous='name = "compiler"\nversion = "0.41.11"\ndependency = "unchanged"\n'

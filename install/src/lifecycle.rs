@@ -1,6 +1,48 @@
 //! Explicit ownership records for reversible user configuration and uninstall.
 use super::*;
 
+fn windows_prerequisite_command(file:&Path, editor:bool)->Command {
+    let mut cmd=Command::new("powershell.exe");
+    // A native installed command has no bootstrap .cmd parent to select the
+    // unconfigured-client default. Keep explicit policies, and apply a default
+    // only inside this child. Invoking the file still enforces signature policy.
+    let script=format!("$ErrorActionPreference='Stop'; if (@((Get-ExecutionPolicy -List).ExecutionPolicy -ne 'Undefined').Count -eq 0) {{ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force }}; & $env:THOR_INSTALL_PREREQUISITES_SCRIPT{}",if editor {" -VSCode"} else {""});
+    cmd.args(["-NoProfile","-Command",&script]);
+    // Windows PowerShell must not inherit PowerShell 7's module directories.
+    // The file path is data, including spaces/quotes, never interpolated code.
+    cmd.env_remove("PSModulePath").env("THOR_INSTALL_PREREQUISITES_SCRIPT",file);
+    cmd
+}
+
+#[cfg(all(test,windows))]
+mod windows_prerequisite_tests {
+    use super::*;
+    #[test]
+    fn native_helper_preserves_explicit_policies_and_literal_paths() {
+        let directory=env::temp_dir().join(format!("thor policy {} 'quoted'",unique()));
+        fs::create_dir(&directory).unwrap();let _guard=RemoveDir(directory.clone());
+        let file=directory.join("helper.ps1");
+        fs::write(&file,"param([switch]$VSCode)\nWrite-Output ('HELPER_EXECUTED: '+$VSCode); exit 17\n").unwrap();
+        for (policy,allowed) in [("RemoteSigned",true),("Restricted",false),("AllSigned",false)] {
+            let output=windows_prerequisite_command(&file,true).env("PSExecutionPolicyPreference",policy).output().unwrap();
+            let executed=String::from_utf8_lossy(&output.stdout).contains("HELPER_EXECUTED: True");
+            assert_eq!(executed,allowed,"policy {policy}: {}",String::from_utf8_lossy(&output.stderr));
+            assert_eq!(output.status.code()==Some(17),allowed);
+        }
+    }
+    #[test]
+    fn native_helper_does_not_unblock_downloaded_unsigned_scripts() {
+        let directory=env::temp_dir().join(format!("thor downloaded policy {}",unique()));
+        fs::create_dir(&directory).unwrap();let _guard=RemoveDir(directory.clone());
+        let file=directory.join("helper.ps1");
+        fs::write(&file,"Write-Output 'HELPER_EXECUTED'; exit 17\n").unwrap();
+        fs::write(directory.join("helper.ps1:Zone.Identifier"),"[ZoneTransfer]\nZoneId=3\n").unwrap();
+        let output=windows_prerequisite_command(&file,false).env("PSExecutionPolicyPreference","RemoteSigned").output().unwrap();
+        let executed=String::from_utf8_lossy(&output.stdout).contains("HELPER_EXECUTED");
+        assert!(!executed);assert_ne!(output.status.code(),Some(17));
+    }
+}
+
 pub(super) fn prerequisites(o:&Options)->Result<()> {
     if o.no_deps {println!("SKIP: automatic prerequisite installation (--no-install-deps); build/run checks remain enabled");return Ok(());}
     let temp=env::temp_dir().join(format!("thor-prerequisites-{}",unique()));fs::create_dir(&temp).map_err(err)?;
@@ -11,8 +53,7 @@ pub(super) fn prerequisites(o:&Options)->Result<()> {
     let mut cmd;
     if cfg!(windows) {
         let file=temp.join("prerequisites.ps1");fs::write(&file,include_str!("../prerequisites.ps1")).map_err(err)?;
-        cmd=Command::new("powershell.exe");cmd.args(["-NoProfile","-File"]).arg(file);
-        if o.vscode && o.code.is_none() {cmd.arg("-VSCode");}
+        cmd=windows_prerequisite_command(&file,o.vscode && o.code.is_none());
     } else {
         let file=temp.join("prerequisites.sh");fs::write(&file,include_str!("../prerequisites.sh")).map_err(err)?;
         cmd=Command::new("sh");cmd.arg(file);

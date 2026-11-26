@@ -11,7 +11,8 @@ extracted GitHub source ZIP, choose one:
 ```
 
 Windows uses `.\thor-install.cmd` or `thor-install.ps1`. On an unconfigured
-Windows client, the `.cmd` launcher selects `RemoteSigned` for its child process
+Windows client, the `.cmd` launcher and installed prerequisite helper select
+`RemoteSigned` for their child process
 only; it leaves explicit execution policies and organization Group Policy alone.
 Unsigned scripts marked as downloaded from the internet remain subject to
 Windows' signature policy; use a Git checkout or review and unblock a trusted

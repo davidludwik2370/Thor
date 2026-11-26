@@ -25,7 +25,7 @@ def version_only(previous,current,old,new):
     return previous.count(token)==1 and previous.replace(token,'version = "'+new+'"')==current
 
 
-def guard(base_source,base_tag):
+def guard(base_source,base_tag,reuse_compiler=False):
     if not re.fullmatch(r'[a-f0-9]{40}',base_source):raise ValueError('A full base source commit is required')
     run(['git','fetch','--depth=1','origin',base_source])
     old=output(['git','show',base_source+':release/version'])
@@ -33,7 +33,9 @@ def guard(base_source,base_tag):
     if not all(re.fullmatch(r'\d+\.\d+\.\d+',v) for v in (old,new)):raise ValueError('Invalid release version')
     if base_tag!='v'+old:raise ValueError('Base tag does not match the reviewed base source version')
     a,b=tuple(map(int,old.split('.'))),tuple(map(int,new.split('.')))
-    if a[:2]!=b[:2] or b[2]<=a[2]:raise ValueError('Only a newer patch version may reuse the SDK')
+    if reuse_compiler:
+        if old!=new:raise ValueError('Reusing the compiler requires the identical package version')
+    elif a[:2]!=b[:2] or b[2]<=a[2]:raise ValueError('Only a newer patch version may reuse the SDK')
     for file in ('rust/Cargo.toml','rust/Cargo.lock','install/Cargo.toml','install/Cargo.lock'):
         previous=subprocess.check_output(['git','show',base_source+':'+file],cwd=ROOT,text=True)
         if not version_only(previous,(ROOT/file).read_text(),old,new):raise ValueError('Manifest/dependencies changed: '+file)
@@ -42,9 +44,16 @@ def guard(base_source,base_tag):
            'install/linux-vendor.json','install/ols-source.json','install/source-tools.json',
            'install/git-lfs-source.json','install/cmake-source.json']
     run(['git','diff','--exit-code',base_source,'--',*paths])
-    release=json.loads(output(['gh','release','view',base_tag,'--json','isDraft']))
-    if release['isDraft']:raise ValueError('The reusable base must be published')
+    release=json.loads(output(['gh','release','view',base_tag,'--json','isDraft,targetCommitish']))
+    validate_base_release(release,reuse_compiler,os.environ.get('GITHUB_SHA') or output(['git','rev-parse','HEAD']))
     return old,new
+
+
+def validate_base_release(release,reuse_compiler,source):
+    if reuse_compiler:
+        if not release['isDraft'] or release['targetCommitish']!=source:
+            raise ValueError('Installer-only refresh requires this exact source commit\'s unpublished draft')
+    elif release['isDraft']:raise ValueError('The reusable base must be published')
 
 
 def bootstrap(args):
@@ -53,8 +62,8 @@ def bootstrap(args):
     run([*launcher,*args])
 
 
-def build(base_source,base_tag,destination):
-    old,new=guard(base_source,base_tag)
+def build(base_source,base_tag,destination,reuse_compiler=False):
+    old,new=guard(base_source,base_tag,reuse_compiler)
     system={'Linux':'linux','Darwin':'macos','Windows':'windows'}[platform.system()]
     arch={'x86_64':'x86_64','AMD64':'x86_64','arm64':'aarch64','aarch64':'aarch64'}[platform.machine()]
     temporary=Path(os.environ['RUNNER_TEMP']);previous=temporary/'thor-patch-base';previous.mkdir()
@@ -69,11 +78,15 @@ def build(base_source,base_tag,destination):
     if manifest['version']!=old or manifest['target']!=system+'-'+arch:raise ValueError('Base identity mismatch')
     target=temporary/'thor-patch-target';os.environ['CARGO_TARGET_DIR']=str(target)
     os.environ['CARGO_INCREMENTAL']='0';os.environ['CARGO_BUILD_JOBS']='2'
-    for package in ('rust','install'):
+    if reuse_compiler:
+        # License inventory uses offline Cargo metadata for the retained compiler.
+        # Fetch its pinned source packages without compiling the compiler again.
+        run(['cargo','fetch','--locked','--manifest-path',ROOT/'rust/Cargo.toml'])
+    for package in (('install',) if reuse_compiler else ('rust','install')):
         run(['cargo','build','--release','--locked','--manifest-path',ROOT/package/'Cargo.toml','-j','2'])
     suffix='.exe' if os.name=='nt' else ''
     run([sys.executable,ROOT/'tools/build_distribution.py','--odin',base/('odin/odin'+suffix),
-         '--compiler',target/('release/thor-rust'+suffix),'--installer',target/('release/thor-install'+suffix),
+         '--compiler',base/('thor'+suffix) if reuse_compiler else target/('release/thor-rust'+suffix),'--installer',target/('release/thor-install'+suffix),
          '--tls',base/('tls/bin/tls'+suffix),'--vsix',base/'editors/thor-language.vsix',
          '--output',destination,'--portable'])
     archive=destination/f'thor-{new}-{system}-{arch}.tar.gz'
@@ -84,18 +97,19 @@ def build(base_source,base_tag,destination):
         run([sys.executable,ROOT/'tools/release_compatibility.py',archive,'--report',destination/'native-abi.json'])
     (destination/'patch-build.json').write_text(json.dumps({'base_tag':base_tag,'base_source':base_source,
         'version':new,'target':system+'-'+arch,'compiler_implementation_unchanged':True,
-        'verified_sdk_tls_reused':True,'upgrade_doctor_checked_unchecked_uninstall':True},indent=2)+'\n')
+        'verified_sdk_tls_reused':True,'compiler_binary_reused':reuse_compiler,'upgrade_doctor_checked_unchecked_uninstall':True},indent=2)+'\n')
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--base-source',required=True);p.add_argument('--base-tag',required=True)
     p.add_argument('--guard-only',action='store_true');p.add_argument('--output',type=Path)
+    p.add_argument('--reuse-compiler',action='store_true',help='Refresh only an identical-version unpublished installer')
     o=p.parse_args()
     if o.guard_only:
-        old,new=guard(o.base_source,o.base_tag);print(json.dumps({'base':old,'version':new}));return
+        old,new=guard(o.base_source,o.base_tag,o.reuse_compiler);print(json.dumps({'base':old,'version':new}));return
     if not o.output:p.error('--output is required for a build')
-    o.output.mkdir(parents=True,exist_ok=True);build(o.base_source,o.base_tag,o.output.resolve())
+    o.output.mkdir(parents=True,exist_ok=True);build(o.base_source,o.base_tag,o.output.resolve(),o.reuse_compiler)
 
 
 if __name__=='__main__':main()
