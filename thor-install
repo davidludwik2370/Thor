@@ -7,6 +7,7 @@ bundle=
 from_source=false
 no_deps=false
 reuse_odin=false
+portable_bundle=false
 editor=false
 custom_code=false
 maintenance=
@@ -56,6 +57,7 @@ while [ "$#" -gt 0 ]; do
     arg=$1; shift
     case "$arg" in
         --from-source) from_source=true;;
+        --portable-bundle) portable_bundle=true; printf '%s\n' "$arg" >> "$forward/args";;
         --no-install-deps) no_deps=true; printf '%s\n' "$arg" >> "$forward/args";;
         --odin) [ "$#" -gt 0 ] || { echo '--odin requires a value' >&2; exit 1; }; reuse_odin=true; printf '%s\n%s\n' "$arg" "$1" >> "$forward/args"; shift;;
         --vscode) editor=true; printf '%s\n' "$arg" >> "$forward/args";;
@@ -90,6 +92,7 @@ source_install() {
 source_prerequisites() {
     set -- --source
     if $reuse_odin; then set -- "$@" --reuse-odin; fi
+    if $portable_bundle; then set -- "$@" --portable-bundle; fi
     if $editor && ! $custom_code; then set -- "$@" --vscode; fi
     sh "$root/install/prerequisites.sh" "$@"
 }
@@ -147,6 +150,21 @@ if $from_source; then
     if $dry; then echo 'Source install plan: acquire pinned build tools/Odin, build Thor/TLS/editor, verify and install; no changes made.'; exit 0; fi
     if ! $no_deps; then source_prerequisites; fi
     source_install; exit $?
+fi
+# Reject an unsupported system before downloading an installer its loader
+# cannot start. Custom bundles/source builds have their own compatibility policy.
+if [ "$os" = linux ] && [ -z "$base$bundle" ] && [ "$version" = "$(cat "$root/release/version")" ] && [ -f "$root/release/linux-compatibility.json" ]; then
+    minimum=$(sed -n 's/^ *"glibc": "\([0-9.]*\)".*/\1/p' "$root/release/linux-compatibility.json")
+    libc=$(getconf GNU_LIBC_VERSION 2>/dev/null || :)
+    current=${libc#glibc }
+    if [ -z "$minimum" ] || [ "$current" = "$libc" ] || ! awk -v current="$current" -v minimum="$minimum" 'BEGIN {
+        if(current !~ /^[0-9]+[.][0-9]+$/) exit 1;
+        split(current,a,".");split(minimum,b,".");
+        exit !(a[1]+0>b[1]+0 || (a[1]+0==b[1]+0 && a[2]+0>=b[2]+0));
+    }'; then
+        echo "Published Linux bundles require glibc $minimum or newer (this system: ${libc:-not GNU libc}). Use a supported distribution or an explicitly configured --from-source build." >&2
+        exit 1
+    fi
 fi
 if [ -z "$bundle" ]; then
     if ! $no_deps && ! $dry; then sh "$root/install/prerequisites.sh" --download-only; fi

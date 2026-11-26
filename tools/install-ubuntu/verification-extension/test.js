@@ -31,7 +31,7 @@ async function run() {
         const odinIcon=odin.packageJSON.contributes.languages.find(language=>language.id==='odin').icon;
         for(const theme of ['light','dark'])assert.ok(fs.existsSync(path.join(odin.extensionPath,odinIcon[theme])));
         checks.push('standard-ols-owns-odin-language-grammar-and-icons');
-        if(process.platform==='linux' && process.arch==='arm64') {
+        {
             const server=vscode.workspace.getConfiguration('ols').get('server.path');
             assert.ok(server&&fs.existsSync(server),'Installer must select a native OLS server');
             await odin.activate();
@@ -42,7 +42,12 @@ async function run() {
             });
             const tokens=await until('automatic native OLS semantic tokens',()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',odinDocument.uri));
             assert.ok(tokens.data.length);
-            checks.push('automatic-arm64-native-ols-build-and-language-services');
+            await until('automatic native OLS completion',async()=>{
+                const response=await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',odinDocument.uri,
+                    odinDocument.positionAt(odinSource.indexOf('record.number')+'record.'.length));
+                return response?.items.some(item=>(typeof item.label==='string'?item.label:item.label.label)==='number');
+            });
+            checks.push('automatic-native-ols-build-and-language-services');
         }
 
         // Code itself starts without the installed bin on PATH. Exercise a new

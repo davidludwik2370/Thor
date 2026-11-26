@@ -151,6 +151,31 @@ def extract_zip(archive, destination, root):
     return destination / root
 
 
+def ensure_git_lfs(work, env, target):
+    """Acquire one private binary; never install Git filters or hooks globally."""
+    config=json.loads(Path(__file__).with_name('git-lfs-source.json').read_text())
+    try:
+        text=subprocess.check_output(['git-lfs','version'],env=env,text=True,stderr=subprocess.DEVNULL)
+        found=re.search(r'git-lfs/(\d+\.\d+\.\d+)',text)
+        if found and tuple(map(int,found[1].split('.')))>=tuple(map(int,config['version'].split('.'))):return
+    except (OSError,subprocess.CalledProcessError):
+        pass
+    if target not in config['targets']:
+        raise ValueError('Source SDK acquisition needs Git LFS from the host package manager.')
+    entry=config['targets'][target]
+    zipped=entry['url'].endswith('.zip')
+    archive=work/('git-lfs.zip' if zipped else 'git-lfs.tar.gz')
+    download(entry['url'],archive,entry['sha256'])
+    directory=(extract_zip if zipped else extract_tar)(archive,work/'private-lfs',config['root'])
+    archive.unlink()
+    executable=directory/('git-lfs.exe' if target.startswith('windows-') else 'git-lfs')
+    executable.chmod(0o755)
+    env['PATH']=str(directory)+os.pathsep+env['PATH']
+    text=subprocess.check_output(['git-lfs','version'],env=env,text=True).strip()
+    if not text.startswith('git-lfs/'+config['version']+' '):raise ValueError('Private Git LFS failed its version check')
+    print('PASS: private Git LFS (no global Git configuration changes)',flush=True)
+
+
 def ensure_node(work, env, target):
     env.setdefault('NODE_COMPILE_CACHE', str(work / 'node-compile-cache'))
     npm = 'npm.cmd' if os.name == 'nt' else 'npm'

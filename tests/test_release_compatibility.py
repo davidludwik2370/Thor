@@ -6,6 +6,7 @@ import struct
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools import release_compatibility as abi
 
@@ -109,3 +110,33 @@ class ReleaseCompatibilityTests(unittest.TestCase):
             streamed=abi.inspect_archive(archive)
             self.assertEqual(streamed['required'],directory['required'])
             self.assertEqual({r['file'] for r in streamed['files']},{r['file'] for r in directory['files']})
+
+
+class MacReleaseCompatibilityTests(unittest.TestCase):
+    def test_legacy_and_modern_slices_are_both_checked(self):
+        text='Load command 1\n cmd LC_BUILD_VERSION\n platform MACOS\n minos 11.0\nLoad command 2\n cmd LC_VERSION_MIN_MACOSX\n version 15.0\n'
+        self.assertEqual(abi.macos_versions(text),['11.0','15.0'])
+
+    def test_other_apple_platform_is_not_a_macos_requirement(self):
+        self.assertEqual(abi.macos_versions('Load command 1\n cmd LC_BUILD_VERSION\n platform IOS\n minos 17.0\n'),[])
+
+    def test_missing_and_malformed_native_floor_is_rejected(self):
+        for text in ['nothing','Load command 1\n platform MACOS\n minos unknown\n']:
+            with self.assertRaises(ValueError):abi.macos_versions(text)
+
+    def test_portable_gate_and_architecture_validation(self):
+        data=bytearray(32);data[:4]=bytes.fromhex('cffaedfe');struct.pack_into('<I',data,4,0x100000c)
+        rows=components(bytes(data))
+        for floor,passes in [('11.0',True),('13.0',True),('13.0.1',False),('15.0',False)]:
+            with self.subTest(floor=floor),patch.object(abi.subprocess,'run',return_value=subprocess_result('Load command 1\n platform MACOS\n minos '+floor+'\n')):
+                if passes:
+                    result=abi.inspect_macos(rows,'aarch64',portable=True)
+                    self.assertEqual(result['required']['macos'],floor)
+                else:
+                    with self.assertRaisesRegex(ValueError,'requires macOS'):abi.inspect_macos(rows,'aarch64',portable=True)
+        with self.assertRaisesRegex(ValueError,'native macOS x86_64'):abi.inspect_macos(rows,'x86_64',portable=True)
+
+
+def subprocess_result(stdout):
+    import subprocess
+    return subprocess.CompletedProcess([],0,stdout,'')

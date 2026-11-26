@@ -222,3 +222,44 @@ class MacDebugToolsTests(unittest.TestCase):
                 helper=str(root/'odin/libexec'/name)
                 self.assertIn(('otool','-L',helper),calls)
                 self.assertTrue(any(str(call.args[0][-1])==helper for call in run.call_args_list))
+
+class GitLFSToolTests(unittest.TestCase):
+    def test_compatible_git_lfs_is_reused_without_global_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            env={'PATH':'/original'}
+            with patch.object(tools.subprocess,'check_output',return_value='git-lfs/3.8.1 (GitHub)'),patch.object(tools,'download',side_effect=AssertionError('unnecessary download')):
+                tools.ensure_git_lfs(Path(temporary),env,'linux-aarch64')
+            self.assertEqual(env['PATH'],'/original');self.assertEqual(list(Path(temporary).iterdir()),[])
+
+    def test_private_binary_uses_pinned_digest_for_each_native_host(self):
+        config=json.loads(Path(tools.__file__).with_name('git-lfs-source.json').read_text())
+        for target,item in config['targets'].items():
+            with self.subTest(target=target),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary).resolve();exe='git-lfs.exe' if target.startswith('windows-') else 'git-lfs';data=b'private binary'
+                blob=io.BytesIO()
+                if item['url'].endswith('.zip'):
+                    with zipfile.ZipFile(blob,'w') as z:z.writestr(config['root']+'/'+exe,data)
+                else:
+                    with tarfile.open(fileobj=blob,mode='w:gz') as t:
+                        info=tarfile.TarInfo(config['root']+'/'+exe);info.size=len(data);info.mode=0o755;t.addfile(info,io.BytesIO(data))
+                def download(url,path,digest):
+                    self.assertEqual(url,item['url']);self.assertEqual(digest,item['sha256']);path.write_bytes(blob.getvalue())
+                env={'PATH':'/original'}
+                with patch.object(tools,'download',side_effect=download),patch.object(tools.subprocess,'check_output',side_effect=[FileNotFoundError(),'git-lfs/'+config['version']+' (GitHub)']):
+                    tools.ensure_git_lfs(root,env,target)
+                private=root/'private-lfs'/config['root']
+                self.assertEqual((private/exe).read_bytes(),data);self.assertTrue(env['PATH'].startswith(str(private)+os.pathsep))
+                self.assertFalse((root/'git-lfs.zip').exists());self.assertFalse((root/'git-lfs.tar.gz').exists())
+
+    def test_missing_bsd_package_has_no_guessed_binary_download(self):
+        with tempfile.TemporaryDirectory() as temporary,patch.object(tools.subprocess,'check_output',side_effect=FileNotFoundError()),patch.object(tools,'download',side_effect=AssertionError('foreign binary')):
+            with self.assertRaisesRegex(ValueError,'host package manager'):tools.ensure_git_lfs(Path(temporary),{'PATH':'/original'},'freebsd-aarch64')
+
+
+class SDKPointerTests(unittest.TestCase):
+    def test_packaging_rejects_unresolved_large_file_pointers(self):
+        from tools.build_distribution import reject_lfs_pointer
+        with tempfile.TemporaryDirectory() as temporary:
+            p=Path(temporary)/'library.a';p.write_bytes(b'version https://git-lfs.github.com/spec/v1\noid sha256:'+b'0'*64+b'\nsize 12345\n')
+            with self.assertRaisesRegex(ValueError,'Unresolved Git LFS'):reject_lfs_pointer(p)
+            p.write_bytes(b'!<arch>\nreal library payload');reject_lfs_pointer(p)

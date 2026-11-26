@@ -1,0 +1,57 @@
+name: Installer OS compatibility
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Candidate draft or published release to verify
+        required: true
+        default: v0.41.11
+        type: string
+      public_install:
+        description: Exercise the exact GitHub bootstrap command instead of a local candidate override
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Acquire and verify the native candidate
+        if: '!inputs.public_install'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=aarch64;; *) exit 1;; esac
+          mkdir -p "$RUNNER_TEMP/thor-candidate"
+          gh release download "$RELEASE_TAG" --pattern "thor-*-linux-$arch.tar.gz*" --dir "$RUNNER_TEMP/thor-candidate"
+          python3 tools/release_compatibility.py "$RUNNER_TEMP"/thor-candidate/*.tar.gz --report "$RUNNER_TEMP/linux-abi.json"
+      - name: Clean install, real editor services, debugger, ordinary PATH and uninstall
+        env:
+          PUBLIC_INSTALL: ${{ inputs.public_install }}
+        run: |
+          for image in ubuntu:22.04 ubuntu:24.04 debian:12 fedora:latest; do
+            label=$(printf '%s' "$image" | tr ':' '-')
+            args=()
+            if [ "$PUBLIC_INSTALL" != true ]; then
+              files=("$RUNNER_TEMP"/thor-candidate/*.tar.gz)
+              args=(--bundle "${files[0]}")
+            fi
+            python3 tools/test_install_linux.py --image "$image" "${args[@]}" --output "$RUNNER_TEMP/compatibility/$label"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-compatibility-${{ matrix.os }}
+          path: ${{ runner.temp }}/compatibility/**
+          retention-days: 3
+          if-no-files-found: warn

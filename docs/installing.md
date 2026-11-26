@@ -27,7 +27,7 @@ directory; `--version VERSION` selects a version. Otherwise the bootstrap derive
 `https://github.com/OWNER/REPO/releases/download/vVERSION` from the clone's GitHub
 origin. No command uploads or publishes anything.
 
-The current published macOS bundle requires **macOS 15 or newer** because of
+The current published macOS bundle requires **macOS 13 or newer** because of
 its bundled Odin/LLVM libraries. This is distinct from Thor's CPU support: M1
 is supported. On older macOS versions, the default repository command selects a
 native source build before downloading that incompatible bundle. A custom
@@ -35,6 +35,16 @@ native source build before downloading that incompatible bundle. A custom
 The official bundle's minimum is recorded in `release/macos-minimum`.
 
 ## Automatic prerequisites and supported hosts
+
+The portable Linux release baseline is **Ubuntu 22.04 with current updates**:
+glibc 2.35 and libstdc++ ABI GLIBCXX 3.4.30. Release packaging checks the actual
+native executables and shared libraries, including native vendor libraries.
+Linux support here means glibc-based systems; Alpine/musl is a separate,
+unvalidated configuration. The macOS ARM64 baseline is macOS 13 (tested on
+13.5.1); Windows desktop validation currently covers Windows 11 x64. Windows 10
+validation is deferred. See `release/linux-compatibility.json` and
+`release/macos-minimum` for the enforced release bounds.
+
 
 On Ubuntu/Debian, setup waits up to five minutes for package-manager locks held
 by automatic updates or another package operation. Package-list lock contention
@@ -97,10 +107,15 @@ uses Python 3.9+, Rust/Cargo, Node/npm, Git, LLVM development tools, and the
 pinned reviewed Odin revision. Rust packages use committed Cargo lockfiles; SDK
 files are checked against the reviewed source hashes. A compatible existing Odin
 can be selected explicitly. BSD builds use system Rust packages. Windows source
-prerequisite acquisition uses winget for missing Python/Git/Git LFS; if App Installer
+prerequisite acquisition uses winget for missing Python/Git; if App Installer
 is unavailable, it reports which tool to install. Binary setup does not require
 winget, Rust, Python or Node. Windows Rust executables link their C runtime
 statically so the installer can start before developer tools are installed.
+
+SDK source acquisition also uses a checksum-pinned private Git LFS binary when
+needed. Its filters apply only to the disposable SDK checkout, and no Git hooks
+or global Git configuration are installed. Packaging rejects unresolved large-
+file pointer files rather than silently shipping unusable vendor libraries.
 
 Compatible existing Rust/Cargo and Node/npm are reused. Otherwise macOS, Linux
 and Windows source builds download verified binary tools into their temporary
@@ -126,7 +141,7 @@ DWARF 5 information and prevent source breakpoints from resolving.
 Linux setup no longer installs Node/npm through the OS package manager. BSD
 continues to use native binary packages for Node, Rust and LLVM. Reusing Odin
 with `--odin PATH` skips SDK-only C++/LLVM acquisition, and on Windows also skips
-Git/Git LFS acquisition. The required native C compiler/linker/SDK is still checked.
+Git acquisition. The required native C compiler/linker/SDK is still checked.
 Extra cross-target linkers such as `wasm-ld` remain optional prerequisites for
 those targets; native Linux source setup no longer installs LLD unconditionally.
 

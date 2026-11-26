@@ -4,11 +4,15 @@ import argparse
 import json
 from pathlib import Path
 import struct
+import re
+import subprocess
 import tarfile
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT/'release/linux-compatibility.json'
 LIMIT = 1024 * 1024 * 1024
+MACHO = {bytes.fromhex(s) for s in ('feedface','cefaedfe','feedfacf','cffaedfe','cafebabe','bebafeca','cafebabf','bfbafeca')}
 
 
 def version(value):
@@ -148,6 +152,76 @@ def inspect_directory(directory, arch, *, portable=False):
     return inspect(entries(), arch, portable=portable)
 
 
+def macos_versions(output):
+    blocks = re.split(r'Load command \d+', output)[1:]
+    versions=[]
+    for block in blocks:
+        modern=bool(re.search(r'platform\s+MACOS\b',block))
+        legacy='LC_VERSION_MIN_MACOSX' in block
+        if modern or legacy:
+            found=re.findall((r'minos' if modern else r'version')+r'\s+(\d+\.\d+(?:\.\d+)?)',block)
+            if len(found)!=1:raise ValueError('Missing or ambiguous macOS deployment target')
+            versions.extend(found)
+    if not versions and not ('platform' in output or re.search(r'LC_VERSION_MIN_(?:IPHONEOS|WATCHOS|TVOS)', output)):
+        raise ValueError('No macOS deployment target in Mach-O component')
+    return versions
+
+
+def macho_architectures(data):
+    magic=data[:4]
+    if magic in (bytes.fromhex('cffaedfe'),bytes.fromhex('cefaedfe'),bytes.fromhex('feedfacf'),bytes.fromhex('feedface')):
+        if len(data)<12:raise ValueError('Truncated Mach-O header')
+        return {struct.unpack_from(('<' if magic[:1] in (b'\xcf',b'\xce') else '>')+'I',data,4)[0]}
+    endian='<' if magic in (bytes.fromhex('bebafeca'),bytes.fromhex('bfbafeca')) else '>'
+    if len(data)<8:raise ValueError('Truncated universal Mach-O header')
+    count=struct.unpack_from(endian+'I',data,4)[0]
+    width=32 if magic in (bytes.fromhex('cafebabf'),bytes.fromhex('bfbafeca')) else 20
+    if not 0<count<=128 or 8+count*width>len(data):raise ValueError('Invalid universal Mach-O architecture table')
+    return {struct.unpack_from(endian+'I',data,8+i*width)[0] for i in range(count)}
+
+
+def inspect_macos(entries, arch, *, portable=False):
+    floor = (ROOT/'release/macos-minimum').read_text().strip()
+    required = {'thor','thor-install','odin/odin','tls/bin/tls'}
+    seen, rows = set(), []
+    expected = {'aarch64': 0x100000c, 'x86_64': 0x1000007}[arch]
+    with tempfile.TemporaryDirectory(prefix='thor-macho-inspect-') as temporary:
+        binary = Path(temporary)/'component'
+        for name, data in entries:
+            if name.endswith(('.a','.o','.obj')) or data[:4] not in MACHO:
+                if name in required:raise ValueError(name+': expected a native Mach-O executable')
+                continue
+            if expected not in macho_architectures(data):
+                if name in required:raise ValueError(name+': expected native macOS '+arch+' executable')
+                continue  # Foreign SDK libraries are not loaded on this host.
+            binary.write_bytes(data)
+            p = subprocess.run(['vtool','-arch','arm64' if arch=='aarch64' else 'x86_64','-show-build',str(binary)],capture_output=True,text=True)
+            if p.returncode:raise ValueError(name+': cannot inspect Mach-O deployment target: '+p.stderr)
+            versions = macos_versions(p.stdout)
+            if not versions:
+                if name in required:raise ValueError(name+': executable is not a macOS target')
+                continue
+            seen.add(name)
+            for value in versions:
+                if portable and version(value)+(0,)*(3-len(version(value))) > version(floor)+(0,)*(3-len(version(floor))):
+                    raise ValueError(name+' requires macOS '+value+'; portable releases must support '+floor)
+            rows.append({'file':name,'macos':max(versions,key=version)})
+    if not required.issubset(seen):raise ValueError('Missing native macOS executables: '+', '.join(sorted(required-seen)))
+    return {'portable':portable,'required':{'macos':max((r['macos'] for r in rows),key=version)},'files':rows}
+
+
+def inspect_macos_directory(directory, arch, *, portable=False):
+    def entries():
+        for p in sorted(Path(directory).rglob('*')):
+            if not p.is_file() or p.suffix in ('.a','.o','.obj'):continue
+            with p.open('rb') as stream:
+                start=stream.read(64)
+                if start[:4] in MACHO or p.relative_to(directory).as_posix() in {'thor','thor-install','odin/odin','tls/bin/tls'}:
+                    if p.stat().st_size>LIMIT:raise ValueError('Oversized Mach-O component: '+str(p))
+                    yield p.relative_to(directory).as_posix(), start+stream.read()
+    return inspect_macos(entries(),arch,portable=portable)
+
+
 def inspect_archive(archive, *, portable=True):
     with tarfile.open(archive, 'r|*') as incoming:
         manifest = incoming.next()
@@ -155,8 +229,8 @@ def inspect_archive(archive, *, portable=True):
             raise ValueError('Missing or oversized distribution manifest')
         metadata = json.load(incoming.extractfile(manifest))
         target = metadata['target']
-        if not target.startswith('linux-'):
-            raise ValueError('Expected a Linux distribution')
+        if not target.startswith(('linux-','macos-')):
+            raise ValueError('Expected a Linux or macOS distribution')
         def entries():
             names = set()
             while True:
@@ -174,9 +248,10 @@ def inspect_archive(archive, *, portable=True):
                     raise ValueError('Oversized distribution component: '+member.name)
                 stream = incoming.extractfile(member)
                 header = stream.read(64)
-                if header[:4] == b'\x7fELF':
+                if header[:4] == b'\x7fELF' or (header[:4] in MACHO and not member.name.endswith(('.a','.o','.obj'))) or member.name in {'thor','thor-install','odin/odin','tls/bin/tls'}:
                     yield member.name, header+stream.read()
-        return inspect(entries(), target.removeprefix('linux-'), portable=portable)
+        system,arch=target.split('-',1)
+        return (inspect if system=='linux' else inspect_macos)(entries(),arch,portable=portable)
 
 
 def main():

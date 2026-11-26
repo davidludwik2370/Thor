@@ -16,10 +16,10 @@ import tempfile
 import zipfile
 if __package__:
     from .ols_source import stage_source
-    from .release_compatibility import inspect_directory
+    from .release_compatibility import inspect_directory, inspect_macos_directory
 else:
     from ols_source import stage_source
-    from release_compatibility import inspect_directory
+    from release_compatibility import inspect_directory, inspect_macos_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,6 +72,13 @@ def tree(source, destination):
 def sdk_components(sdk,stage):
     for name in ('base','core','vendor','shared','bin'):
         if (sdk/name).is_dir():tree(sdk/name,stage/'odin'/name)
+
+
+def reject_lfs_pointer(path):
+    with path.open('rb') as source:
+        prefix=source.read(64)
+    if prefix.startswith(b'version https://git-lfs.github.com/spec/v1'):
+        raise ValueError(f'Unresolved Git LFS object: {path.name}. Acquire the complete pinned SDK with Git LFS before packaging.')
 
 
 def verify_sdk(odin, sdk):
@@ -275,9 +282,12 @@ def build(options):
         rust_licenses(stage)
         relocate_odin(stage)
         compatibility = inspect_directory(stage, arch, portable=getattr(options,'portable',False)) if system=='linux' else None
+        if system=='macos':
+            compatibility = inspect_macos_directory(stage,arch,portable=getattr(options,'portable',False))
         files = {}
         for p in sorted(stage.rglob('*')):
             if p.is_file():
+                reject_lfs_pointer(p)
                 files[p.relative_to(stage).as_posix()] = dict(size=p.stat().st_size,sha256=sha(p),executable=bool(p.stat().st_mode & 0o111))
         manifest = dict(schema=1,product='Thor',version=version,target=system+'-'+arch,odin_version=odin_version,files=files)
         if compatibility:
@@ -312,7 +322,7 @@ def main():
     parser.add_argument('--vsix',type=Path,default=ROOT/'editors/vscode/thor-language.vsix')
     parser.add_argument('--ols-source',type=Path,help='Pinned upstream OLS checkout (otherwise download and verify pinned source)')
     parser.add_argument('--output',type=Path,default=ROOT/'dist')
-    parser.add_argument('--portable',action='store_true',help='Require the reviewed Linux release ABI baseline (maintainers)')
+    parser.add_argument('--portable',action='store_true',help='Require the reviewed release OS/ABI baseline (maintainers)')
     options=parser.parse_args()
     try:build(options)
     except (OSError,ValueError,subprocess.CalledProcessError) as error:parser.exit(1,f'distribution build failed: {error}\n')

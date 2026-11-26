@@ -4,8 +4,9 @@
 set -eu
 PATH="$PATH:/usr/local/bin:/usr/pkg/bin:/usr/local/sbin:/usr/pkg/sbin"; export PATH
 source_build=false; editor=false; plan=false; download_only=false; reuse_odin=false
+portable_bundle=false
 for arg do
-    case "$arg" in --source) source_build=true;; --reuse-odin) reuse_odin=true;; --vscode) editor=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
+    case "$arg" in --source) source_build=true;; --portable-bundle) portable_bundle=true;; --reuse-odin) reuse_odin=true;; --vscode) editor=true;; --dry-run) plan=true;; --download-only) download_only=true;; *) echo "Unknown prerequisite option: $arg" >&2; exit 1;; esac
 done
 system=$(uname -s)
 machine=$(uname -m)
@@ -170,6 +171,13 @@ if $source_build; then
         esac
     fi
     echo 'PASS: source-build prerequisites'
+    if $portable_bundle && [ "$system" = Linux ]; then
+        if command -v apt-get >/dev/null 2>&1; then
+            packages cmake pkg-config libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev
+        else
+            echo 'Build portable Linux releases on the reviewed Ubuntu 22.04 baseline.' >&2; exit 1
+        fi
+    fi
 fi
 if $editor; then
     script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

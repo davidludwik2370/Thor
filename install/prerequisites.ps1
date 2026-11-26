@@ -99,10 +99,10 @@ try {
     if ($SourceBuild) {
         # winget is an acquisition helper, not a prerequisite for normal installs.
         # Node/Rust are private verified binary tools, not global winget installs.
-        # Reusing Odin also avoids Git/Git LFS acquisition for the SDK checkout.
+        # Git LFS is a private verified binary; no global filters/hooks are set.
         $tools=[System.Collections.Generic.List[object]]::new()
         $tools.Add(@('python','Python.Python.3.12'))
-        if (!$ReuseOdin) {$tools.Add(@('git','Git.Git')); $tools.Add(@('git-lfs','GitHub.GitLFS'))}
+        if (!$ReuseOdin) {$tools.Add(@('git','Git.Git'))}
         foreach($tool in $tools) {
             $available=if($tool[0] -eq 'python'){FindSourcePython}else{Get-Command $tool[0] -ErrorAction SilentlyContinue}
             if (!$available) {

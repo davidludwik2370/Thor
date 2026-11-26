@@ -48,6 +48,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Select the reviewed portable Mac LLVM binaries
+        if: runner.os == 'macOS'
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from install.source_tools import acquire_macos_llvm
+          from install.from_source import host
+          work=Path(os.environ['RUNNER_TEMP'])/'thor-portable-llvm'
+          work.mkdir()
+          env=dict(os.environ)
+          config=acquire_macos_llvm(work,env,host())
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('LLVM_CONFIG='+config+'\n')
+              f.write('LDFLAGS='+env['LDFLAGS']+'\n')
+          PY
       - name: Build and verify portable POSIX distribution
         if: runner.os != 'Windows'
         run: |

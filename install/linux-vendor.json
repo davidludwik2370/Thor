@@ -1,0 +1,15 @@
+{
+  "raylib": {
+    "revision": "dbc56a87da87d973a9c5baa4e7438a9d20121d28",
+    "url": "https://codeload.github.com/raysan5/raylib/tar.gz/dbc56a87da87d973a9c5baa4e7438a9d20121d28",
+    "sha256": "81b06ce7c19cf3b634b0271c23c361ba6ad8bf45fb8b036abbfeb4260ec1e126",
+    "root": "raylib-dbc56a87da87d973a9c5baa4e7438a9d20121d28"
+  },
+  "raygui": {
+    "revision": "25c8c65a6e5f0f4d4b564a0343861898c6f2778b",
+    "url": "https://codeload.github.com/raysan5/raygui/tar.gz/25c8c65a6e5f0f4d4b564a0343861898c6f2778b",
+    "sha256": "86881d5aa498f4e78c6758efa12bc43bd19ff649904c3c9e8fc6b1f3edbbd55a",
+    "root": "raygui-25c8c65a6e5f0f4d4b564a0343861898c6f2778b"
+  },
+  "raygui_binding_sha256": "e3b2712ea1732366274449eb2fe9e0bbb20e9375daad6eb0bd784ddbab656b1a"
+}

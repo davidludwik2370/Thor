@@ -16,3 +16,29 @@ a native source build on older Macs. Recheck Mach-O deployment targets for the
 compiler, installer, TLS, Odin, symbolizer and bundled libraries when publishing;
 Thor's Rust executable's target alone is insufficient to establish SDK support.
 Custom bundles and release bases have their own compatibility requirements.
+
+## Portable releases
+
+Run the **Portable release build** workflow to build Linux x64/ARM64 on Ubuntu
+22.04, Apple Silicon macOS with reviewed static LLVM binaries and deployment
+floor 13.0, and Windows x64. It uploads only to a draft bound to its source
+commit; it never publishes automatically. Use `--portable-bundle` together with
+`--from-source --export-bundle DIR` for equivalent maintainer builds. Portable
+SDK refreshes use disposable source checkouts and never modify a reused Odin.
+
+The release builder records native ABI/deployment requirements in its manifest.
+`python3 tools/release_compatibility.py BUNDLE --report REPORT.json` independently
+checks Linux and macOS archives. This includes native SDK shared libraries;
+foreign target libraries are not requirements of the host toolchain. SDK large-
+file objects must be present, and native Raylib/Raygui are checked with static
+and shared FFI smoke programs in checked and unchecked configurations.
+
+The **Installer OS compatibility** workflow tests the candidate on Ubuntu
+22.04/24.04, Debian 12 and current Fedora, on x64 and ARM64. Each case uses a
+fresh bounded container, automatically installs developer prerequisites and
+VS Code, verifies real OLS/TLS hover/completion, terminal PATH, Run, a debugger
+breakpoint, preservation and uninstall. After publication, rerun with
+`public_install=true` to test the exact command from a public GitHub clone.
+Containers exercise real editor services under Xvfb; physical/desktop VM checks
+remain separate. Reports record the exact image ID and OS, and temporary
+containers and newly pulled unused images are removed.

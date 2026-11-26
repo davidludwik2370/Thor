@@ -77,6 +77,8 @@ def ensure_node(work, env):
 
 
 def build(work, forward, odin=None, export_bundle=None, portable=False):
+    if portable and odin is not None:
+        raise ValueError('Portable release generation requires a disposable SDK source checkout; omit --odin. Reused SDKs are never modified.')
     target = host()
     install_env = dict(os.environ)
     env = dict(install_env)
@@ -116,22 +118,26 @@ def build(work, forward, odin=None, export_bundle=None, portable=False):
     if revision == '9a69916':
         revision = '9a6991685ddf663956d9836602eb421e141fc443'
     if not odin:
+        source_tools.ensure_git_lfs(work,env,target)
         checkout = work/'Odin'
         run(['git', 'init', checkout], env=env)
+        run(['git','-C',checkout,'lfs','install','--local','--skip-repo'],env=env)
         run(['git', '-C', checkout, 'remote', 'add', 'origin', 'https://github.com/odin-lang/Odin.git'], env=env)
         run(['git', '-C', checkout, 'fetch', '--depth=1', 'origin', revision], env=env)
-        run(['git', '-C', checkout, 'checkout', '--detach', 'FETCH_HEAD'], env=env)
+        run(['git', '-C', checkout, 'checkout', '--detach', 'FETCH_HEAD'], env={**env,'GIT_LFS_SKIP_SMUDGE':'1'})
         actual = run(['git', '-C', checkout, 'rev-parse', 'HEAD'], env=env, capture=True)
         if not actual.startswith(revision):
             raise ValueError('Downloaded Odin revision does not match the reviewed SDK')
+        run(['git','-C',checkout,'-c','lfs.concurrenttransfers=2','-c','lfs.activitytimeout=60','lfs','pull'],env={**env,'GIT_LFS_SKIP_SMUDGE':'0'})
         if os.name == 'nt':
-            run(['git', '-C', checkout, 'lfs', 'pull'], env=env)
             run(['cmd.exe', '/d', '/c', 'build.bat', 'release'], cwd=checkout, env=env)
         else:
             make = 'gmake' if platform.system() in ('FreeBSD', 'NetBSD', 'OpenBSD') else 'make'
             run([make, 'release-native'], cwd=checkout, env=env)
             source_tools.retain_llvm_notices(env['LLVM_CONFIG'], checkout)
         odin = checkout/('odin.exe' if os.name == 'nt' else 'odin')
+        if portable and platform.system() in ('Linux','Darwin'):
+            run([sys.executable,ROOT/'tools/build_portable_vendor.py','--sdk',checkout],env=env)
     # The release builder checks revision AND the SDK file hashes before staging.
     for manifest in ('rust/Cargo.toml', 'install/Cargo.toml'):
         run(['cargo', 'build', '--release', '--locked', '--manifest-path', ROOT/manifest, '-j', '2'], env=env, cwd=ROOT)

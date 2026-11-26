@@ -273,3 +273,55 @@ class SourceSdkComponentsTests(unittest.TestCase):
             self.assertEqual((stage/'odin/bin/radlink.exe').read_bytes(),b'linker payload')
             self.assertEqual((stage/'odin/bin/RAD-LICENSE').read_text(),'runtime helper license')
             self.assertFalse((stage/'odin/obj').exists())
+
+@unittest.skipIf(os.name=='nt','POSIX Linux loader preflight')
+class LinuxBaselineTests(unittest.TestCase):
+    def exercise(self,libc,*args):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'release').mkdir();(root/'install').mkdir();bin=root/'bin';bin.mkdir()
+            shutil.copy2(ROOT/'thor-install',root/'thor-install')
+            for name in ['version','linux-compatibility.json']:shutil.copy2(ROOT/'release'/name,root/'release'/name)
+            (root/'install/from_source.py').write_text('print("source fallback")')
+            for name,body in [('uname','case "$1" in -s) echo Linux;; -m) echo x86_64;; esac'),('getconf','printf "%s\\n" '+repr(libc)),('git','echo https://github.com/davidludwik2370/Thor.git'),('curl','touch "'+str(root/'download')+'"; printf 404')]:
+                p=bin/name;p.write_text('#!/bin/sh\n'+body+'\n');p.chmod(0o755)
+            result=subprocess.run([root/'thor-install','--dry-run','--no-install-deps',*args],env={**os.environ,'PATH':str(bin)+os.pathsep+os.environ['PATH'],'THOR_RELEASE_BASE':''},capture_output=True,text=True,timeout=10)
+            return result,(root/'download').exists()
+
+    def test_floor_and_newer_glibc_reach_acquisition(self):
+        for libc in ['glibc 2.35','glibc 2.39','glibc 2.100']:
+            with self.subTest(libc=libc):
+                p,downloaded=self.exercise(libc)
+                self.assertEqual(p.returncode,0,p.stderr);self.assertTrue(downloaded)
+
+    def test_old_or_non_gnu_libc_stops_before_download(self):
+        for libc in ['glibc 2.34','glibc 2.9','musl','']:
+            with self.subTest(libc=libc):
+                p,downloaded=self.exercise(libc)
+                self.assertNotEqual(p.returncode,0);self.assertFalse(downloaded);self.assertIn('require glibc 2.35',p.stderr)
+
+    def test_custom_bundle_policy_and_explicit_source_build_are_preserved(self):
+        p,downloaded=self.exercise('glibc 2.34','--release-base','http://localhost:1/releases')
+        self.assertEqual(p.returncode,0,p.stderr);self.assertTrue(downloaded)
+        p,downloaded=self.exercise('glibc 2.34','--from-source')
+        self.assertEqual(p.returncode,0,p.stderr);self.assertFalse(downloaded)
+
+class SourceSDKAcquisitionTests(unittest.TestCase):
+    def test_lfs_filters_are_scoped_to_the_disposable_checkout(self):
+        import contextlib,json
+        profile=json.loads((ROOT/'rust/data'/('noalloc-io-sdk-windows.json' if os.name=='nt' else 'noalloc-io-sdk.json')).read_text())
+        revision=profile.get('revision',profile.get('reviewed_sdk_revision'))
+        calls=[]
+        def run(args,**kwargs):
+            args=list(map(str,args));calls.append((args,kwargs))
+            if args[-2:]==['rev-parse','HEAD']:
+                return next(a[-1] for a,k in calls if a[:1]==['git'] and 'fetch' in a)
+        with tempfile.TemporaryDirectory() as t,contextlib.ExitStack() as stack:
+            for obj,name in [(source.source_tools,'ensure_rust'),(source.source_tools,'ensure_git_lfs'),(source,'ensure_node'),(source.source_tools,'retain_llvm_notices')]:stack.enter_context(patch.object(obj,name))
+            stack.enter_context(patch.object(source,'llvm_config',return_value='/llvm/bin/llvm-config'))
+            stack.enter_context(patch.object(source,'run',side_effect=run))
+            source.build(Path(t),[])
+        local=[a for a,k in calls if 'lfs' in a and 'install' in a]
+        self.assertEqual(len(local),1);self.assertIn('--local',local[0]);self.assertIn('--skip-repo',local[0])
+        pull=next((a,k) for a,k in calls if 'lfs' in a and 'pull' in a)
+        self.assertIn('lfs.concurrenttransfers=2',pull[0]);self.assertEqual(pull[1]['env']['GIT_LFS_SKIP_SMUDGE'],'0')
+        self.assertFalse(any('--global' in a for a,k in calls))
