@@ -1,0 +1,571 @@
+{
+  "schema": 1,
+  "examples": [
+    {
+      "id": "selective-and-wildcard-imports",
+      "section": "selective-and-wildcard-imports",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "3 true",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "inferred-array-literals",
+      "section": "inferred-array-literals",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[10, 20, 30]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "membership-and-intervals",
+      "section": "membership-and-intervals",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "true false true",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "membership-in-generic-constraints",
+      "section": "membership-in-generic-constraints",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "3",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "multiline-ternaries",
+      "section": "multiline-ternaries",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "10",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "constant-string-repetition",
+      "section": "constant-string-repetition",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "ababab",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "constant-sequence-concatenation",
+      "section": "constant-sequence-concatenation",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[1, 2, 3, 4]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "exponentiation",
+      "section": "exponentiation",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "1024 0.125",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "struct-operators",
+      "section": "struct-operators",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "9 12",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "typed-loop-bindings",
+      "section": "typed-loop-bindings",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "34",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "formatted-strings",
+      "section": "formatted-strings",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "Hello Ada: 3",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "collection-comprehensions",
+      "section": "collection-comprehensions",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[0, 4, 16]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "sets",
+      "section": "sets",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "3 true",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "negative-indices-and-slices",
+      "section": "negative-indices-and-slices",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "31 [10, 20]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "switch-expressions",
+      "section": "switch-expressions",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "two",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "comparison-switch-cases",
+      "section": "comparison-switch-cases",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "2",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "optional-results-with-or-panic",
+      "section": "optional-results-with-or-panic",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "42",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "multiple-value-or-else-defaults",
+      "section": "multiple-value-or-else-defaults",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "fallback",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "spread-minimum-and-maximum",
+      "section": "spread-minimum-and-maximum",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "2 true 9",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "using-without-a-feature-header",
+      "section": "using-without-a-feature-header",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "42",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "generic-callback-defaults",
+      "section": "generic-callback-defaults",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "3",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "pure-functions",
+      "section": "pure-functions",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "16",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "implicit-function-returns",
+      "section": "implicit-function-returns",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "12 4",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "pure-callback-types",
+      "section": "pure-callback-types",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "6",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "automatic-caller-metadata",
+      "section": "automatic-caller-metadata",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "number 3",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "procedure-result-type-queries",
+      "section": "procedure-result-type-queries",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "3 true",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "compile-time-execution",
+      "section": "compile-time-execution",
+      "engines": [
+        "thor"
+      ],
+      "placement": "body",
+      "stdout": "16 17",
+      "comptime_modes": true,
+      "no_odin_reason": "Executing procedure calls as compile-time constants is a Thor compiler facility."
+    },
+    {
+      "id": "runtime-barriers-and-evaluation-modes",
+      "section": "runtime-barriers-and-evaluation-modes",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "16",
+      "comptime_modes": true,
+      "no_odin_reason": null
+    },
+    {
+      "id": "compile-time-switches",
+      "section": "compile-time-switches",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "20",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "immutable-bindings-and-views",
+      "section": "immutable-bindings-and-views",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "4 10",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "immutable-write-rejected",
+      "section": "immutable-bindings-and-views",
+      "engines": [
+        "thor"
+      ],
+      "placement": "body",
+      "error": "immutable"
+    },
+    {
+      "id": "read-only-and-writable-slice-parameters",
+      "section": "read-only-and-writable-slice-parameters",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[1, 2]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "scoped-owners",
+      "section": "scoped-owners",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[7, 0, 0]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "arbitrary-precision-numbers",
+      "section": "arbitrary-precision-numbers",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "123456789012345678901234567890 5/4",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "allocation-free-contracts",
+      "section": "allocation-free-contracts",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "6",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "no-alloc-rejected",
+      "section": "allocation-free-contracts",
+      "engines": [
+        "thor"
+      ],
+      "placement": "body",
+      "error": "no_alloc:"
+    },
+    {
+      "id": "unused-declaration-contracts",
+      "section": "unused-declaration-contracts",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "ready",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "unused-use-rejected",
+      "section": "unused-declaration-contracts",
+      "engines": [
+        "thor"
+      ],
+      "placement": "body",
+      "error": "unused"
+    },
+    {
+      "id": "local-vet-suppressions",
+      "section": "local-vet-suppressions",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "4",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "mapping-and-filtering",
+      "section": "mapping-and-filtering",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[-2, 0, 6] [3]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "parallel-mapping",
+      "section": "parallel-mapping",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "file",
+      "stdout": "[4, 9, 16]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "sorted-copies",
+      "section": "sorted-copies",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[1, 2, 3] [3, 1, 2]",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "scoped-arenas",
+      "section": "scoped-arenas",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "10",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "deep-graph-copies",
+      "section": "deep-graph-copies",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "1 9",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "allocation-free-value-hashing",
+      "section": "allocation-free-value-hashing",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "true",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "named-zip-views",
+      "section": "named-zip-views",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "Ada 36\nLin 28",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "printing-conversion-and-reductions",
+      "section": "printing-conversion-and-reductions",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "42 6 false",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "formatting-helpers",
+      "section": "formatting-helpers",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "1,234,567",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    }
+  ]
+}

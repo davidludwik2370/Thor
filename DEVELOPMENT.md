@@ -28,6 +28,20 @@ The [language specification](docs/language-spec.md) defines the numbered languag
    support, and TLS changes in the same repository. Do not mark a task complete
    merely because its syntax parses or generated code compiles in one example.
 
+Keep the public README organized around named user-facing extensions. Add each
+new extension to its linked index and provide a minimal example and an idiomatic
+Odin comparison where one exists. Explain Thor-only guarantees and compile-time
+facilities explicitly. Detailed contracts and implementation history belong in
+the linked reference guides.
+
+README code fences marked `readme-example` are the actual inputs to
+`tests.test_readme_examples`; `tests/fixtures/readme-examples.json` supplies only
+wrapper context, expected output or expected rejection, and mode selection. Do
+not keep a second copy of the snippets in fixtures. Update the manifest when
+adding or changing examples, and run the maintained example suite in checked and
+unchecked builds. Its structure checks protect index order, local links, legacy
+incoming anchors and coverage of every displayed Thor/Odin code fence.
+
 ```sh
 THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py
 ./thor run demo

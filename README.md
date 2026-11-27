@@ -1,1895 +1,1568 @@
+![Thor](assets/branding/logo-slim.png)
+
 # Thor
 
-Thor extends Odin with pure functions, compile-time execution, immutable views,
-comprehensions and other features while generating native Odin programs.
+Thor extends Odin with concise syntax, checked contracts and compile-time procedure execution. It generates ordinary Odin and uses Odin for native code generation and linking.
 
 ## Install
 
-After cloning, run the native installer from the repository root:
-
 ```sh
+git clone https://github.com/davidludwik2370/Thor.git
+cd Thor
 ./thor-install --vscode --profile Thor --path
 ```
 
-Missing build prerequisites and VS Code are installed automatically where supported.
-Editor support requires VS Code 1.96.0 or newer; setup checks its version and
-upgrades an obsolete standard installation when needed.
-Use `./thor-install --from-source` for a local release build, `./thor-install --doctor`
-to verify an installation, and `./thor-install --uninstall` to remove Thor while
-retaining VS Code, developer tools and projects.
+On Windows, use `.\thor-install.cmd --vscode --profile Thor --path` instead of the last command. The installer acquires supported prerequisites, installs the toolchain and optional editor tools, sets up PATH and verifies the installation. OS authorization prompts can still require approval.
 
-Use `./thor-install` for the toolchain only, or `--vscode` without `--profile`
-to keep your normal editor profile/theme. Existing editor preferences and
-project configurations are preserved. Windows uses `thor-install.cmd`.
-Editor setup includes Thor tools, the standard Odin Language Server (OLS) extension and CodeLLDB. The
-extension makes installed Thor commands available in new VS Code terminals;
-reload the window after updates and relaunch terminals with a stale environment.
-When using `--profile Thor`, open your project in that VS Code profile, for example
-with `code --profile Thor /path/to/project`. Restarting an existing window keeps
-its selected profile; Thor files should show **Thor** in the status bar.
-The [installation guide](docs/installing.md) covers prerequisites, optional Thor
-colors, source builds, verification and uninstall. Native bundles are downloaded
-automatically when available; otherwise supported hosts build from the checkout.
-Use `--bundle FILE` for an offline or locally prepared distribution.
+Omit `--vscode` for the toolchain alone. A named profile preserves your normal VS Code preferences. Add `--from-source` to install exactly the checked-out revision; downloaded releases can lag this README. See the [installation guide](docs/installing.md) for supported systems, update, verification and uninstall.
 
-Thor-owned code uses [0BSD](LICENSE). Incorporated code retains its original
-licenses; see [NOTICE](NOTICE).
+## Thor extensions
 
-## Compiler and development
+This tour assumes familiarity with Odin. [Odin’s overview](https://odin-lang.org/docs/overview/) introduces the underlying language. Native syntax, standard libraries, `when`, build tags and mixed `.odin`/`.thor` projects remain available.
 
-`thor` runs the prebuilt Rust compiler. `thor-rust` selects the same implementation,
-and `thor-python` retains a frozen historical reference. Compiler fixes and features
-are maintained in Rust only. See [Python retirement and validation](docs/python-retirement.md)
-and the
-[migration status and comparison commands](docs/rust-migration.md) and the
-[compiler-efficiency follow-up](docs/compiler-efficiency-2026-11.md) and the
-[cache/discovery improvements](docs/compiler-cache-discovery-2026-11.md) and the
-[dependency lookahead](docs/compiler-dependency-lookahead-2026-11.md) and the
-[shared type, summary, and parallel lowering pass](docs/compiler-structural-3-5-2026-11.md).
-The [slice-checker follow-up](docs/slice-checker-efficiency-2026-11.md) covers
-permission-root pruning, type-property caching, shared graph storage, and selective replay.
-The [SDK and resolver pass](docs/sdk-resolver-efficiency-2026-11.md) covers compact
-syntax caching, semantic state transfer, dependency worklists and complete call plans.
-The [AST and index pass](docs/ast-index-efficiency-2026-11.md) extends project
-syntax caching, packs AST lists, and reuses dependency indexes and signature layouts.
+The index and sections below use the same order. Odin comparisons demonstrate equivalent behavior for the example; Thor-only compiler guarantees are called out explicitly.
 
-![Thor](assets/branding/logo-slim.png)
+**Data and expressions**
 
-Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T23** from the reference specification in
-[the language specification](docs/language-spec.md). It includes the parser and project support needed to make
-those features usable together.
+- [Selective and wildcard imports](#selective-and-wildcard-imports) — Bring selected public names, or every public name, into the current file.
+- [Inferred array literals](#inferred-array-literals) — Write a fixed array without repeating its length and element type.
+- [Membership and intervals](#membership-and-intervals) — Test collections and numeric or ordered intervals with `in` and `not_in`.
+- [Membership in generic constraints](#membership-in-generic-constraints) — Express allowed types and constant values as membership constraints.
+- [Multiline ternaries](#multiline-ternaries) — Continue a ternary before its colon without a line-continuation escape.
+- [Constant string repetition](#constant-string-repetition) — Repeat a compile-time string with `*`.
+- [Constant sequence concatenation](#constant-sequence-concatenation) — Concatenate constant arrays or same-type slices with `++`.
+- [Exponentiation](#exponentiation) — Use infix `**` for integer and floating-point powers.
+- [Struct operators](#struct-operators) — Apply arithmetic, bitwise operations, shifts, power and complement field by field.
+- [Typed loop bindings](#typed-loop-bindings) — Choose a numeric range’s value type or a sequence loop’s index type.
+- [Formatted strings](#formatted-strings) — Embed expressions in quoted or raw strings, with optional formatting.
+- [Collection comprehensions](#collection-comprehensions) — Build collections with an output expression, iteration and an optional filter.
+- [Sets](#sets) — Use `set[T]`, deduplicating literals and mathematical set operations.
+- [Negative indices and slices](#negative-indices-and-slices) — Count backward from the end of sequences.
 
-Switch cases accept comparison prefixes (`<`, `<=`, `>`, `>=`, `!=`) in
-statements, expressions and `#switch`; see the
-[comparison switch demo](examples/switch_comparisons/demo.thor).
+**Control flow**
 
-The [attributes, directives, and file-tag reference](docs/attributes-and-directives.md)
-documents every recognized name in Thor and the pinned Odin compiler, including
-placement, arguments, restrictions, and obsolete or reserved forms.
+- [Switch expressions](#switch-expressions) — Use a switch as a value, including multiple results and contextual literals.
+- [Comparison switch cases](#comparison-switch-cases) — Match `<`, `<=`, `>`, `>=` or `!=` against the switch selector.
+- [Optional results with or_panic](#optional-results-with-or-panic) — Unwrap a successful optional result or panic with the original source context.
+- [Multiple-value or_else defaults](#multiple-value-or-else-defaults) — Provide a parenthesized fallback list with matching discarded positions.
+- [Spread minimum and maximum](#spread-minimum-and-maximum) — Reduce sequences with `min`/`max` and receive an optional presence flag.
+- [Using without a feature header](#using-without-a-feature-header) — Use standalone `using` statements and `using` parameters directly.
 
-[`@(no_alloc)` and `#+vet no_alloc`](docs/no-alloc.md) provide conservative,
-checked contracts for allocation-free ordinary execution without runtime
-instrumentation; fatal diagnostic reporting may allocate. A runnable
-[example](examples/no_alloc/demo.thor) demonstrates both forms; a
-[fixed-buffer I/O demo](examples/no_alloc_io/demo.thor) shows input and printing.
+**Functions and compile-time execution**
 
-Arbitrary-precision stages 1–5 implement predefined `Integer`/`Rational` types,
-exact unquoted literals, constructors, read-only components, direct-copy ownership,
-runtime operators, read-only constants, fn/#run, formatting and shared-library
-integration. See [the introductory demo](examples/big_numbers/demo.thor),
-[the compile-time demo](examples/big_comptime/demo.thor),
-[the integration demo](examples/big_integration/demo.thor),
-[the runtime API](runtime/big/README.md), and
-[the language reference](docs/arbitrary-precision.md).
+- [Generic callback defaults](#generic-callback-defaults) — Infer an inline default callback from earlier generic inputs.
+- [Pure functions](#pure-functions) — Declare deterministic functions with checked read-only inputs and effects.
+- [Implicit function returns](#implicit-function-returns) — Return a value-returning `fn` body’s last expression automatically.
+- [Pure callback types](#pure-callback-types) — Preserve a function’s purity contract through callback values and aliases.
+- [Automatic caller metadata](#automatic-caller-metadata) — Expose caller expressions and locations as documented, non-overridable parameters.
+- [Procedure result type queries](#procedure-result-type-queries) — Derive one result’s type or a named record of several result types.
+- [Compile-time execution](#compile-time-execution) — Evaluate eligible known-argument `fn` calls automatically, or request execution with `#run`.
+- [Runtime barriers and evaluation modes](#runtime-barriers-and-evaluation-modes) — Choose optional compile-time work and mark calls that should stay at runtime.
+- [Compile-time switches](#compile-time-switches) — Select statements or values using `#switch` and leave inactive arms unchecked.
 
-Odin compatibility is checked against real projects as well as focused tests.
-The [native Windows follow-up](docs/windows-validation-followup-2026-11-23.md) records
-Windows compiler/editor coverage, remaining native debugger limits and manual review steps.
-The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)
-records the original failures and their regression cases; the compiler preserves
-native range/type operands, enum indices, SOA iteration and storage rules while
-adding Thor's syntax.
-The [November compatibility fixes](docs/odin-superset-audit-2026-11-13/fixes.md)
-cover native type parsing, resource expressions, source introspection, project
-identity, and user collection names in both compiler implementations.
-Use `thor migrate /path/to/odin/project` to create a validated Thor copy.
-The [migration guide](docs/odin-migration.md) explains keyword renames,
-configuration, and review notices.
+**Ownership and contracts**
 
-Collection comprehensions construct slices, dynamic arrays, sets and maps,
-with filtered compile-time fixed arrays and one-level `..` unpacking. See the
-[comprehension reference](docs/comprehensions.md) and the executable
-[commented examples](examples/comprehensions/demo.thor).
+- [Immutable bindings and views](#immutable-bindings-and-views) — Initialize once at runtime with `:>` and prevent writes through that binding.
+- [Read-only and writable slice parameters](#read-only-and-writable-slice-parameters) — Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
+- [Scoped owners](#scoped-owners) — Attach shallow end-of-scope cleanup to a local declaration with `~`.
+- [Arbitrary-precision numbers](#arbitrary-precision-numbers) — Use predefined `Integer` and exact `Rational` values, literals and operators.
+- [Allocation-free contracts](#allocation-free-contracts) — Check `@(no_alloc)` procedures or an entire `#+vet no_alloc` file.
+- [Unused declaration contracts](#unused-declaration-contracts) — Mark declarations intentionally unused and reject later references to them.
+- [Local vet suppressions](#local-vet-suppressions) — Silence selected vet advice on one declaration using named enum options.
 
-Same-type structs containing self-contained fixed-size arithmetic values support
-field-by-field arithmetic, bitwise operators, shifts, power `**`, unary complement
-`~`, and compound assignments, including contextual
-literals and compile-time values. See [struct arithmetic](docs/struct-arithmetic.md)
-and its [executable example](examples/struct_arithmetic/demo.thor).
+**Basic library**
 
-The [parameter-contract demo](examples/parameter_contracts/demo.thor) covers
-non-overridable `:>` caller metadata parameters, explicit `#ro` slice readers,
-`#runtime` evaluation barriers, declaration-local `@(vet_ignore={.unused})`, aliases,
-callbacks, and compile-time capture. Their contracts are included in the
-[attribute/directive reference](docs/attributes-and-directives.md).
+- [Mapping and filtering](#mapping-and-filtering) — Allocate mapped and filtered slices with polymorphic callbacks inferred from the data.
+- [Parallel mapping](#parallel-mapping) — Run a mapping callback with bounded workers and ordered results.
+- [Sorted copies](#sorted-copies) — Sort an allocated copy while keeping the input unchanged.
+- [Scoped arenas](#scoped-arenas) — Use one growing arena for allocations with the same block lifetime.
+- [Deep graph copies](#deep-graph-copies) — Clone supported reachable data while preserving cycles, sharing and interior references.
+- [Allocation-free value hashing](#allocation-free-value-hashing) — Hash supported logical contents without allocating.
+- [Named zip views](#named-zip-views) — Give parallel slices field names without allocating a new array of records.
+- [Printing conversion and reductions](#printing-conversion-and-reductions) — Use small printing, parsing and collection helpers with explicit ownership.
+- [Formatting helpers](#formatting-helpers) — Use the native formatting support package directly when interpolation is not needed.
 
-## Run the demo
+Also: [compiler commands](#compiler-commands), [vetting](#thor-vetting), [VS Code and TLS](#vs-code-and-tls), and [compatibility and development](#compatibility-and-development).
 
-Requirements are `odin` on `PATH` and a release compiler built with Rust 1.85+
-and Cargo. Build it once after checkout and rebuild after editing Rust compiler
-sources. The launcher executes the existing binary directly. The first invocation
-builds and caches the small Odin frontend automatically.
+## Reading the examples
 
-```sh
-cargo build --release --locked --manifest-path rust/Cargo.toml
-./thor run demo
+Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. The tests compile the exact displayed snippets, run both languages, compare their output and check rejection examples in checked and unchecked builds.
+
+## Data and expressions
+
+### Selective and wildcard imports
+
+Bring selected public names, or every public name, into the current file.
+
+**Thor**
+
+<!-- readme-example: selective-and-wildcard-imports:thor -->
+```odin
+import _ "core:math" / sqrt
+import * "core:strings"
+fmt.println(sqrt(f64(9)), has_prefix("Thor", "Th"))
 ```
 
-For compiler development, `python3 tools/build_compiler.py` builds the release
-compiler and prunes obsolete development artifacts before/after the build. The
-maintained test runner does the same. Plain Cargo builds remain supported.
-See [storage limits and retention](docs/storage.md).
+**Odin**
 
-Python 3.10+ is needed for the reference compiler and Python development tools.
-The reference publisher uses Pillow for PNG/ICO icons. See
-[application publishing](docs/publishing.md).
-
-[demo/main.thor](demo/main.thor) has a labeled section for every completed task,
-with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T23 demos passed.`
-
-Select another compile-time branch with an ordinary Odin define:
-
-```sh
-./thor run demo -define:DEMO_MODE=1
-./thor run demo -define:DEMO_MODE=3
+<!-- readme-example: selective-and-wildcard-imports:odin -->
+```odin
+import "core:math"
+import "core:strings"
+fmt.println(math.sqrt(f64(9)), strings.has_prefix("Thor", "Th"))
 ```
 
-For a more spacious, commented walkthrough in the style of Odin's language demo,
-read [examples/demo/demo.thor](examples/demo/demo.thor) and run:
+`import "core:math" / sqrt` also retains the `math` namespace. `import *` retains its namespace; `import _ ... / names` omits it. Names are file-local, are not re-exported, and obey privacy and collision checks. Selected mutable package variables require their namespace; wildcard imports preserve live variable access.
 
-```sh
-./thor run examples/demo
-./thor test examples/demo -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+[Import rules](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Inferred array literals
+
+Write a fixed array without repeating its length and element type.
+
+**Thor**
+
+<!-- readme-example: inferred-array-literals:thor -->
+```odin
+values := [10, 20, 30]
+fmt.println(values)
 ```
 
-It uses fresh examples, with a procedure per topic, ownership explanations,
-commented invalid cases, a mixed Odin/Thor helper package, and five sections on
-Integer/Rational construction, ownership, operators, compile-time results and
-library/formatting interactions. Its compile-time
-branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
+**Odin**
 
-## Commands
-
-The canonical local toolchain is `/Users/davidludwik/Thor`. Its compiler, TLS,
-frontend and shared libraries live there; projects keep their own caches and
-generated application code. See [INSTALLATION.md](INSTALLATION.md).
-
-```sh
-./thor transpile demo                  # Print the generated package path.
-./thor check demo
-./thor build demo -out:demo-program     # Choose a name when building from this checkout.
-./thor run demo
-./thor test path/to/tests              # Run Odin @(test) procedures.
-./thor run path/to/main.thor -- argument "two words"
-./thor check demo --output-dir /tmp/thor-generated
+<!-- readme-example: inferred-array-literals:odin -->
+```odin
+values := [3]int{10, 20, 30}
+fmt.println(values)
 ```
+
+Context supplies element types in arguments, returns, assignments and nested literals. Otherwise the first element establishes the type. Empty literals need context. A fixed array itself needs no heap cleanup.
+
+[Array inference](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Membership and intervals
+
+Test collections and numeric or ordered intervals with `in` and `not_in`.
+
+**Thor**
+
+<!-- readme-example: membership-and-intervals:thor -->
+```odin
+values := [2, 4, 6]
+needle := 4
+fmt.println(needle in values, needle not_in values, needle in 0..<5)
+```
+
+**Odin**
+
+<!-- readme-example: membership-and-intervals:odin -->
+```odin
+values := [3]int{2, 4, 6}
+needle := 4
+found := false
+for value in values { if value == needle { found = true; break } }
+fmt.println(found, !found, 0 <= needle && needle < 5)
+```
+
+Works with arrays, slices, dynamic arrays, maps, bit sets and Thor sets. Intervals accept `..<` and `..=`; reversed intervals are empty. Operands run once in source order. String substring membership is not added. Ordered string intervals are supported.
+
+[Membership and coercion rules](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Membership in generic constraints
+
+Express allowed types and constant values as membership constraints.
+
+**Thor**
+
+<!-- readme-example: membership-in-generic-constraints:thor -->
+```odin
+numeric :: proc(value: $T) -> T where T in [int, f64] { return value }
+fmt.println(numeric(3))
+```
+
+**Odin**
+
+<!-- readme-example: membership-in-generic-constraints:odin -->
+```odin
+numeric :: proc(value: $T) -> T where T == int || T == f64 { return value }
+fmt.println(numeric(3))
+```
+
+Type membership compares exact type identities: aliases match, distinct types remain distinct. Constant value constraints can also use lists and intervals, such as `where N in 1..=8`.
+
+[Generic membership](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Multiline ternaries
+
+Continue a ternary before its colon without a line-continuation escape.
+
+**Thor**
+
+<!-- readme-example: multiline-ternaries:thor -->
+```odin
+enabled := true
+value := enabled ? 10
+                 : 20
+fmt.println(value)
+```
+
+**Odin**
+
+<!-- readme-example: multiline-ternaries:odin -->
+```odin
+enabled := true
+value := enabled ? 10 : 20
+fmt.println(value)
+```
+
+Nested ternaries and comments preserve the normal lazy evaluation of the selected operand. Odin-style `value if condition else other` and `value when condition else other` remain available.
+
+[Expression rules](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Constant string repetition
+
+Repeat a compile-time string with `*`.
+
+**Thor**
+
+<!-- readme-example: constant-string-repetition:thor -->
+```odin
+TEXT :: "ab" * 3
+fmt.println(TEXT)
+```
+
+**Odin**
+
+<!-- readme-example: constant-string-repetition:odin -->
+```odin
+TEXT :: "ab" + "ab" + "ab"
+fmt.println(TEXT)
+```
+
+Either operand order works. Both operands must be compile-time constants, and the count must be nonnegative. The result is borrowed constant storage, so do not delete it. Runtime `:>` bindings do not qualify as constants.
+
+[Repetition limits and generics](docs/language-guide.md#string-repetition).
+
+### Constant sequence concatenation
+
+Concatenate constant arrays or same-type slices with `++`.
+
+**Thor**
+
+<!-- readme-example: constant-sequence-concatenation:thor -->
+```odin
+FIRST :: [1, 2]
+SECOND :: [3, 4]
+ALL :: FIRST ++ SECOND
+fmt.println(ALL)
+```
+
+**Odin**
+
+<!-- readme-example: constant-sequence-concatenation:odin -->
+```odin
+import "base:intrinsics"
+FIRST :: [2]int{1, 2}
+SECOND :: [2]int{3, 4}
+ALL :: intrinsics.concatenate(FIRST, SECOND)
+fmt.println(ALL)
+```
+
+Array lengths may differ; element types must agree. This is shallow, outer-sequence concatenation with no heap allocation. Arrays and slices cannot be mixed implicitly. `++` has addition precedence; it is not an increment operator and has no `++=` form.
+
+[Concatenation rules](docs/language-guide.md#sequence-concatenation).
+
+### Exponentiation
+
+Use infix `**` for integer and floating-point powers.
+
+**Thor**
+
+<!-- readme-example: exponentiation:thor -->
+```odin
+fmt.println(2 ** 10, 2.0 ** -3)
+```
+
+**Odin**
+
+<!-- readme-example: exponentiation:odin -->
+```odin
+import "core:math"
+power :: proc(base, exponent: int) -> int {
+    result := 1
+    for _ in 0..<exponent { result *= base }
+    return result
+}
+fmt.println(power(2, 10), math.pow(f64(2), f64(-3)))
+```
+
+Power associates right: `2 ** 3 ** 2` is 512. It binds more tightly than unary signs. Integer exponents must be nonnegative; invalid runtime exponents panic. Operand types must agree after normal literal coercion. Prefix `**values` retains Odin’s argument expansion.
+
+[Power, overflow and generic rules](docs/language-guide.md#exponentiation).
+
+### Struct operators
+
+Apply arithmetic, bitwise operations, shifts, power and complement field by field.
+
+**Thor**
+
+<!-- readme-example: struct-operators:thor -->
+```odin
+Pair :: struct { a, b: int }
+left := Pair{1, 2}
+right := Pair{3, 4}
+result := left + right
+result += {5, 6}
+fmt.println(result.a, result.b)
+```
+
+**Odin**
+
+<!-- readme-example: struct-operators:odin -->
+```odin
+Pair :: struct { a, b: int }
+left := Pair{1, 2}
+right := Pair{3, 4}
+result := Pair{left.a + right.a, left.b + right.b}
+result.a += 5
+result.b += 6
+fmt.println(result.a, result.b)
+```
+
+Operands must have the same struct type; untyped literals receive that context. Every non-padding field must be a supported self-contained fixed-size value with the operator. `_` padding is ignored. Pointer, string, slice, map, set, dynamic and Integer/Rational fields are excluded. Compound assignments, nested structs, generics and compile-time values follow the same rules.
+
+[Complete operator restrictions](docs/struct-arithmetic.md).
+
+### Typed loop bindings
+
+Choose a numeric range’s value type or a sequence loop’s index type.
+
+**Thor**
+
+<!-- readme-example: typed-loop-bindings:thor -->
+```odin
+total := 0
+for i: i16 in 0..<3 { total += int(i) }
+values := [10, 20]
+for value, (i: u8) in values { total += value + int(i) }
+fmt.println(total)
+```
+
+**Odin**
+
+<!-- readme-example: typed-loop-bindings:odin -->
+```odin
+total := 0
+for i := i16(0); i < 3; i += 1 { total += int(i) }
+values := [2]int{10, 20}
+for value, index in values {
+    if index > int(max(u8)) { panic("index does not fit") }
+    i := u8(index)
+    total += value + int(i)
+}
+fmt.println(total)
+```
+
+Thor range values and indices remain immutable. `&value` keeps native reference iteration. Index narrowing is checked even in unchecked builds; fixed arrays that cannot fit the index type are rejected. The Odin counter above reproduces the iteration but does not enforce Thor’s immutability.
+
+[Typed range and index rules](docs/language-guide.md#typed-loops).
+
+<a id="interpolation-switches-sets-and-negative-indices"></a>
+
+### Formatted strings
+
+Embed expressions in quoted or raw strings, with optional formatting.
+
+**Thor**
+
+<!-- readme-example: formatted-strings:thor -->
+```odin
+name := "Ada"
+count := 3
+text := f"Hello {name}: {count}"
+defer delete(text)
+fmt.println(text)
+```
+
+**Odin**
+
+<!-- readme-example: formatted-strings:odin -->
+```odin
+name := "Ada"
+count := 3
+text := fmt.aprintf("Hello %s: %d", name, count)
+defer delete(text)
+fmt.println(text)
+```
+
+Supports nested expressions, raw backticks, escaped braces, precision, grouping, Unicode padding and dynamic widths. Named results own their strings. Anonymous f-string arguments are cleaned up after the enclosing expression; `f!"..."` opts out for an API that takes ownership. Other referenced values retain their normal ownership.
+
+[Formatting grammar](docs/interpolation-formatting.md) and [temporary ownership](docs/language-guide.md#interpolation-switches-sets-and-negative-indices).
+
+### Collection comprehensions
+
+Build collections with an output expression, iteration and an optional filter.
+
+**Thor**
+
+<!-- readme-example: collection-comprehensions:thor -->
+```odin
+squares := [n*n for n in 0..<5 if n % 2 == 0]
+defer delete(squares)
+fmt.println(squares)
+```
+
+**Odin**
+
+<!-- readme-example: collection-comprehensions:odin -->
+```odin
+buffer := make([dynamic]int)
+for n in 0..<5 { if n % 2 == 0 { append(&buffer, n*n) } }
+squares := make([]int, len(buffer))
+copy(squares, buffer[:])
+delete(buffer)
+defer delete(squares)
+fmt.println(squares)
+```
+
+A bare runtime comprehension returns an owned slice. Explicit slice, dynamic-array, set and map constructors are supported. Leading `..` flattens one level or merges map entries. Copies are shallow; free separately owned elements as needed. Eligible constant comprehensions produce fixed arrays without runtime allocation.
+
+[Constructors, flattening and compile-time arrays](docs/comprehensions.md).
+
+### Sets
+
+Use `set[T]`, deduplicating literals and mathematical set operations.
+
+**Thor**
+
+<!-- readme-example: sets:thor -->
+```odin
+values := set[int]{1, 2, 2}
+defer delete(values)
+values += 3
+fmt.println(len(values), 2 in values)
+```
+
+**Odin**
+
+<!-- readme-example: sets:odin -->
+```odin
+values := make(map[int]struct{})
+defer delete(values)
+values[1] = {}
+values[2] = {}
+values[3] = {}
+_, found := values[2]
+fmt.println(len(values), found)
+```
+
+Supports union, intersection, difference, symmetric difference, in-place updates, logical equality, membership and iteration. Iteration order is unspecified. The backing table is owned and copies are shallow; free it once. Native Odin can also use the ordinary `thor:sets` runtime API.
+
+[Set operators and ownership](docs/language-guide.md#interpolation-switches-sets-and-negative-indices).
+
+### Negative indices and slices
+
+Count backward from the end of sequences.
+
+**Thor**
+
+<!-- readme-example: negative-indices-and-slices:thor -->
+```odin
+values := [10, 20, 30]
+values[-1] += 1
+fmt.println(values[-1], values[:-1])
+```
+
+**Odin**
+
+<!-- readme-example: negative-indices-and-slices:odin -->
+```odin
+values := [3]int{10, 20, 30}
+values[len(values)-1] += 1
+fmt.println(values[len(values)-1], values[:len(values)-1])
+```
+
+Applies to signed sequence indices and slice bounds, including writes and addressable access. Bounds retain their normal checks. Map keys, enum indices and pointer behavior keep their native meanings.
+
+[Indexing and slice rules](docs/slice-access.md).
+
+## Control flow
+
+### Switch expressions
+
+Use a switch as a value, including multiple results and contextual literals.
+
+**Thor**
+
+<!-- readme-example: switch-expressions:thor -->
+```odin
+number := 2
+label := switch number { case 1: "one"; case 2: "two"; case: "other" }
+fmt.println(label)
+```
+
+**Odin**
+
+<!-- readme-example: switch-expressions:odin -->
+```odin
+number := 2
+label: string
+switch number { case 1: label = "one"; case 2: label = "two"; case: label = "other" }
+fmt.println(label)
+```
+
+Selectorless switches use Boolean conditions. Arms may return several values or forward a multi-result call. Value switches need a default unless an enum is exhaustively covered. Nonreturning calls may replace a value arm. `break` is allowed only when a switch is the entire RHS of ordinary assignment, where it skips that assignment’s stores.
+
+[Switch values, cancellation and ownership](docs/language-guide.md#interpolation-switches-sets-and-negative-indices).
+
+### Comparison switch cases
+
+Match `<`, `<=`, `>`, `>=` or `!=` against the switch selector.
+
+**Thor**
+
+<!-- readme-example: comparison-switch-cases:thor -->
+```odin
+number := 12
+result := 0
+switch number { case < 10: result = 1; case < 20: result = 2; case: result = 3 }
+fmt.println(result)
+```
+
+**Odin**
+
+<!-- readme-example: comparison-switch-cases:odin -->
+```odin
+number := 12
+result := 0
+switch { case number < 10: result = 1; case number < 20: result = 2; case: result = 3 }
+fmt.println(result)
+```
+
+Available in statements, value switches and `#switch`. The selector executes once, and matching uses the first applicable case. Equality keeps the ordinary `case value:` spelling; `case == value:` is rejected. Prefix comparisons require a value selector, not a type switch.
+
+[Runnable comparison examples](examples/switch_comparisons/demo.thor).
+
+<a id="optional-results-with-or-panic"></a>
+
+### Optional results with or_panic
+
+Unwrap a successful optional result or panic with the original source context.
+
+**Thor**
+
+<!-- readme-example: optional-results-with-or-panic:thor -->
+```odin
+import "core:strconv"
+number := strconv.parse_int("42") or_panic
+fmt.println(number)
+```
+
+**Odin**
+
+<!-- readme-example: optional-results-with-or-panic:odin -->
+```odin
+import "core:strconv"
+number, ok := strconv.parse_int("42")
+if !ok { panic("parse_int failed") }
+fmt.println(number)
+```
+
+Accepts a trailing success Boolean or nil-comparable error, optional lookups/assertions, and multiple successful values. The operand runs once. Failure reporting includes the original expression and location, even with assertions disabled. Successful owned results still need their normal cleanup.
+
+[Unwrap and panic rules](docs/language-guide.md#optional-results-with-or_panic).
+
+<a id="multiple-value-or-else-defaults"></a>
+
+### Multiple-value or_else defaults
+
+Provide a parenthesized fallback list with matching discarded positions.
+
+**Thor**
+
+<!-- readme-example: multiple-value-or-else-defaults:thor -->
+```odin
+load :: proc() -> (int, string, bool) { return 0, "", false }
+_, text := load() or_else (_, "fallback")
+fmt.println(text)
+```
+
+**Odin**
+
+<!-- readme-example: multiple-value-or-else-defaults:odin -->
+```odin
+load :: proc() -> (int, string, bool) { return 0, "", false }
+_, text, ok := load()
+if !ok { text = "fallback" }
+fmt.println(text)
+```
+
+Fallbacks run only on failure, in source order. `_` must match discarded target positions; do not supply a real value for a discarded slot. Each retained slot keeps its own type and ownership. The fallback list itself allocates nothing.
+
+[Complete fallback-list rules](docs/or-else-fallback-lists.md).
+
+### Spread minimum and maximum
+
+Reduce sequences with `min`/`max` and receive an optional presence flag.
+
+**Thor**
+
+<!-- readme-example: spread-minimum-and-maximum:thor -->
+```odin
+values := [7, 2, 9]
+smallest, ok := min(..values[:])
+fmt.println(smallest, ok, max(**values))
+```
+
+**Odin**
+
+<!-- readme-example: spread-minimum-and-maximum:odin -->
+```odin
+values := [3]int{7, 2, 9}
+smallest, largest, ok := 0, 0, false
+for value in values {
+    if !ok || value < smallest { smallest = value }
+    if !ok || value > largest { largest = value }
+    ok = true
+}
+fmt.println(smallest, ok, largest)
+```
+
+A slice spread returns `(value, ok)`; an empty input without scalar starting values yields zero/false. The flag can be omitted using native optional-result behavior. Fixed-array expansion returns one value and rejects empty arrays. Inputs execute once in order; the reduction allocates nothing and returned strings remain borrowed.
+
+[Reduction details](docs/language-guide.md#spread-minimum-and-maximum).
+
+### Using without a feature header
+
+Use standalone `using` statements and `using` parameters directly.
+
+**Thor**
+
+<!-- readme-example: using-without-a-feature-header:thor -->
+```odin
+Person :: struct { age: int }
+person := Person{42}
+using person
+fmt.println(age)
+```
+
+**Odin**
+
+<!-- readme-example: using-without-a-feature-header:odin -->
+```odin
+#+feature using-stmt
+Person :: struct { age: int }
+person := Person{42}
+using person
+fmt.println(age)
+```
+
+Thor supplies Odin’s feature tag only when needed. Promoted fields retain their types, permissions and f-string context. Existing tags are preserved; an explicit `#+feature !using-stmt` still disables these forms. Embedded `using` fields keep their native behavior.
+
+[Using compatibility](docs/language-guide.md#using-without-a-feature-header).
+
+## Functions and compile-time execution
+
+### Generic callback defaults
+
+Infer an inline default callback from earlier generic inputs.
+
+**Thor**
+
+<!-- readme-example: generic-callback-defaults:thor -->
+```odin
+choose :: proc(a, b: $T, less := proc(x, y: T) -> bool { return x < y }) -> T {
+    return a if less(a, b) else b
+}
+fmt.println(choose(7, 3))
+```
+
+**Odin**
+
+<!-- readme-example: generic-callback-defaults:odin -->
+```odin
+less_than :: proc(x, y: $E) -> bool { return x < y }
+choose :: proc(a, b: $T, less: proc(x, y: T) -> bool = less_than) -> T {
+    return a if less(a, b) else b
+}
+fmt.println(choose(7, 3))
+```
+
+Callers may omit the callback or supply a compatible runtime value. Dependencies must be inferable from its parameter types. The literal cannot capture enclosing runtime parameters. Indirect procedure values still require ordinary explicit callback arguments.
+
+[Default callback restrictions](docs/language-guide.md#generic-callback-defaults).
+
+<a id="pure-functions-and-compile-time-execution"></a>
+
+### Pure functions
+
+Declare deterministic functions with checked read-only inputs and effects.
+
+**Thor**
+
+<!-- readme-example: pure-functions:thor -->
+```odin
+square :: fn(value: int) -> int { return value*value }
+number := 4
+fmt.println(square(number))
+```
+
+**Odin**
+
+<!-- readme-example: pure-functions:odin -->
+```odin
+square :: proc(value: int) -> int { return value*value }
+number := 4
+fmt.println(square(number))
+```
+
+The Odin procedure has the same result but does not enforce purity. Thor rejects I/O, ambient mutable state, escaping mutation and unverified calls, including transitive effects. Supported scratch allocation is allowed: purity does not imply allocation-free execution. Runtime string/slice results own independent storage; nested results may need `pure.destroy`.
+
+[Purity and supported values](docs/purity-diagnostics.md), [result ownership](docs/language-guide.md#pure-functions-and-compile-time-execution).
+
+### Implicit function returns
+
+Return a value-returning `fn` body’s last expression automatically.
+
+**Thor**
+
+<!-- readme-example: implicit-function-returns:thor -->
+```odin
+quad :: fn(x: int) -> int { 4*x }
+choose :: fn(x: int) -> int { switch x { case 0: 4; case: 8 } }
+fmt.println(quad(3), choose(0))
+```
+
+**Odin**
+
+<!-- readme-example: implicit-function-returns:odin -->
+```odin
+quad :: proc(x: int) -> int { return 4*x }
+choose :: proc(x: int) -> int {
+    switch x { case 0: return 4; case: return 8 }
+}
+fmt.println(quad(3), choose(0))
+```
+
+Early explicit returns remain valid. Trailing value-producing `switch`, `#switch` and `#partial switch` work, including multiple results. Assignments, loops, `if`/`when` statements and nested statement blocks do not imply returns. Ordinary `proc` bodies keep their explicit-return rules.
+
+[Runnable implicit-return example](examples/implicit_returns/demo.thor).
+
+### Pure callback types
+
+Preserve a function’s purity contract through callback values and aliases.
+
+**Thor**
+
+<!-- readme-example: pure-callback-types:thor -->
+```odin
+twice :: fn(x: $T) -> T { return x*2 }
+apply :: fn(x: int, callback: fn(int) -> int) -> int { return callback(x) }
+callback: fn(int) -> int = twice
+number := 3
+fmt.println(apply(number, callback))
+```
+
+**Odin**
+
+<!-- readme-example: pure-callback-types:odin -->
+```odin
+twice :: proc(x: $T) -> T { return x*2 }
+apply :: proc(x: int, callback: proc(int) -> int) -> int { return callback(x) }
+callback: proc(int) -> int = twice
+number := 3
+fmt.println(apply(number, callback))
+```
+
+Runtime-selected callbacks use ordinary procedure pointers, without runtime purity tags or adapters. Aliases, generic forwarding and storage preserve the Thor contract. Plain `proc` values cannot be converted back into `fn` types. A pure callback’s identity and arguments must be known for compile-time execution.
+
+[Callback types, conversions and compile-time rules](docs/pure-callbacks.md).
+
+### Automatic caller metadata
+
+Expose caller expressions and locations as documented, non-overridable parameters.
+
+**Thor**
+
+<!-- readme-example: automatic-caller-metadata:thor -->
+```odin
+show :: proc(value: int, expression :> #caller_expression(value)) {
+    fmt.println(expression, value)
+}
+number := 3
+show(number)
+```
+
+**Odin**
+
+<!-- readme-example: automatic-caller-metadata:odin -->
+```odin
+show :: proc(value: int, expression := #caller_expression(value)) {
+    fmt.println(expression, value)
+}
+number := 3
+show(number)
+```
+
+Thor’s `:>` parameters cannot be supplied by the caller; Odin’s default above can be overridden. Also supports whole-call `#caller_expression` and `#caller_location`. Metadata remains explicit native parameters, is static data, and survives compatible aliases/callbacks. These directives belong in parameters, not directly in a body; foreign/exported interfaces cannot use automatic slots.
+
+[Automatic parameter contracts](docs/attributes-and-directives.md#param-automatic-caller-metadata).
+
+### Procedure result type queries
+
+Derive one result’s type or a named record of several result types.
+
+**Thor**
+
+<!-- readme-example: procedure-result-type-queries:thor -->
+```odin
+import ti "thor:intrinsics"
+calculate :: proc(x: int) -> (value: int, valid: bool) { return x, x > 0 }
+Result :: ti.result_type_of(calculate(3))
+result := Result{3, true}
+fmt.println(result.value, result.valid)
+```
+
+**Odin**
+
+<!-- readme-example: procedure-result-type-queries:odin -->
+```odin
+Result :: struct { value: int, valid: bool }
+result := Result{3, true}
+fmt.println(result.value, result.valid)
+```
+
+The query does not execute the call or its arguments. One result yields its exact type; several yield a struct with result names, or `v0`, `v1`, etc. No-result calls are errors. The Odin example defines the record manually; Thor derives and checks it against the actual procedure.
+
+[Result-type query reference](runtime/intrinsics/README.md).
+
+### Compile-time execution
+
+Evaluate eligible known-argument `fn` calls automatically, or request execution with `#run`.
+
+**Thor**
+
+<!-- readme-example: compile-time-execution:thor -->
+```odin
+square :: fn(x: int) -> int { return x*x }
+ordinary :: proc(x: int) -> int { return x+1 }
+SIZE :: square(4)
+NEXT :: #run ordinary(SIZE)
+values: [SIZE]int
+fmt.println(len(values), NEXT)
+```
+
+There is no equivalent Odin language facility for executing these procedure calls as constants. Thor verifies dependencies and effects, executes native helpers, and caches contents-only results. Required work cannot silently fall back to runtime. Supported allocated results materialize independent runtime owners; constants use their documented borrowed-storage rules. Runtime bindings, including `:>`, are not automatically constant inputs. Debug builds leave optional calls at runtime; required constants and `#run` still evaluate. Evaluation currently uses the host target.
+
+[Execution, caches and ownership](docs/language-guide.md#pure-functions-and-compile-time-execution).
+
+### Runtime barriers and evaluation modes
+
+Choose optional compile-time work and mark calls that should stay at runtime.
+
+**Thor**
+
+<!-- readme-example: runtime-barriers-and-evaluation-modes:thor -->
+```odin
+square :: fn(x: int) -> int { return x*x }
+value := #runtime square(4)
+fmt.println(value)
+```
+
+**Odin**
+
+<!-- readme-example: runtime-barriers-and-evaluation-modes:odin -->
+```odin
+square :: proc(x: int) -> int { return x*x }
+value := square(4)
+fmt.println(value)
+```
+
+`#runtime` blocks Thor’s optional evaluator; Odin may still optimize the generated call. `--comptime=required` keeps required work and explicit `#run`; `normal` also folds eligible `fn` calls; `aggressive` also folds eligible allocation-free ordinary calls; `override` additionally overrides `#runtime`. None permits impure compile-time execution.
+
+[Mode eligibility and failure behavior](docs/comptime-modes.md).
+
+### Compile-time switches
+
+Select statements or values using `#switch` and leave inactive arms unchecked.
+
+**Thor**
+
+<!-- readme-example: compile-time-switches:thor -->
+```odin
+MODE :: 2
+VALUE :: #switch MODE { case 1: 10; case: 20 }
+fmt.println(VALUE)
+```
+
+**Odin**
+
+<!-- readme-example: compile-time-switches:odin -->
+```odin
+MODE :: 2
+VALUE :: 10 when MODE == 1 else 20
+fmt.println(VALUE)
+```
+
+Statement-form `#switch` corresponds to an Odin `when` / `else when` chain. Selectorless arms use compile-time Boolean conditions in order. Value forms need their required results/default. Native Odin `when` remains available directly; Thor does not add a `#if` preprocessor.
+
+[Compile-time branch selection](docs/attributes-and-directives.md#dir-switch).
+
+## Ownership and contracts
+
+### Immutable bindings and views
+
+Initialize once at runtime with `:>` and prevent writes through that binding.
+
+**Thor**
+
+<!-- readme-example: immutable-bindings-and-views:thor -->
+```odin
+number := 3
+value :> number+1
+values :> [10, 20]
+fmt.println(value, values[0])
+```
+
+**Odin**
+
+<!-- readme-example: immutable-bindings-and-views:odin -->
+```odin
+number := 3
+value := number+1
+values := [2]int{10, 20}
+fmt.println(value, values[0])
+```
+
+The Odin code reproduces the values, not the write restrictions. Thor also supports `name: Type > expression`. Records/fixed arrays protect directly stored subobjects; slices become read-only views. Existing writable aliases may still change shared backing storage. Pointer targets and dynamic-array contents retain their documented native behavior. `:>` is not a compile-time constant or a general ownership guarantee.
+
+[Immutability, aliases and storage](docs/slice-access.md).
+
+**Rejected in Thor**
+
+<!-- readme-example: immutable-write-rejected:thor -->
+```odin
+value :> 3
+value = 4
+```
+
+### Read-only and writable slice parameters
+
+Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
+
+**Thor**
+
+<!-- readme-example: read-only-and-writable-slice-parameters:thor -->
+```odin
+copy_values :: proc(#ro source, #mut destination: []int) { copy(destination, source) }
+source :> []int{1, 2}
+destination := make([]int, 2)
+defer delete(destination)
+copy_values(source, destination)
+fmt.println(destination)
+```
+
+**Odin**
+
+<!-- readme-example: read-only-and-writable-slice-parameters:odin -->
+```odin
+copy_values :: proc(source, destination: []int) { copy(destination, source) }
+source := []int{1, 2}
+destination := make([]int, 2)
+defer delete(destination)
+copy_values(source, destination)
+fmt.println(destination)
+```
+
+`#ro` prevents writes through the parameter, even with writable caller storage. `#mut` requires a writable view and applies to the next name only; omitted requirements are inferred from use and transitive calls. Returned/stored aliases retain permissions. These are Thor compile-time checks, not qualifiers carried in Odin’s native slice representation.
+
+[Slice access and alias propagation](docs/slice-access.md).
+
+### Scoped owners
+
+Attach shallow end-of-scope cleanup to a local declaration with `~`.
+
+**Thor**
+
+<!-- readme-example: scoped-owners:thor -->
+```odin
+values~ := make([]int, 3)
+values[0] = 7
+fmt.println(values)
+```
+
+**Odin**
+
+<!-- readme-example: scoped-owners:odin -->
+```odin
+values := make([]int, 3)
+defer delete(values)
+values[0] = 7
+fmt.println(values)
+```
+
+Both `values~ :=` / `values ~:=` and the `:>` variants work. Cleanup reads the final binding and retains the correct allocator. Supported owners include pointers, slices, strings, dynamic arrays, maps, sets and logical numbers. Cleanup is shallow; nested allocations and graph roots need their own cleanup. Tracked escaping owners/views are rejected, but this is not a complete memory-safety proof.
+
+[Supported owners, escapes and allocator rules](docs/scoped-owners.md).
+
+### Arbitrary-precision numbers
+
+Use predefined `Integer` and exact `Rational` values, literals and operators.
+
+**Thor**
+
+<!-- readme-example: arbitrary-precision-numbers:thor -->
+```odin
+import "thor:big"
+whole: Integer = 123456789012345678901234567890
+fraction: Rational = 1.25
+defer delete(whole)
+defer delete(fraction)
+a := big.to_string(whole)
+b := big.to_string(fraction)
+defer delete(a)
+defer delete(b)
+fmt.println(a, b)
+```
+
+**Odin**
+
+<!-- readme-example: arbitrary-precision-numbers:odin -->
+```odin
+import "thor:big"
+whole, ok := big.parse_integer("123456789012345678901234567890")
+if !ok { panic("invalid integer") }
+fraction := big.fraction(5, 4)
+defer big.destroy(&whole)
+defer big.destroy(&fraction)
+a := big.to_string(whole)
+b := big.to_string(fraction)
+defer delete(a)
+defer delete(b)
+fmt.println(a, b)
+```
+
+The Odin version uses Thor’s ordinary Odin runtime library. Thor adds exact unquoted literals, constructors, arithmetic/comparisons, Integer bitwise operations, read-only numeric components, formatting and `fn`/`#run` support. Direct numeric copies own independent storage and replacement cleans up the old value; whole aggregates remain shallow. Delete runtime owners, not borrowed constants. Native Odin must clone owning numeric headers explicitly.
+
+[Language and ownership reference](docs/arbitrary-precision.md), [native runtime API](runtime/big/README.md).
+
+### Allocation-free contracts
+
+Check `@(no_alloc)` procedures or an entire `#+vet no_alloc` file.
+
+**Thor**
+
+<!-- readme-example: allocation-free-contracts:thor -->
+```odin
+@(no_alloc)
+sum :: proc(values: []int) -> int {
+    total := 0
+    for value in values { total += value }
+    return total
+}
+values := [1, 2, 3]
+fmt.println(sum(values[:]))
+```
+
+**Odin**
+
+<!-- readme-example: allocation-free-contracts:odin -->
+```odin
+sum :: proc(values: []int) -> int {
+    total := 0
+    for value in values { total += value }
+    return total
+}
+values := [3]int{1, 2, 3}
+fmt.println(sum(values[:]))
+```
+
+Odin executes the same algorithm without this checked contract. Thor checks ordinary explicit/transitive call paths conservatively; runtime-capacity guesses do not exempt operations such as `append`. Fatal panic/trap reporting is excluded. Supported fixed-buffer I/O and formatting can be allocation-free. No runtime allocation tracker is added by the contract.
+
+[Contract and panic-path boundaries](docs/no-alloc.md), [fixed-buffer I/O](examples/no_alloc_io/demo.thor).
+
+**Rejected in Thor**
+
+<!-- readme-example: no-alloc-rejected:thor -->
+```odin
+@(no_alloc)
+allocate :: proc() { values := make([]int, 2); defer delete(values) }
+allocate()
+```
+
+### Unused declaration contracts
+
+Mark declarations intentionally unused and reject later references to them.
+
+**Thor**
+
+<!-- readme-example: unused-declaration-contracts:thor -->
+```odin
+@(unused)
+reserved :: 64
+fmt.println("ready")
+```
+
+**Odin**
+
+<!-- readme-example: unused-declaration-contracts:odin -->
+```odin
+reserved :: 64
+_ = reserved
+fmt.println("ready")
+```
+
+`@(unused)` suppresses the tagged declaration’s unused warning and makes reads, writes, aliases, address-taking and type queries on it errors. Its initializer still runs and retains normal cleanup requirements. The Odin discard only suppresses unused advice; it does not forbid later use.
+
+[Unused attribute rules](docs/attributes-and-directives.md#attr-unused).
+
+**Rejected in Thor**
+
+<!-- readme-example: unused-use-rejected:thor -->
+```odin
+@(unused)
+reserved :: 64
+fmt.println(reserved)
+```
+
+### Local vet suppressions
+
+Silence selected vet advice on one declaration using named enum options.
+
+**Thor**
+
+<!-- readme-example: local-vet-suppressions:thor -->
+```odin
+@(vet_ignore={.immutable})
+value := 4
+fmt.println(value)
+```
+
+**Odin**
+
+<!-- readme-example: local-vet-suppressions:odin -->
+```odin
+value := 4
+fmt.println(value)
+```
+
+`@(vet_ignore={.immutable, .pure})` selects multiple checks. Dedicated `.lifetime_unknown` and `.leak_unknown` options acknowledge intentional unverified cases; definite memory findings retain their own rules. Suppressions do not bypass type checking, immutability, purity or `no_alloc` contracts. TLS completes the option names after `.`.
+
+[Suppression options](docs/attributes-and-directives.md#attr-vet_ignore) and [vet policy](docs/compiler-guide.md#thor-vetting).
 
 ## Basic library
 
-The bundled [`thor:basic` package](runtime/basic/README.md) works from any Thor
-project without additional collection flags. Its canonical source is
-[runtime/basic/basic.thor](runtime/basic/basic.thor):
+`import "thor:basic"` exposes bundled conveniences. This package uses Thor syntax and is consumed with Thor; its ordinary Odin support packages can also be used directly from Odin. All allocating results retain their documented ownership.
 
+### Mapping and filtering
+
+Allocate mapped and filtered slices with polymorphic callbacks inferred from the data.
+
+**Thor**
+
+<!-- readme-example: mapping-and-filtering:thor -->
 ```odin
 import "thor:basic"
-
-// Inside a procedure:
-result := basic.sorted([]int{3, 1, 2})
-defer delete(result)
-basic.print(result)
+twice :: proc(x: $T) -> T { return x*2 }
+positive :: proc(x: $T) -> bool { return x > 0 }
+values := []int{-1, 0, 3}
+mapped := basic.fmap(values, twice)
+kept := basic.filter(values, positive)
+defer delete(mapped)
+defer delete(kept)
+fmt.println(mapped, kept)
 ```
 
-Use `import "thor:basic" / sorted, print` for selected unqualified names.
-Use these forms to expose every public name, or select names without also
-introducing the package namespace:
+**Odin**
 
+<!-- readme-example: mapping-and-filtering:odin -->
 ```odin
-import * "thor:basic"                // All public names; basic.name also works.
-// Alternatively:
-import _ "thor:basic" / sorted, print // Only sorted and print; no basic namespace.
+values := []int{-1, 0, 3}
+mapped := make([]int, len(values))
+buffer := make([dynamic]int)
+for value, i in values {
+    mapped[i] = value*2
+    if value > 0 { append(&buffer, value) }
+}
+kept := make([]int, len(buffer))
+copy(kept, buffer[:])
+delete(buffer)
+defer delete(mapped)
+defer delete(kept)
+fmt.println(mapped, kept)
 ```
 
-The unqualified names are local to the importing file. They are not re-exported,
-and private declarations and internal imports stay hidden. Wildcard imports
-preserve live access to exported variables, including assignments. Local
-variables may shadow imported names; conflicting file-scope declarations and
-imports are errors. Public names in conditional branches reserve their names
-even when inactive, so two wildcard imports with overlapping potential exports
-are rejected. An unused conditional export is not forced to exist.
+Argument order is data first: `fmap(values, callback)` and `filter(values, predicate)`. Order is preserved; results own their outer slices and copies are shallow. `fmap` retains the input element type. Empty inputs are supported, and no extra callback annotation is needed for polymorphic procedures.
 
-Run the [import walkthrough](examples/imports/demo.thor) with
-`thor run /path/to/thor/examples/imports`.
-Run the [commented example](examples/basic/demo.thor) with
-`thor run /path/to/thor/examples/basic`.
+[Basic API](runtime/basic/README.md).
 
-`basic.deepclone(&source)` returns an independently allocated graph root and an
-error, preserving cycles, shared storage and interior references.
-`basic.deepfree(root)` releases it once. See the [ownership contract](docs/deepclone.md)
-and [graph-copy demo](examples/deepclone/demo.thor); these are library procedures
-and require no changes to the Thor/Odin compilers.
+### Parallel mapping
 
-For allocations that all share a block's lifetime:
+Run a mapping callback with bounded workers and ordered results.
 
+**Thor**
+
+<!-- readme-example: parallel-mapping:thor -->
 ```odin
+import "thor:basic"
+square :: proc(x: $T) -> T { return x*x }
+main :: proc() {
+    results := basic.pmap([]int{2, 3, 4}, square)
+    defer delete(results)
+    fmt.println(results)
+}
+```
+
+**Odin**
+
+<!-- readme-example: parallel-mapping:odin -->
+```odin
+import "core:thread"
+Job :: struct { input, output: int }
+worker :: proc(t: ^thread.Thread) {
+    job := cast(^Job)t.data
+    job.output = job.input*job.input
+}
+main :: proc() {
+    jobs := [3]Job{{input=2}, {input=3}, {input=4}}
+    threads: [3]^thread.Thread
+    for &job, i in jobs {
+        threads[i] = thread.create(worker)
+        if threads[i] == nil { panic("thread creation failed") }
+        threads[i].data = &job
+        thread.start(threads[i])
+    }
+    for t in threads { thread.join(t); thread.destroy(t) }
+    results: [3]int
+    for job, i in jobs { results[i] = job.output }
+    fmt.println(results)
+}
+```
+
+The small Odin example shows explicit threads, not pmap’s scheduler implementation. `pmap` uses bounded workers, joins before returning, preserves result order, and retains a runtime callback fallback. One callback input receives the whole element; several use struct fields in order; zero inputs use empty structs. One result yields `[]T`; several yield result structs with named fields or `v0`, `v1`, etc.; no results cannot be assigned. `result_type=Result` overrides result names/type mapping. Inputs and results are shallow; worker allocations and shared mutable state need their normal ownership/synchronization. Eligible `#run` mappings use the compile-time execution path.
+
+[Inputs, specialization, scheduling, RNG and allocators](runtime/parallel/README.md).
+
+### Sorted copies
+
+Sort an allocated copy while keeping the input unchanged.
+
+**Thor**
+
+<!-- readme-example: sorted-copies:thor -->
+```odin
+import "thor:basic"
+values := []int{3, 1, 2}
+ordered := basic.sorted(values)
+defer delete(ordered)
+fmt.println(ordered, values)
+```
+
+**Odin**
+
+<!-- readme-example: sorted-copies:odin -->
+```odin
+import "core:slice"
+values := []int{3, 1, 2}
+ordered := make([]int, len(values))
+copy(ordered, values)
+slice.sort(ordered)
+defer delete(ordered)
+fmt.println(ordered, values)
+```
+
+Pass a comparator for records or alternate ordering. The returned outer slice is owned by the caller; referenced element storage is still shallow.
+
+[Sorting API](runtime/basic/README.md).
+
+### Scoped arenas
+
+Use one growing arena for allocations with the same block lifetime.
+
+**Thor**
+
+<!-- readme-example: scoped-arenas:thor -->
+```odin
+import "thor:basic"
 {
     context.allocator = basic.scoped_arena()
-    values := make([]int, 100)
-    text := f"Created {len(values)} values"
-    basic.print(text)
+    values := make([]int, 10)
+    fmt.println(len(values))
 }
-// The arena is destroyed and the enclosing allocator restored.
 ```
 
-The arena uses Odin's native caller-scope deferred cleanup, including early
-returns. Keep its allocations within that scope; explicit allocator choices and
-`context.temp_allocator` retain their usual behavior. See the
-[scoped arena contract](runtime/basic/README.md#scoped-arena-allocations).
+**Odin**
 
-Use `nums~ := make([]int, 5)` for a single local with automatic shallow
-cleanup. Both `:=` and `:>` are supported. See [scoped owners](docs/scoped-owners.md)
-and the [runnable example](examples/scoped_owners/main.thor).
-
-`basic.hash(value)` returns a runtime `u64` value hash without allocating.
-Select `.XXH64` or `.FNV64a` with `algorithm=`, or use the default `.XXH3_64`.
-`basic.try_hash(value)` returns `(hash, Hash_Error)` for recoverable failures.
-Strings/ordered containers hash contents, structs ignore padding, and pointers
-hash addresses. See the [hashing contract](runtime/hash/README.md).
-
-`basic._string(value, allocator=...)` returns owned text and an optional
-`runtime.Allocator_Error`. It supports numeric values including `Integer` and
-`Rational`, bools, enums, runes, strings/cstrings, and byte/rune sequences:
-
+<!-- readme-example: scoped-arenas:odin -->
 ```odin
-text := basic._string([]rune{'a', '界', '😀'}) or_panic
+import "core:mem/virtual"
+{
+    arena: virtual.Arena
+    err := virtual.arena_init_growing(&arena)
+    if err != nil { panic("arena initialization failed") }
+    defer virtual.arena_destroy(&arena)
+    context.allocator = virtual.arena_allocator(&arena)
+    values := make([]int, 10)
+    fmt.println(len(values))
+}
+```
+
+The helper uses Odin’s caller-scope deferred cleanup. Allocations must not escape the block. Early returns, breaks and continues perform normal scoped cleanup; explicit allocator choices and `context.temp_allocator` remain separate. This is a library convenience, not general lifetime proof.
+
+[Arena lifetime and allocator rules](runtime/basic/README.md#scoped-arena-allocations).
+
+### Deep graph copies
+
+Clone supported reachable data while preserving cycles, sharing and interior references.
+
+**Thor**
+
+<!-- readme-example: deep-graph-copies:thor -->
+```odin
+import "thor:basic"
+source := [1, 2]
+cloned, err := basic.deepclone(&source)
+if err != .None { panic("clone failed") }
+defer { release_err := basic.deepfree(cloned); if release_err != .None { panic("free failed") } }
+cloned^[0] = 9
+fmt.println(source[0], cloned^[0])
+```
+
+**Odin**
+
+<!-- readme-example: deep-graph-copies:odin -->
+```odin
+import "thor:graph"
+source := [2]int{1, 2}
+cloned, err := graph.deepclone(&source)
+if err != .None { panic("clone failed") }
+defer { release_err := graph.deepfree(cloned); if release_err != .None { panic("free failed") } }
+cloned^[0] = 9
+fmt.println(source[0], cloned^[0])
+```
+
+The Odin version calls the same ordinary Odin support package. `deepclone` returns an owned graph root plus an error; release it once with `deepfree` using the matching allocator. Preserve its documented ownership boundaries and reachability. `~` shallow cleanup is not a substitute for `deepfree`.
+
+[Supported graph shapes and ownership](docs/deepclone.md).
+
+### Allocation-free value hashing
+
+Hash supported logical contents without allocating.
+
+**Thor**
+
+<!-- readme-example: allocation-free-value-hashing:thor -->
+```odin
+import "thor:basic"
+first := [1, 2]
+second := [1, 2]
+fmt.println(basic.hash(first) == basic.hash(second))
+```
+
+**Odin**
+
+<!-- readme-example: allocation-free-value-hashing:odin -->
+```odin
+import hashing "thor:hash"
+first := [2]int{1, 2}
+second := [2]int{1, 2}
+fmt.println(hashing.hash(first) == hashing.hash(second))
+```
+
+The native Odin package provides the same API. Struct padding, allocator metadata and spare capacity are ignored. Pointers hash addresses; unsupported/cyclic data is rejected. `try_hash` returns a recoverable error. Algorithms include XXH3_64, XXH64 and FNV64a.
+
+[Hashing contract](runtime/hash/README.md).
+
+### Named zip views
+
+Give parallel slices field names without allocating a new array of records.
+
+**Thor**
+
+<!-- readme-example: named-zip-views:thor -->
+```odin
+import "thor:basic"
+names := []string{"Ada", "Lin"}
+ages := []int{36, 28}
+people := basic.zip(name=names, age=ages)
+for person in people { fmt.println(person.name, person.age) }
+```
+
+**Odin**
+
+<!-- readme-example: named-zip-views:odin -->
+```odin
+names := []string{"Ada", "Lin"}
+ages := []int{36, 28}
+people := soa_zip(name=names, age=ages)
+for person in people { fmt.println(person.name, person.age) }
+```
+
+`basic.zip` is an alias for native `soa_zip`. It borrows the columns, stops at the shortest column, and retains their slice permissions. Thor also carries those field types and readonly properties through `using` and interpolations.
+
+[Basic library ownership](runtime/basic/README.md).
+
+### Printing conversion and reductions
+
+Use small printing, parsing and collection helpers with explicit ownership.
+
+**Thor**
+
+<!-- readme-example: printing-conversion-and-reductions:thor -->
+```odin
+import "thor:basic"
+number := basic._int("42") or_panic
+values := basic.range(1, 4)
+defer delete(values)
+basic.print(number, basic.sum(values), basic.and(true, false))
+```
+
+**Odin**
+
+<!-- readme-example: printing-conversion-and-reductions:odin -->
+```odin
+import "core:strconv"
+number, ok := strconv.parse_int("42")
+if !ok { panic("invalid integer") }
+values := make([]int, 3)
+for i in 0..<3 { values[i] = i+1 }
+defer delete(values)
+total := 0
+for value in values { total += value }
+fmt.println(number, total, true && false)
+```
+
+Allocating helpers use their supplied allocator or `context.allocator`. Boolean reduction procedures may stop traversing values early, but ordinary call arguments are all evaluated before the procedure starts; use `&&`/`||` for lazy expressions. The table below groups the remaining API, with full contracts in the linked reference.
+
+[Complete basic API](runtime/basic/README.md).
+
+### Formatting helpers
+
+Use the native formatting support package directly when interpolation is not needed.
+
+**Thor**
+
+<!-- readme-example: formatting-helpers:thor -->
+```odin
+import f "thor:format"
+text := f.format(1234567, grouping=true)
 defer delete(text)
+fmt.println(text)
 ```
 
-Strings/bytes are copied; rune sequences are UTF-8 encoded. Scalar formatting
-matches plain interpolation. Failures return empty text and release temporary
-allocations. See the [conversion contract](runtime/basic/README.md#converting-values-to-strings).
+**Odin**
 
-## Optional results with `or_panic`
-
-Use postfix `or_panic` when an optional result must succeed:
-
+<!-- readme-example: formatting-helpers:odin -->
 ```odin
-value := strconv.parse_int("42") or_panic
-entry := records[key] or_panic
-node := item.(^Node) or_panic
-first, second := get_pair() or_panic // Drops only the final status.
-minimum := min(..values) or_panic
+import f "thor:format"
+text := f.format(1234567, grouping=true)
+defer delete(text)
+fmt.println(text)
 ```
 
-Like `or_else panic(...)`, it unwraps optional lookups/assertions and procedure
-results whose final value is a success boolean or a nil-comparable error.
-Booleans succeed when true; error values succeed when nil. The operand executes
-exactly once, at its original expression site; short-circuited expressions stay
-unevaluated. Ordinary type checking and ownership rules still apply. The
-operator does not free the successful result or introduce automatic cleanup of
-user-owned values.
+Both languages can call this ordinary Odin library. It supports grouping, width, alignment and Unicode fills; returned strings belong to the caller. The formatting package also supports explicit native fmt registration for logical numbers.
 
-On failure the ordinary panic handler receives the original `.thor` file, line,
-column, and procedure, plus a message containing the original expression and
-returned error/status. The default handler writes to stderr, for example:
+[Formatting and ownership](docs/language-guide.md#expressions-arrays-and-ranges), [big-number formatting](runtime/big/README.md#language-integration-helpers).
 
-```text
-/path/main.thor(27:13) panic: unexpected failure
-  expression: strconv.parse_int(text)
-  procedure: main
-  error: false
-```
+### More basic helpers
 
-The location remains present with `-disable-assert`; panic is never compiled out.
-The status check itself allocates nothing and formats no text; result allocation
-and numeric-copy ownership retain their usual rules. Only the failure path
-formats the returned error, using the temporary allocator.
-Contextless procedures use a contextless panic; ordinary procedures retain the
-current custom panic handler. `fn` and `#run` use the same unwrap semantics:
-failed evaluations report both the evaluation request and the original failing
-unwrap. `#run` still requires a direct call: put the unwrap inside the called
-procedure rather than writing `#run (operation() or_panic)`. Native `#load`
-retains its own constant-expression restrictions.
-
-TLS supports result types, immutable highlighting, keyword help/completion,
-references/rename, and diagnostics. Original-source debug mapping applies as
-usual. `or_panic` is reserved in Thor; native `.odin` files remain unchanged.
-
-## Multiple-value `or_else` defaults
-
-Optional operations with several successful results can use a parenthesized
-fallback list. Discarded positions must match the assignment targets:
-
-```odin
-_, cores :> info.cpu_core_count() or_else (_, 1)
-number, text := read_pair() or_else (7, "fallback")
-```
-
-The operation executes once; defaults execute in order only on failure. Each
-slot retains its corresponding result type, ownership, and slice permissions.
-The fallback list itself does not allocate. See the
-[complete rules](docs/or-else-fallback-lists.md) and
-[runnable example](examples/or-else-lists/or_else_lists.thor).
-
-## Spread minimum and maximum
-
-Thor extends Odin's builtins with fixed-array expansion and slice spreading:
-
-```odin
-a := [?]int{1, 2, 3}
-maximum := max(**a)         // int: 3
-minimum, ok := min(..a[:]) // int: 1, bool: true
-lowest := min(..a[:])      // The presence flag is optional.
-
-empty: []int
-missing, found := min(..empty) // 0, false
-fallback, valid := max(7, ..empty) // 7, true
-```
-
-Every call containing a slice spread returns `(value, ok)` with Odin's
-`#optional_ok` behavior. `ok` reports whether the whole call has at least one
-candidate, including scalar starting values. Empty slices without starting values
-return the element type's zero value and false. `or_else` and `or_return` work
-with the status. A fixed-array expansion produces a single value; expanding a
-zero-length array is a compile error.
-
-Arguments execute once in source order. Fixed-array expansion snapshots its
-elements; a slice borrows its backing storage. Reductions allocate no heap
-storage or mutate their inputs. Results preserve the element type. Untyped scalar
-literals can adapt to it; typed mismatches are errors. Ordered numbers, strings,
-enums and their distinct aliases retain native comparison semantics. Selected
-strings remain borrowed from the input.
-
-Scalar calls such as `min(x,y)` and type limits such as `max(int)` retain their
-native behavior. User-defined procedures named min/max remain ordinary calls.
-Immutable aliases of the actual builtins and `core:math.min/max` also support the
-new forms. Declared `fn`/`#run` bodies can reduce sequences, and required constants
-with known inputs are evaluated. The existing single-result compile-time rule
-still applies: return a record containing both value and status from a function
-when both must be retained at compile time.
-
-Run the [commented example](examples/extrema/demo.thor) with
-`./thor run examples/extrema`.
-
-## Compilation and Odin flags
-
-Thor uses Odin as its native backend. For a single-file build:
-
-```sh
-./thor build path/to/my_file.thor -o:speed -debug -out:my_program
-```
-
-1. Thor parses the original files with its shared Odin/Thor frontend and checks
-   Thor-specific rules.
-2. Required compile-time work, including `#run` and eligible known-argument `fn`
-   calls, is evaluated. This can compile and run temporary native Odin helpers;
-   successful results can be reused from the evaluation cache.
-3. Thor writes generated `.odin` files, source maps and a manifest into
-   the hidden build directory. Imported project packages are mirrored there too.
-4. Thor invokes Odin on the generated file, automatically supplying `-file` for
-   a single-file input. Odin performs native checking, code generation and linking.
-5. Thor translates compiler diagnostics back to the original source locations.
-   A successful build leaves the executable at `my_program` in this example.
-
-Generated files retain the original relative layout inside the output tree;
-`my_file.odin` is not written over or beside the original `my_file.thor`. Use
-`--output-dir /tmp/generated` to choose the generated tree's location. Without
-`-out:...`, `thor build` names the executable after the working directory and
-places it there (`.exe` is appended on Windows). For example, running
-`thor build .` inside `thor-playground` produces `./thor-playground`. This also
-applies when building a source elsewhere or using `--output-dir`. Set `-out:path`
-to choose the artifact's name and location. Building from the Thor checkout
-requires a different output name, such as `-out:demo-program`, to protect the
-existing `thor` launcher.
-`run` and `test` keep their temporary executables under the generated output tree.
-Odin's other native build modes can be selected with `-build-mode:...`.
-
-The source path defaults to `.` for commands that operate on existing source:
-`thor build`, `thor run -debug`, `thor vet --apply` and `thor test` use the current
-working directory. Explicit file and directory paths still work, including with
-options before the path. Thor does not search parent directories for a project.
-`thor run -- argument1 argument2` passes those arguments to the current project's
-program. Bare `thor` shows help, and `thor new` requires a project name.
-
-| Thor command | Work after parsing and compile-time evaluation |
+| Family | Helpers and behavior |
 | --- | --- |
-| `transpile` | Write the generated Odin tree and print its entry path; skip final Odin checking/building. |
-| `check` | Ask Odin to check the generated source. |
-| `build` | Ask Odin to build the requested artifact; an executable by default. |
-| `run` | Build an executable, then run it. |
-| `test` | Build with Odin's `-build-mode:test`, then run the test executable. |
-| `publish` | Build and package a local macOS app, Windows ZIP or Linux archive with resources, icon and native dependencies. |
+| Output and reflection | `print`, `type`, `size`; separators/terminators and value type/byte-size queries. |
+| Parsing and conversion | `_int`, `_uint`, `_i8`…`_i128`, `_u8`…`_u64`, `_f32`, `_f64`, `_bool`, `_string`; checked parsing or owned text. |
+| I/O | `input`, `read`, `write`; line/file input and file output with status results. Free owned input text. |
+| Strings | `split`, `join`; split returns borrowed views in an owned outer slice, join returns owned text. |
+| Collections | `swap` exchanges pointed-to values; `clone` is shallow; `to_set`/`to_slice` allocate outer containers; `range` allocates integer sequences. |
+| Reductions | `and`, `or`, `sum`; Boolean identities and native numeric arithmetic. |
+| Unicode | `chr`, `ord`; single Unicode-scalar conversions with input restrictions. |
+| Randomness | `random(T, lo, hi, gen)`; inclusive bounds and an optional generator. |
+| Tables | `table`; owned formatted text for struct rows, with heading tags and alignment. |
 
-For distributable applications use `thor publish .`. It includes `assets/`
-automatically, discovers `assets/icon.png` or `assets/icon.ico`, and reads optional
-`[publish]` settings from `thor.toml`. GUI mode is the default: macOS launches the
-executable directly, Windows selects the GUI subsystem, and Linux desktop metadata
-disables the terminal. Use `--app-type console` when a terminal is wanted. See the
-[publishing guide](docs/publishing.md) and [example](examples/publish/README.md).
-Published executables default to `-o:speed`; an explicit `-o:...` flag overrides
-that setting. Ordinary build/run/test optimization defaults are unchanged.
+See the [complete API and ownership rules](runtime/basic/README.md). Pass custom allocators consistently when constructing and freeing owned data. Basic convenience functions do not introduce general garbage collection.
 
-`run` and `test` remove their executable afterward unless `-keep-executable` is
-passed. Generated sources remain available for inspection. Source-map files are
-saved for `-debug` builds and the explicit `transpile` command; ordinary compiler
-diagnostics use mappings held in memory.
+<a id="commands"></a>
 
-Thor forwards flags it does not handle itself to the final Odin invocation.
-Use Odin's usual `-flag:value` spelling, including `-o:speed`, `-debug`,
-`-define:NAME=value`, `-out:path`, and `-target:os_arch`. Values containing spaces
-must remain part of the same quoted argument. Thor does not reproduce Odin's
-complete flag catalog; Odin validates forwarded flags, and compatibility with
-every option is not guaranteed. Thor exposes the commands above rather
-than forwarding arbitrary Odin subcommands.
+<a id="compilation-and-odin-flags"></a>
 
-A few options receive additional handling:
+## Compiler commands
 
-- `-collection:name=path` is rewritten to the corresponding generated package
-  location. Source-relative assets keep their original resource paths.
-- Diagnostics normally use Odin's JSON output internally, followed by Thor's
-  source mapping. `-json-errors` requests mapped JSON; `--raw-diagnostics`
-  exposes the unmodified backend diagnostics.
-- Defines and relevant native options also reach compile-time helpers. Options
-  for the final artifact, such as `-out:` and `-build-mode:`, are omitted from
-  helper builds. Helpers execute natively; a cross-target build requiring Thor
-  compile-time execution currently reports an unsupported-target error.
+Commands accept a package directory or a single file. Original sources are preserved; generated Odin and caches live separately.
 
-Thor caches compile-time execution results and per-file parser output. Every
-invocation discovers the current source files, performs fresh Thor analysis,
-regenerates project Odin and in-memory source maps, and runs the requested Odin check or build.
-There is no whole-project or generated-output cache.
-Common native libraries are read from the installation. Project-independent Thor
-library translations live under the installation's `lib/`; checked or
-configuration-dependent versions remain in the project.
+| Command | Purpose |
+| --- | --- |
+| `thor new app` | Create a project with editor/run/debug configuration. |
+| `thor check .` | Check Thor contracts and native Odin types. |
+| `thor build . -o:speed` | Build an executable or a selected native build mode. |
+| `thor run . -- args` | Build and run, forwarding program arguments after `--`. |
+| `thor test .` | Build and run native `@(test)` procedures. |
+| `thor transpile .` | Emit the generated Odin tree for inspection. |
+| `thor vet .` | Check conventions, contracts and memory findings. |
+| `thor migrate path/to/odin/project` | Create and validate a Thor copy of an Odin project. |
+| `thor publish .` | Produce a distributable application/archive. |
+| `thor help` / `thor help build -full` | Show command and extended flag help. |
 
-Compile-time results and parser output share a bounded per-user cache
-(or the cache root selected by `--cache-dir` or `THOR_CACHE_DIR`). Records contain
-typed values and dependency metadata. Dependency checks cover
-called bodies, declarations, bindings, types, imports, attributes, library sources,
-resources and compiler configuration. Toolchain contents are hashed once per
-invocation when compile-time result reuse needs their identity. Resource reuse
-checks file contents and directory membership, including same-size edits with
-unchanged timestamps.
+Native flags keep Odin’s `-flag:value` spelling, including `-debug`, `-o:speed`, `-target:…`, `-define:NAME=value` and collection flags. Thor options such as `--comptime=aggressive` control the transpiler. `--run-timeout SEC` bounds compile-time execution. Diagnostics and debugger maps point back to original source.
 
-Verified scalar `#run` sites can reuse results before constructing temporary
-helpers. Adding an unrelated local variable or moving a call does not change its
-calculation. Native type witnesses still check the original call in generated
-Odin, preserving overload, privacy and nominal-type errors. Generic, aggregate,
-conditional, `using` and overlay cases retain the conservative helper path when
-these early checks cannot establish reuse. Dynamic resource paths bypass result
-caching when their inputs cannot be established safely.
-
-The cache lives in `~/Library/Caches/Thor` on macOS, `$XDG_CACHE_HOME/thor`
-(or `~/.cache/thor`) on Linux, and `%LOCALAPPDATA%/Thor/cache` on Windows.
-Its managed records have a combined **512 MiB** budget, shared across projects,
-with automatic eviction. Parser records are keyed by source contents, parser binary
-and relevant parsing options.
-Editing one file reuses parsing of unchanged imports; each consumer constructs
-fresh syntax objects and performs fresh analysis. Editor overlays participate
-using their actual text. Errors are not cached.
-
-`--cache-report` prints `thor_cache` evaluation counters and `thor_prepared_hits`
-for results reused before helper construction; one early hit can cover nested
-calculations too. `--no-cache` bypasses result, parser and memory-vet caches.
-`--clear-cache` clears their entries before compiling. Memory vet can reuse
-unchanged checks after validating dependency contents, flags and resources;
-see [memory-check reuse](docs/lifetime-vet.md#reusing-unchanged-checks). The former
-`--no-transpile-cache` option was removed with the whole-project cache.
-
-Thor's own options use long names, such as `--output-dir`, `--odin`,
-`--run-timeout`, `--no-cache`, and `--cache-report`. Run `./thor` for a short
-overview and common options, `./thor help` for the usual Thor options grouped by
-command, or `./thor help build` for one command’s options. Add `-full` to include
-all compatible native compiler options: `./thor help -full` or
-`./thor help build -full`. Odin’s `-help` spelling remains accepted; `-h` and
-`--help` have been removed. [The CLI guide](docs/cli.md) describes command
-compatibility, source-facing tools, and reporting.
-`--odin /path/to/odin` or `THOR_ODIN` selects the Odin executable.
-Compile-time helper execution is unlimited by default. `--run-timeout 0`
-explicitly selects unlimited execution. A positive value, such as
-`--run-timeout 10`, sets a deadline for each compile-time execution.
-
-Arguments after `--` are passed to the executable by `run` or `test`:
-
-```sh
-./thor run path/to/my_file.thor -o:speed -- first_argument "two words"
-```
-
-## VS Code and TLS
-
-The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T23 features. Build the server and extension from this repository:
-
-```sh
-python3 tools/build_tls.py
-cd editors/vscode
-npm ci
-npm test
-npm run package
-```
-
-In VS Code, run **Extensions: Install from VSIX** and select
-`editors/vscode/thor-language.vsix`. Reopen a `.thor` file or reload the window.
-The supplied `.vscode/settings.json` points to the local TLS executable. Use
-**Thor: Restart Language Server** after rebuilding it. From another workspace,
-set `tls.server.path` to the absolute path of `tls/bin/tls`.
-
-The extension provides a Thor grammar, snippets, brackets/comments, and a TLS
-client. TLS provides completion, hover, definitions, semantic highlighting,
-symbol renaming, and live parser/compiler diagnostics on original, unsaved Thor
-text. The client
-finds the `thor` compiler launcher alongside the local TLS checkout; use
-`tls.compiler.path` for another location. Use **Rename Symbol** in the context menu
-or **F2** to rename a resolved source identifier. Formatting, automatic imports,
-and Thor code actions remain disabled. Existing
-Odin support continues to handle `.odin` files.
-
-Additional editor checks:
-
-```sh
-python3 tools/build_tls.py test
-python3 tools/test_vscode.py
-```
-
-The VS Code test uses a temporary editor profile. See [TLS's notes](tls/THOR.md)
-for the pinned upstream revision, semantic-resolution limits, and configuration.
-For the startup sequence, local installation model, LSP communication and the two
-highlighting layers, see [how the VS Code extension works](editors/vscode/README.md#how-vs-code-launches-tls).
-
-## Create, run and debug a project
-
-With this checkout on PATH and the local Thor Language extension installed:
-
-```sh
-thor new my_project          # Create ./my_project
-thor new my_project --open   # Also open VS Code
-mkthor my_project            # Create ~/Code/Thor/my_project and open VS Code
-```
-
-Creation writes just `my_project.thor`, `.vscode/tasks.json`, and
-`.vscode/launch.json`. No package manifest, README, local library copy or TLS
-settings file is needed. The default source comes from the editable shared
-[templates/main.thor](templates/main.thor), initially copied from your Desktop
-`new.thor`. Project creation does not invoke Odin or build caches.
-
-**Cmd+R** runs the project in VS Code's integrated terminal; **Cmd+Shift+R**
-builds with debugging and starts CodeLLDB. Use **Ctrl+R / Ctrl+Shift+R** elsewhere.
-Both commands save edits first. **F5** also starts debugging. The shortcuts apply
-to Thor editors and leave existing Odin shortcuts alone. Both shortcuts target
-the active file's containing directory, including projects nested inside a
-larger workspace. Cmd+R reuses the active integrated terminal, changes directory
-if necessary, and runs `thor run .` with its existing shell environment. If the
-terminal already reports that directory, only `thor run .` is sent; otherwise
-a shell condition avoids a redundant `cd`. If no live terminal exists, it opens
-one directly in that directory. Normal runs include sibling source files and
-do not launch VS Code tasks. Cmd+Shift+R builds and launches the debugger in that
-same source directory, using matching local executable and source-map paths.
-
-Install **CodeLLDB** (`vadimcn.vscode-lldb`) as well as the locally built Thor
-extension. Rebuild/install the VSIX and reload VS Code after updating from an
-older extension. `mkthor` itself is an executable beside `thor`, so the same PATH
-entry makes both commands available. Other creation options include:
-
-```sh
-thor new my_project --parent /path/to/projects
-thor new my_project --template /path/to/starter.thor
-thor new my_project --gitignore # Optional fourth file for build output/caches
-mkthor my_project --parent /path/to/projects
-mkthor my_project --no-open
-mkthor my_project --odin /path/to/odin
-```
-
-The generated task runs `thor build . -debug -o:none`, keeps the executable in
-`.vscode/bin/debug`, and writes the matching generated sources/maps beneath
-`.vscode/bin/generated/`. Tasks record the Thor installation's launcher path;
-TLS discovers the shared installation. The optional `--odin` selects an Odin
-executable for the debug build task; normal runs use the terminal's environment.
-Existing folders and symlinks are never
-overwritten. Platform/test filename suffixes retain Odin's native filtering;
-the creator warns about names such as `example_linux` instead of silently
-changing the requested filename. Use a neutral name for a portable starter.
-
-On native macOS, debug executable builds also enable allocation tracking and
-AddressSanitizer, with runtime reports mapped to the original Thor source even
-when the executable is launched directly. Use `--track-allocations=off` and/or
-`--no-sanitize` to disable them; `--track-allocations=trace` adds allocation call
-stacks. Normal builds and debugging on other platforms retain their existing
-behavior. See [memory debugging](docs/memory-debugging.md) for ownership,
-configuration and tool dependencies.
-
-The `thor-lldb` debug adapter reads those maps and uses ordinary Odin and CodeLLDB.
-Breakpoints, stack frames, Step Over/Into/Out, watches and local inspection refer
-to original Thor files; generated expression helpers are presented as their
-owning procedure. A step can enter a user procedure called from inside an fstring
-or switch arm. Compiler/runtime housekeeping is skipped during source stepping.
-Mixed imported Odin files retain normal source locations. Conditional breakpoints
-and variable editing also work through expression captures.
-
-With `-debug`, optional automatic `fn` evaluation in runtime expressions is
-retained as runtime calls for stepping. Required constants, type/signature work,
-generic constant arguments and explicit `#run` still evaluate during compilation.
-Compile-time-only code and inactive branches have no runtime breakpoint location.
-Watch/condition expressions use CodeLLDB's expression syntax; they are not a full
-Thor interpreter. Save before debugging; the pre-launch task rebuilds, and the
-adapter rejects stale source snapshots or incompatible maps.
-
-This repository also includes **Debug Thor Walkthrough (LLDB)**, which builds
-`examples/demo` when the debug shortcut is used from a Thor document in this
-workspace. See the [debugger guide](editors/vscode/DEBUGGING.md) for setup,
-architecture, supported behavior and tests.
-
-## Project inputs and output
-
-Inputs can be a single `.thor`/`.odin` file or a package directory. Directory
-inputs can mix both extensions. Relative imported packages and explicitly passed
-`-collection:name=path` collections are mirrored into the generated tree. Odin's
-native file suffixes and build tags select active native sources. Resource paths
-in `#load`, `#load_hash`, `#load_directory`, and `#exists` remain relative to the
-original source file, including in ordinary Odin dependencies. Explicit collection
-resource paths and relative foreign objects/libraries use their original roots.
-The manifest records the forwarded native flags, including asset collections;
-assets are referenced in place, so retain the original project when compiling
-generated output. `thor:` defaults to this checkout's [runtime](runtime/README.md)
-collection and may be overridden with an explicit collection flag.
-
-Thor additions such as `:>` belong in `.thor` files. `.odin` files retain ordinary
-Odin syntax, including when compiled through `thor`. When converting a project,
-rename its Thor source files to `.thor` and update any editor tasks that still
-invoke `odin build` to use Thor (see the [debugger setup](editors/vscode/DEBUGGING.md)).
-
-See [Compilation and Odin flags](#compilation-and-odin-flags) for flag forwarding,
-native helper builds, output locations and runtime arguments.
-
-Generated files live under `.thor-build/`; the frontend binary is cached under
-`.thor-cache/`, keyed by its source and Odin version. Source files are never
-overwritten. A manifest allows stale generated sources to be removed on rebuild;
-Thor refuses to reuse an unrelated nonempty output directory.
-Generated trees are rejected as compiler inputs. File suffixes and build tags
-follow `-target:os_arch`, including when checking a target different from the host.
-`test` and `build -build-mode:test` include test-tagged files.
+The [compiler guide](docs/compiler-guide.md) covers outputs, caches, flags, diagnostics and project discovery. See [publishing](docs/publishing.md), [migration](docs/odin-migration.md) and [memory debugging](docs/memory-debugging.md) for complete workflows.
 
 ## Thor vetting
 
-`thor vet` checks Thor conventions and reports warnings. Source changes are
-explicitly requested with `--apply` or confirmed through `--ask`.
+```sh
+thor vet .
+thor vet . --apply
+thor build . --vet
+thor vet . --unverified
+thor build . --vet --unverified=error
+```
+
+Vet suggests immutable declarations and pure functions, reports unused imports/types/procedures/locals, and checks supported lifetime, leak, allocator, buffer and other memory hazards. `--apply` performs verified corrections; uncertain configuration or escaping-reference edits stay manual. It can remove unused imports and fix unused iterator bindings, but it does not delete unused types, procedures or ordinary locals.
+
+Definite findings are shown normally. Unverified analysis is summarized by default; `--unverified` shows individual explanations, and `--unverified=error` makes uncertainty fail the command. These options also work with `build --vet`. Passing vet is not a general memory-safety guarantee. Odin’s native vet flags and supported `#+vet` options remain available; `no_alloc` additionally establishes its explicit contract.
+
+See [vet checks and suppression policy](docs/compiler-guide.md#thor-vetting), [immutable advice](docs/immutable-vet.md) and [lifetime/ownership analysis](docs/lifetime-vet.md).
+
+<a id="create-run-and-debug-a-project"></a>
+
+## VS Code and TLS
+
+`--vscode --profile Thor` installs the Thor extension/TLS, standard Odin OLS and CodeLLDB. Open a project in that profile:
 
 ```sh
-thor vet .                         # Report findings
-thor vet . --apply                 # Apply verified corrections
-thor vet . --ask                   # Preview corrections and ask once [y/N]
-thor build . --vet                 # Require Thor convention checks to pass
-thor vet . --vet=unused            # Select checks (comma-separated)
-thor vet . -warnings-as-errors     # Require corrections for a successful check
-thor vet . --unverified            # Show individual incomplete-analysis notices
-thor build . --vet --unverified=error # Also fail on unverified findings
+code --profile Thor /path/to/project
 ```
 
-The `immutable` check suggests `:>` for initialized bindings whose conversion
-passes the compiler in the current configuration. Grouped declarations qualify
-together. Global bindings and changes with uncertain API or configuration effects
-produce manual-review warnings that `--apply` leaves unchanged. See
-[immutable declaration advice](docs/immutable-vet.md), including alias batches
-and editor actions. The `pure` check
-suggests `fn` for eligible procedures, including their transitive calls and
-signature requirements. Findings have stable `thor/prefer-immutable` and
-`thor/prefer-fn` diagnostic codes. The `unused` check reports unused local
-variables, immutable bindings, local constants, loop/type-switch/comprehension
-bindings, and procedure parameters with the `thor/unused` code. It also reports
-unused imports (`thor/unused-import`) and named data types and type aliases
-(`thor/unused-type`), including package-level types. Unused named `proc`/`fn`
-declarations, constant procedure aliases and overload groups use
-`thor/unused-procedure`. Entry points, lifecycle hooks, exported/required
-procedures and native test procedures are treated as used. Calls, callbacks,
-aliases and compile-time references count as uses; self-recursion alone does not.
-All four checks
-are enabled by default for `thor vet` and `--vet`. `_` and explicit `_ = value`
-uses indicate intentional discards. Member names, named argument labels, and
-shadowed bindings are distinguished from actual uses. Named return values and
-parameter names in procedure-type declarations are part of their signatures.
-Other package-level values and struct fields are outside this local-binding check.
-Type references in annotations, aliases, other project files, f-strings and
-compile-time code count as uses; a recursive type's self-reference alone does not.
-Generic type specializations and aliases into Odin libraries are checked too.
-The latter load declaration facts on demand during vetting; ordinary builds
-without `--vet` keep their existing SDK loading behavior.
-Assignments alone do not count as uses, including `x += 1` and simple arithmetic
-self-updates such as `x = x + 1`. Passing a value to any function counts as use,
-even when that function ignores its parameter; unused parameters are checked in
-their own bodies. Writing through pointer or slice parameters counts as use
-because it can change the caller's data, as do writes through `for &value` and
-reference type-switch bindings. Conditions, returns, address-taking and explicit
-`_ = value` discards also count. This is a conservative local check:
-it does not trace unused values through other bindings or report overwritten
-initializers when the binding is subsequently used.
-Unused regular variables, parameters, types and procedures have no removal edit:
-initializer effects, allocations and public declarations require review.
-`--apply` and `--ask` preserve their declarations. Unused `for` iterator bindings
-have compiler-validated fixes: a first or sole binding becomes `_`, and an unused
-second binding is removed. Both unused bindings become a single `_`.
+TLS provides completion, hover with type sizes and target-dependence labels, signature help, definitions, references/rename, semantic highlighting and compiler-backed diagnostics for unsaved text. Thor colors are optional and apply to Thor tokens; normal OLS owns `.odin` files.
 
-```odin
-for hand, i in hands { use(i) }    // --apply: for _, i in hands
-for hand, i in hands { use(hand) } // --apply: for hand in hands
-for i in 0..<trials { run() }     // --apply: for _ in 0..<trials
-```
+Run/debug shortcuts are **Cmd+R / Cmd+Shift+R** on macOS and **Ctrl+R / Ctrl+Shift+R** elsewhere. Debugging maps breakpoints and stepping to original `.thor` lines. Trust your own project when VS Code asks, and reload the window after extension/server updates. Debugger capabilities retain the documented native platform limitations.
 
-Reference markers on discarded bindings are removed. Typed indices keep their
-checked conversion as `(_:Type)`; comment layouts requiring a second binding
-also keep `_`. The iteration expression and body are preserved. TLS offers the
-same fixes. Union-switch and comprehension bindings remain manual.
-Pure-function advice is independent of usage:
-an eligible unused procedure receives both `thor/unused-procedure` and
-`thor/prefer-fn` warnings. `--apply` converts its `proc` keyword to `fn`, and
-the unused warning remains. An explicit `_ = procedure_name` use suppresses
-the unused warning while retaining applicable pure-function advice.
-`@(unused)` explicitly marks a variable, constant, type, `proc`, or `fn` as
-intentionally unavailable. It suppresses that declaration's unused warning;
-referencing it is a compile error until the attribute is removed:
+See the [editor guide](editors/vscode/README.md), [debugger guide](editors/vscode/DEBUGGING.md) and [TLS notes](tls/THOR.md).
 
-```odin
-@(unused)
-debug_dump :: proc(value: int) { _ = value }
+<a id="implemented-syntax"></a>
 
-main :: proc() {
-    @(unused) future_limit :: 100
-    // debug_dump(1)      // Error: debug_dump is marked @(unused).
-    // _ = future_limit  // Error: even an explicit discard is a reference.
-}
-```
+<a id="run-the-demo"></a>
 
-The attribute takes no value and applies to every name in a grouped declaration.
-Reads, writes, addresses, type queries, aliases, and compile-time references all
-count as uses. Checks follow declarations through package imports and distinguish
-shadowed bindings and field/argument labels. Statically excluded files and known
-inactive `when` arms are ignored, including conditions resolved by compile-time
-execution. References in potentially active procedure definitions are checked even
-if the procedure itself is unused. Entry points and declarations automatically
-used through `@(init)`, `@(fini)`, `@(test)`, `@(export)`, or `@(require)` cannot be
-marked `@(unused)`.
+<a id="compiler-and-development"></a>
 
-The attribute does not suppress warnings about parameters or locals inside a
-procedure, or other vet advice. `--apply` preserves it, including when converting
-an eligible `proc` to `fn`. It does not change initializer or ownership behavior.
-For unused parameters, use `_` or `_ = parameter`; this declaration attribute is
-not a parameter annotation. TLS reports forbidden uses at the reference with a
-link to the tagged declaration.
+<a id="tests-and-rejection-examples"></a>
 
-Unused imports have compiler-validated removal edits. Whole selective or wildcard
-imports can be removed when unused; if any selected member or the namespace is
-used, the declaration remains. A standalone unused import's entire line,
-including indentation and its newline, is removed without creating a blank line.
-Comments and neighboring same-line statements are preserved, as are existing
-intentional blank lines and the file's newline style.
-Explicit blank imports (`import _ "package"`) remain intentional, including
-imports needed for initialization. Imports used only in inactive debug/platform
-branches are retained so applying corrections does not break other configurations.
-In test mode with `-all-packages`, imports are test-discovery roots and are also
-retained, even if their namespace is otherwise unused.
-Unused bindings take priority over immutable suggestions. A declaration with an
-unused name receives no immutable suggestion or conversion, including when a
-group contains both used and unused names. After those names are used or removed,
-the remaining declaration can qualify for an immutable suggestion. This also
-applies when selecting only the `immutable` check.
-Bindings used only in explicit `_ = name` discards receive no immutable-binding
-suggestions, conversions, or related TLS quick fixes. Any other use of the
-binding makes it eligible for immutable advice again, regardless of the
-discard's position. Expressions such as `_ = name + 1` count as ordinary uses.
-The `semicolon` check reports unnecessary statement terminators with the
-`thor/unnecessary-semicolon` code. A semicolon at the end of a line or before a
-closing brace can be removed. Semicolons separating statements on one line,
-loop/control-header clauses, and fixed-capacity type syntax remain required.
-The parser identifies optional terminators, including inside f-string expressions.
-`--vet=semicolon` selects this check alone. `--apply`, `--ask`, and TLS quick fixes
-remove the flagged token while preserving comments and line endings.
-`-ignore-warnings` hides warnings from standalone `vet` and editor checks.
-`thor build --vet` treats its convention findings as errors, so this flag does
-not suppress them. Incomplete memory analyses and unfinished correction proofs
-are summarized as nonfatal counts by default. `--unverified` shows details as
-information; `--unverified=error` shows them as errors and fails the command,
-including with `-ignore-warnings`. JSON retains all details. See
-[unverified reporting](docs/lifetime-vet.md#reporting-incomplete-analyses).
-Native vet flags and `#+vet` tags work on Odin-compatible `.thor` source.
-Source-sensitive checks inspect a separate source-preserving view before normal
-Thor compilation, retaining native diagnostics, package scopes and opt-outs.
-That view also supports `fn`, immutable declarations, parameter contracts,
-f-strings and comprehensions, preserving user reads, calls and loop bindings.
-Original formatting is checked before projection; generated helpers do not create
-native-vet findings. See [the policy details](docs/native-vet-audit.md). Native
-`-vet-when-shadowing` and `-vet-semicolon` support the full Thor lowering.
-See [CLI compatibility](docs/cli.md) for details.
+<a id="implementation-and-current-boundary"></a>
 
-Vetting examines project `.thor` files beneath the selected package directory,
-using the active target and build flags. Unused warnings use original source
-bindings so generated helper arguments and ownership cleanup cannot hide unused
-values. Known inactive `when` arms and excluded files are skipped. For unresolved
-generic/native compile-time conditions, potential uses are retained and warnings
-inside uncertain arms are omitted. Immutable advice includes active conditional
-declarations and native declaration attributes; uninitialized bindings are skipped.
-Procedure conversions conservatively skip conditional declarations, generic
-procedures, attributed procedures and the entry point. Procedures returning owned or
-reference-bearing data also require manual review, since `fn` can change result
-ownership and allocation behavior. Converting a procedure to `fn` enables its
-normal automatic compile-time evaluation with known arguments.
+<a id="compiler-diagnostics"></a>
 
-Immutable corrections preserve ownership choices across API results and
-reference-capable output parameters. Compiler-accepted locals whose readonly
-references actually escape receive manual-review warnings. Unrelated output
-parameters and independent value copies support ordinary immutable corrections,
-even when the procedure also calls conditional SDK implementations. Conditional
-writes through the affected value remain protected.
+## Compatibility and development
 
-Reviewed library argument contracts also bound vet's portability analysis.
-Printing a value, including a slice or a zipped row, permits immutable advice
-without inspecting platform-specific printing internals. Formatting buffer
-destinations still require writable access. These contracts preserve package
-identity through aliases and selected imports. Procedure results are cached per
-analysis mode within each vet invocation. Unreviewed conditional implementations
-retain conservative handling.
+Thor is experimental; [platform validation](docs/validation/installer-compatibility-2026-11-26.md) records tested configurations and limits. Native `.odin` dependencies retain Odin semantics; `.thor` files add the documented extensions. Unsafe native operations and unverified foreign contracts remain outside any general safety guarantee. Compile-time execution currently runs on the host; cross-target evaluation has documented limits.
 
-Proposed corrections are validated together through normal Thor checking using
-temporary source overlays. Additional analysis runs for `thor vet` and `--vet`.
-Procedures with definitely unsupported public `fn` parameter/result types or
-direct I/O are discarded before tracing their helper graphs. The remaining
-suggestions still pass complete compiler validation; vet normally performs the
-original check and one proposed-edit check. Mixed valid/invalid edits can require
-additional checks to isolate the safe corrections.
-Applying corrections preserves comments, formatting, line endings and file modes.
-Changed source snapshots are rejected, and write failures roll back completed
-updates. `--ask` accepts `y` or `yes`. An empty answer or end of input declines.
+Try the [commented tour](examples/demo/demo.thor) with `thor run examples/demo`. Feature-specific runnable programs live under [examples](examples). The [language guide](docs/language-guide.md), [language specification](docs/language-spec.md), [attribute/directive inventory](docs/attributes-and-directives.md) and [compiler guide](docs/compiler-guide.md) provide detailed contracts and limits.
 
-Enable `"tls.vet": true` in VS Code to see the same warnings and quick fixes on
-unsaved text. TLS offers a correction for the document snapshot that was checked.
-
-## Compiler diagnostics
-
-In a terminal, diagnostic labels and source underlines are red for errors and
-yellow for warnings. Redirected output and JSON diagnostics remain plain text.
-Native point or partial-word diagnostics underline the complete keyword or
-identifier in the original source. Expression diagnostics use their mapped
-expression boundaries, and editor positions account for UTF-16 columns.
-Set `NO_COLOR=1`, `CLICOLOR=0`, or `TERM=dumb` to disable terminal colors.
-
-`check`, `build`, `run`, and `test` report errors against original `.thor` files
-(or original `.odin` dependencies), with source snippets and underlines. Parser,
-Thor validation, and Odin type-checking errors use the same display. For example,
-`values := [1, "wrong"]` underlines `"wrong"` in your Thor source, even though
-the generated array declaration is much longer.
-
-A declaration that stands alone in an inner control-flow block, such as
-`if condition { x := 10 }`, produces an unused-local warning. Builds continue
-normally, and its initializer executes normally. TLS highlights the original
-variable name with warning severity. `-ignore-warnings` hides the warning and
-`-warnings-as-errors` makes it an error. Explicit Odin vet modes and
-`--raw-diagnostics` use Odin's native policy. An affected build may need an extra
-native checking pass. Already successful checks use a single invocation.
-
-If an array type is accidentally used as an array value (for example,
-`Rows :: [3]int; Rows[i] = 1`), Thor explains the distinction and suggests a
-variable declaration such as `Rows: [3]int`. A related note points to the type's
-declaration. Notes appear with source excerpts in the terminal and as clickable
-related locations in VS Code, including original imported/unsaved source. JSON
-diagnostics expose these as optional `related` entries containing `pos` and
-`message`; notes do not increase the error count.
-
-Indexing errors identify invalid index/lower-bound/upper-bound types at the
-original bound, and proven generated cascades are removed when the real error is
-an undeclared name or missing record field. Result-type errors quote the original
-lowered expression (such as `values[i]`) while preserving its actual type.
-Inline membership-list conversion errors explain the comparison context and link
-to the value being tested. User bindings named `type_of`, `len` or other native
-builtins keep their normal meaning; generated operations use Odin's qualified
-builtin namespace when needed. See the [diagnostic review](docs/diagnostic-review-2026-11-01.md)
-for examples and implementation boundaries.
-
-Unconditional top-level redeclarations in the same untagged file are checked by
-the shared frontend before compile-time evaluation. TLS reports these immediately
-while editing, even without compiler checking, with the duplicate name underlined
-and the earlier declaration's line. Conditional declarations, tagged files,
-cross-file conflicts and other type checks still use the backend.
-
-With `-debug` or `thor transpile`, generated `.odin` files have `.odin.map.json`
-sidecars. Ordinary builds retain mappings in memory without writing these files.
-Shared translated libraries keep their common maps in the installation. These versioned maps
-record exact copied byte ranges, source ranges for generated constructs, and
-original source snapshots. Nested, reordered, and duplicated expressions retain
-their origins. Compiler messages also translate embedded declaration/caller
-locations and quoted lowered expressions. Errors inside membership helpers point
-back to the operation that instantiated them. Empty-array and membership failures
-have Thor-specific explanations; redundant inference errors are suppressed when
-the underlying expression already has a diagnostic.
-
-Power operand mismatches underline the original `**` expression and name both
-types. For example, `HOUSE_ODDS ** i` with `f64` and `int` operands reports the
-type mismatch and asks for an explicit conversion. A failed generated result
-type can also cause a secondary return error; that error is suppressed when
-the original expression already has an error. Genuine user return-type errors
-remain visible.
-
-Thor supports inline generic callback defaults in named procedures:
-
-```odin
-sorted :: proc(data: $T/[]$E,
-               less := proc(i, j: E) -> bool { return i < j }) -> []E {
-    ret := make([]E, len(data))
-    copy(ret, data)
-    slice.sort_by(ret, less)
-    return ret
-}
-```
-
-Import `core:slice` for this example. Calls can omit `less` or supply their own
-comparator, including a runtime procedure value. The returned slice belongs to
-the caller; delete it when finished. See the runnable, commented example in
-[examples/default_callbacks/demo.thor](examples/default_callbacks/demo.thor).
-
-Thor emits a named generic helper, an explicit callback parameter type, and the
-omitted argument at a statically resolved call. This works across Thor/Odin files,
-package imports and selective aliases. Supplying a comparator skips specialization
-of the default, so records can use a custom comparator even though `<` is not
-defined for records. Explicit `nil` stays `nil`. Ordinary Odin procedure-value
-types do not retain default arguments; indirect calls still supply the callback.
-Overloaded calls that Thor cannot resolve also need an explicit callback.
-
-Generic dependencies must be inferable from the callback's parameter types, such
-as `E` in `proc(a,b:E)` or `N` in `proc(a:[N]int)`. A dependency appearing only in
-the result/body is currently rejected with a mapped signature diagnostic.
-Callbacks cannot capture enclosing runtime parameters. An independently generic
-literal such as `proc(a,b:$U)` needs an explicit callback parameter type.
-Ordinary `proc` parameters remain outside the `fn`/`#run` pure-input contract.
-Use a `fn(...) -> ...` callback type when the callable itself must be pure; see
-[pure callback types](docs/pure-callbacks.md).
-
-This extension applies to `.thor` declarations; native `.odin` declarations retain
-their source-mapped unsupported-default check. Named generic defaults, concrete
-callbacks and callbacks using already-bound outer types retain native behavior.
-Odin still selects active branches and instantiates enclosing bodies before
-checking guards or helper bodies. Computed type expressions that cannot be
-classified confidently stay with Odin's checker.
-Unrecoverable locationless errors retain an explicitly labeled package fallback
-in TLS rather than being assigned to an unrelated open file.
-
-Useful options:
+For compiler development:
 
 ```sh
-./thor check demo
-./thor check tests/fixtures/array_type_mismatch --diagnostic-format=json
-./thor check tests/fixtures/array_type_mismatch -terse-errors -error-pos-style:unix
-./thor check tests/fixtures/array_type_mismatch --raw-diagnostics
+python3 tools/build_compiler.py
+python3 tools/build_tls.py
+THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py --match tests.test_readme_examples
 ```
 
-JSON diagnostics go to stderr and use one-based UTF-16 line/column positions,
-UTF-8 byte offsets, severity, stage, and message lines. `-json-errors` is an alias
-for mapped JSON output. `--raw-diagnostics` exposes the backend output for
-investigating transpiler problems. `--overlay <json>` accepts the editor overlay
-format `{"Replace": {"original path": "buffer file path"}}`; checking uses those
-buffers without saving or modifying source files.
+The README’s displayed examples are the test inputs, with a small manifest supplying wrapper context and expected results. Paired examples are run in checked and unchecked builds; compile-time examples also exercise all four evaluation modes. New extensions should add a linked feature entry and a tested example. See [development instructions](DEVELOPMENT.md), [test integration](tests/integration/README.md), [storage retention](docs/storage.md) and [Python reference retirement](docs/python-retirement.md).
 
-TLS uses this same compiler pipeline on open/change/save, including unsaved
-dependencies. It translates ranges to LSP coordinates, preserves the editor's URI
-for symlinked files, clears resolved errors, and discards superseded checks.
-Program/test stdout and stderr remain separate from compiler diagnostics.
-The [Thor debug adapter](editors/vscode/DEBUGGING.md) also maps debugger stack
-frames and stepping. Stack traces printed directly by the native runtime still
-use its own locations.
-
-## Implemented syntax
-
-| Task | Behavior |
-| --- | --- |
-| T01 | CLI, source preservation, generated output, and compile/run/rejection harness. |
-| T02 | `import "core:math" / sin, cos`; multiline lists, retained package namespace, file-local names. |
-| T03 | Ternaries may continue before `:` without a backslash, including nesting and comments. |
-| T04 | Native `when` / `else when` / `else`, including nesting, selected declarations and lazy compile-time execution. |
-| T05 | `[1, 2, 3]` is an inferred fixed array; contextual types, empty typed arrays, nested arrays, arguments, returns, and assignments are supported. |
-| T06 | `in`/`not_in` for arrays, slices, dynamic arrays, native maps and bit sets; interval membership; constant type/value membership in generic constraints. |
-| T07 | Caller-owned integer grouping and Unicode padding helpers in `thor:format`. |
-| T08 | Map-backed `Set(T)` library in `thor:sets`, including mathematical, in-place, clone, iteration, and cleanup operations. |
-| T09 | Shared Thor-owned lexer/parser and source emitter; native AST/token compatibility, comments, and byte spans retained. |
-| T10 | Mixed-source/import graphs, target/tag selection, collections, resource/foreign paths, managed output and CLI flag forwarding. |
-| T11 | Lexical symbols and shapes; contextual arrays through procedure aliases, overloads, generic specializations and private types. |
-| T12 | `x :> expr` and `x: Type > expr`: runtime initialization once, immutable storage and read-only slice views; inferred/per-name `#mut` procedure contracts. |
-| T13 | `f"hello {name}"` and raw f-strings; nested expressions, brace escaping, integer grouping, Unicode padding and owned output. |
-| T14 | Runtime switch expressions and compile-time `#switch` statements/expressions, with optional selectors, lazy matching and contextual results. |
-| T15 | `set[T]`, literals, mathematical/in-place operators, logical equality, membership, len, iteration, clear and delete. |
-| T16 | Negative signed sequence indices and slice bounds, including writable/addressable access; native map, enum-array and pointer behavior retained. |
-| T17 | Expression-local helpers preserve lazy branches, operand order, nested arguments, loop reevaluation and assignment storage. |
-| T18 | Declared `fn` purity, transitive read-only inputs, verified direct calls, recursive/generic functions, and internal scratch allocation. |
-| T19 | Versioned contents-only value serialization and typed reconstruction, including wide integers, exact floats, enums, arrays, records and unions. |
-| T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and optional execution deadlines. |
-| T21 | Persistent contents-only result cache, transitive/configuration/toolchain/resource invalidation, atomic publication, corruption recovery and cache controls. |
-| T22 | Scratch cleanup and independently owned string/slice results, deep aggregate promotion, recursive cleanup and fresh runtime `#run` materialization. |
-| T23 | Automatic known-argument `fn` folding, forward/dependent constants, generic specialization scheduling, selected/lazy paths and fresh folded runtime results. |
-
-Conditional compilation uses Odin's `when`, `else when`, and `else` directly.
-Use ordinary `if` / `else if` for runtime branching. The `#switch` and `#run`
-directives retain their existing behavior.
-
-```odin
-import "core:math" / sin,
-    cos
-
-numeric :: proc(value: $T) -> T where T in [int, f64] {
-    return value
-}
-
-MODE :: 2
-when MODE in [1, 2] {
-    ENABLED :: true
-} else {
-    ENABLED :: false
-}
-
-main :: proc() {
-    values := [1, 2, 3]
-    typed: [2]f64 = [1, 2]
-    empty: [0]int = []
-    result := ENABLED ? 27
-                      : 31
-    assert(result == 27 && 2 in values && 9 not_in typed)
-    assert(len(empty) == 0 && sin(f64(0)) == 0 && cos(f64(0)) == 1)
-}
-```
-
-Import selections have no trailing comma. Selected names may be procedures,
-procedure groups, types, or constants; mutable package-variable selections are
-rejected, including when unused. Local variables/parameters can shadow a selected
-name. The implementation resolves these aliases to qualified references, and
-validates selections with local aliases in a private initializer: Odin does not
-allow privacy attributes on every kind of alias declaration.
-
-Array literals infer their element type from context, otherwise from the first
-element with Odin's normal literal defaulting. A type-only helper is used inside
-`type_of` when necessary; it does not evaluate the element an extra time. Every
-literal element executes once. An empty literal needs context, except that an
-empty membership list can obtain its element type from the needle.
-An inline membership list also receives context from an already typed needle:
-`tile: i8 = 4; found := tile in [4, 8]` uses an `[2]i8` list. Untyped constants
-and arithmetic expressions in the list receive the same context. Conversely,
-`4 in existing_i8_array` coerces the untyped `4` to the array's element type.
-Named arrays keep their established types: `values := [4, 8]` remains `[2]int`,
-so an `i8` needle does not implicitly convert to match it. Explicitly typed list
-elements must match too; out-of-range literals are errors rather than narrowing
-casts. `not_in`, compile-time conditions and generic value constraints follow
-the same rules. With untyped operands on both sides, normal first-element
-defaulting remains in effect, so `1.5 in [1, 2]` is an error.
-The inferred element type also supplies context to later nested array/record
-literals. Procedure defaults and assignments through indexing or pointers are
-covered by the tests.
-
-Runtime membership evaluates the needle first and the container second, once
-each. All literal elements execute before searching, even when the first element
-matches. Enclosing `&&`, `||`, and ternaries retain their lazy behavior. Generated
-membership helpers are contextless and allocate no storage. Map membership tests
-keys, and string substring membership is intentionally unsupported.
-
-Intervals also support membership: `value in low..<high`, `value in low..=high`
-and `value not_in (low..<high)`. The half-open form excludes `high`; inclusive
-membership compares directly without incrementing the bound. Reversed intervals
-are empty. Compatible numeric values, runes, enums and strings use Odin's ordered
-comparisons; string intervals are lexicographic.
-
-Runtime operands execute once in value/low/high order, including the high bound
-when the value is outside the interval. Anonymous owned strings/views are freed
-after comparison. Constants, `when`, `#switch`, `fn`/`#run` and constraints work too:
-
-```odin
-allowed_size_range :: proc($N: int) -> int where N in 0..<10 {
-    return N
-}
-```
-
-Arithmetic bounds work directly, as in `value in low+1..<high-1 && value != 5`.
-Use `for (value in low..<high)` for a condition-only loop; native `for value in
-low..<high` retains iteration. Three-part loop headers accept membership as their
-condition, including an empty post statement. Intervals here are syntax for
-membership, rather than first-class range values.
-
-String repetition uses `*` with a constant string and a nonnegative integer
-constant, in either order. It has ordinary multiplication precedence:
-
-```odin
-X :: "a" * 3          // "aaa"
-Y :: "a" * 3 + "b"    // "aaab"
-Z :: 4 * X + "z"      // "aaaaaaaaaaaaz"
-PHRASE :: ("a" + "b") * 2 // "abab"
-EMPTY :: "anything" * 0   // ""
-```
-
-Like Odin's string `+`, both operands must be compile-time constants; runtime
-immutable bindings (`:>`) are not compile-time constants. Named/imported
-constants, `#config` values, `#run` results and constant parameters inside generic
-procedure bodies work. The result is constant storage: assigning it with `:=`
-does not allocate, and it must not be deleted. Untyped literal/constant inputs
-retain native coercions such as a `cstring`
-procedure argument, including after concatenation. Explicitly typed string
-inputs retain their type, including for zero repetitions.
-Strings repeat their exact bytes, including UTF-8, escapes and raw strings.
-The result is limited to 16 MiB, matching the existing compile-time value budget.
-Thor emits a doubling chain of
-native constant concatenations, with no repetition execution helper or new cache
-files. See [the runnable example](examples/string-repetition/main.thor).
-In generic signatures and type expressions, a repetition depending on generic
-parameters currently needs a fixed integer count from 0 through 128. A count
-that varies with a generic parameter works inside the procedure body.
-
-Compile-time sequence concatenation uses `++`:
-
-```odin
-FIRST :: [1, 2]
-SECOND :: [3, 4, 5]
-ALL :: FIRST ++ SECOND ++ [6] // [6]int
-WORDS :: []string{"hello"} ++ []string{"Thor"} // []string
-ROWS :: [[1, 2]] ++ [[3, 4]] // [2][2]int; rows stay nested
-
-SMALL :: [1]i8{1}
-MORE :: SMALL ++ [2] // New literals inherit the established element type.
-EMPTY:[0]i8: [] ++ [] // Empty literals need an element type from context.
-```
-
-Operands must be native compile-time values. Runtime variables, including `:>`
-bindings and ordinary procedure parameters, do not qualify; `$` constant
-parameters do. Arrays may have different lengths but must have matching element
-types. Slices must have the same slice type. Arrays and slices cannot be mixed
-implicitly. An array result is a plain fixed array of the combined length; a
-slice result retains its slice type. Concatenation is shallow and combines only
-the outer sequence. Constant backing storage follows Odin's usual materialization
-rules, including for nested slices; no independent heap clone is made.
-
-`++` has the same precedence as `+` and associates left to right. Native array
-`+` keeps its element-wise meaning, and strings keep their existing constant
-`+`. There is no `++=` or increment operation. Chains lower to one
-`intrinsics.concatenate` call, with no evaluation helper, heap allocation or
-cache entries. A runtime binding may copy the resulting fixed array normally;
-constant slice backing must not be deleted. Odin's intrinsic restrictions still
-apply: positional constant literals are supported; named/indexed literal entries
-and runtime array arithmetic are not silently evaluated as constants.
-
-See `constant_concatenation` in [the commented tour](examples/demo/demo.thor).
-The old `basic.CONCAT` alias has been removed; use `A ++ B` instead.
-
-Power uses infix `**`; native prefix `**values` expansion remains available.
-It associates to the right and binds above multiplication and unary signs:
-`2 ** 3 ** 2 == 512`, `-2 ** 2 == -4`, and `(-2) ** 2 == 4`.
-Both operands must have the same integer or floating-point type. Untyped numeric
-constants follow native coercions, so `2.0 ** -3 == 0.125` and `f32_value ** 3`
-work; typed `int_value ** f64_value` requires an explicit conversion.
-
-Numeric loops can specify their value type, and array/slice loops can specify
-only the index type using a parenthesized binding:
-
-```odin
-ROUNDS :: 10
-for i: f64 in 1..=ROUNDS { probability := 0.5 ** i; _ = probability }
-for value, (i: i8) in values { _ = value; _ = i }
-for &value, (i: u8) in values { value += int(i) }
-```
-
-Range annotations supply context for untyped bounds; already-typed bounds must
-match or be explicitly converted. Range values and indices remain immutable;
-`&value` keeps its existing reference behavior. Element types are inferred, and
-the ambiguous `for value, i: i8 in values` spelling is rejected. Index types must
-be integers. Fixed arrays must fit their complete index range at compile time;
-slices and dynamic arrays panic if a visited index cannot be represented, even
-with `-disable-assert`. The internal counter retains Odin's normal type, so a
-narrow index cannot wrap. Annotations allocate no memory and preserve native
-range-bound evaluation, labels, and loop control flow. See the
-[commented examples](examples/demo/demo.thor).
-Floating-point ranges keep Odin's unit stepping and precision limits, including
-the inability to advance by one at sufficiently large magnitudes.
-
-Floating-point powers use `core:math.pow`, including fractional exponents.
-Integer powers require a nonnegative exponent (a compile error when known, a
-panic otherwise). `0 ** 0` is `1`; runtime integer overflow follows ordinary
-Odin multiplication. Untyped integer constants retain exact values through 128
-bits. Operands execute once in base/exponent order and retain lazy surrounding
-control flow. Powers work in constants, array sizes, `when`/`#switch`, specialized
-procedure generics and `fn`/`#run`, using the existing native evaluation cache.
-Type-level generic expressions without a resolvable call site currently require
-a fixed nonnegative integer exponent through 128; other generic constant powers
-need a resolvable procedure specialization.
-
-`T in [int, f64]` compares exact type identity; aliases match, unlisted distinct
-types do not. Generic constraints and other constant contexts use constant
-comparisons rather than runtime search. Parentheses, `not_in`, duplicate entries,
-and empty type lists are supported. Named constant arrays can also be used for
-value membership when their length is statically determined by the frontend.
-
-```odin
-import f "thor:format"
-import sets "thor:sets"
-
-main :: proc() {
-    text := f.format(-1234567, grouping=true, width=14, align=.Center, fill='界')
-    defer delete(text) // returned formatting strings belong to the caller
-    names: sets.Set(string)
-    defer sets.destroy(names) // destroy each table once, including its aliases
-    sets.insert(&names, "apple")
-    for name in sets.entries(names) { assert(name == "apple") }
-
-    value :> len(text) // runtime value; direct writes and &value are rejected
-    data := [1, 2]
-    view :> data[:]
-    data[0] = value // writable aliases can change what the read-only view sees
-    // view[0] = value // rejected
-}
-```
-
-Immutable records and fixed arrays also protect directly stored subobjects.
-Slices reached through an immutable binding become read-only views, including
-nested slice references. Existing writable aliases can still modify the shared
-storage. Pointer targets and dynamic arrays retain their existing behavior.
-Taking an immutable header's mutable address is rejected.
-Immutable slice literals with provably compile-time contents use read-only
-backing storage: `@(rodata)` at package scope and `@(static, rodata)` inside a
-procedure. Local backing is shared between calls, avoiding repeated stack
-initialization. This is a storage optimization; the binding remains a runtime
-value. Runtime initializers and views of existing storage retain their normal
-behavior. See [slice literal storage](docs/slice-access.md#constant-literal-storage).
-Native map entry assignment can change the map header, so it requires a mutable
-header (a mutable shallow copy may still access shared entries). Ordinary Odin
-copying and ownership rules apply; this feature does not add lifetime checking.
-Compile-time branches and generic shapes are checked by Odin after lowering, so
-inactive branches remain unchecked and reference views are distinguished from
-directly stored arrays. TLS marks immutable symbols readonly and explains them
-in hover; live compiler checks enforce mutations on unsaved text.
-
-An immutable array can be sliced directly for value iteration:
-
-```odin
-values :> [10, 20, 30]
-for value in values[:2] { fmt.println(value) }
-```
-
-This reads the original storage without allocating or copying the whole array.
-Named immutable views and passing them to readers are supported. Writable aliases
-and `for &value in values[:]` remain rejected. Thor infers per-parameter writable
-access requirements; explicit `#mut` applies to the next name only:
-
-```odin
-copy_values :: proc(source, #mut destination: []int) {
-    copy(destination, source)
-}
-```
-
-TLS displays inferred `#mut` in grey and includes requirements in hover text.
-Resolved calls propagate read-only views stored through output parameters,
-including forwarding procedures. Output storage and returned values preserve
-their shared references.
-See [the complete slice access contract](docs/slice-access.md) and the commented
-[slice access demo](examples/slice_access/demo.thor).
-
-`:>` enforces storage immutability in Thor; Odin's `@(rodata)` is a storage
-placement attribute and does not provide the same compile-time checks.
-
-## Using without a feature header
-
-Thor enables standalone `using value` statements and `using` procedure
-parameters by default. Write them directly in a `.thor` file; the transpiler
-adds `#+feature using-stmt` to that file's generated Odin when needed.
-This includes `using` parameters in procedure types and anonymous procedures.
-Fields promoted by `using person` inside a loop over `soa_zip` or `basic.zip`
-retain their inferred types in Thor expressions and f-string captures. Constant
-aliases of `soa_zip` preserve this inference.
-
-Embedded fields (`struct { using base: Base }`) and declarations such as
-`using value := Record{}` already work in Odin without the feature, so those
-forms do not cause a tag to be added. Comments and strings are ignored.
-Existing feature tags are preserved without duplicates; an explicit
-`#+feature !using-stmt` retains the restriction for that file. Native `.odin`
-dependencies keep Odin's feature rules.
-
-Original `.thor` files are never edited. Compiler diagnostics, TLS locations,
-breakpoints and stepping use the normal source maps to account for the
-generated header line.
-Promoted fields keep their own value types when supplying expression context.
-For example, assigning `kind = switch { case condition: .A; case: .B }` through
-`using record: ^Record` uses the type of `record.kind`, including enum and
-generic fields.
-
-## Interpolation, switches, Sets and negative indices
-
-```odin
-main :: proc() {
-    names := set[string]{"apple", "pear", "apple"}
-    names += "plum"
-    assert(len(names) == 3 && "pear" in names)
-    for name in names { assert(name in names) }
-
-    data := [10, 20, 30]
-    data[-1] += 1
-    tail := data[-2:]
-    label := switch data[-1] {
-        case 30: "before"
-        case 31: "after"
-        case: "other"
-    }
-    value := switch { case len(tail) == 2: 1234567; case: 0 }
-    text := f"{{label}} {label}: {value:'0'12,}"
-    assert(text == "{label} after: 0001,234,567")
-    delete(text)
-    delete(names)
-}
-```
-
-Interpolation accepts quoted or raw backtick literals. `{{` and `}}` escape
-literal braces. Fields contain real Thor expressions, including nested literals,
-switches and interpolations. Parenthesize a ternary before a format separator.
-The [format grammar](docs/interpolation-formatting.md) is
-`[quoted-fill][flags][width][,][.precision][verb]`, following Odin's `fmt` verbs.
-For example, `.2f`, `12.2f`, `-12.2f`, `#08x`, `012,.2f`, and `.2%`.
-Use nested braces for a runtime width: `f"{value:{width}.2f}"`.
-Alignment defaults to right for every type; `-` means left and `^` means center.
-`<` and `>` are removed. Unicode fills use quoted runes (`'界'^12s`);
-width counts runes. `f/F` defaults to three decimal places, `e/E` to six,
-and native `g/G` to shortest round-trip text. Big-number decimals are exact;
-Rational `g/G` requires explicit precision (`.6g`). String `.10s` truncates at
-rune boundaries. Large precisions use sized storage. Fields execute once, left to right. The final string is owned by
-the caller. Internal formatting buffers and owned nested interpolations are
-released after use, including mixed branches such as
-`f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.
-Named field values keep their existing ownership.
-
-Formatting streams into bounded stack scratch, with a heap fallback for large
-output. Common short native f-strings allocate only the final owned string.
-See [formatting performance and benchmarks](docs/fstring-performance.md).
-
-Anonymous f-string arguments are temporary by default. Thor releases them when
-the whole enclosing expression finishes, including nested calls and selected
-conditional/switch branches. This applies to every function, including native
-Odin functions; printing has no special compiler rule.
-
-```odin
-print(f"value {n}")                  // Automatically freed after printing.
-print(identity(f"value {n}"))        // Lives through both calls.
-save_for_later(f!"value {n}")        // Opt out: the receiving API owns cleanup.
-append(&messages, f!"value {n}")     // Containers retain string headers too.
-
-text := f"value {n}"                 // Named owners still require deletion.
-defer delete(text)
-other := f!"value {n}"               // Legal; same ownership as a named f string.
-defer delete(other)
-```
-
-The `f!` spelling also supports raw backticks. It disables automatic temporary
-cleanup; use it when the receiving API retains or deletes the argument. This is
-a caller-controlled lifetime rule, not a checked borrowing contract. Returning
-or storing a reference to a default anonymous argument beyond its expression
-would leave a dangling reference. Named strings, literals and arbitrary
-string-returning procedures are not automatically deleted at call sites.
-Ordinary factory results still need the lifetime specified by their API.
-Native type conversions preserve ownership: `text := string(f"value {n}")`
-owns its string and needs deletion. In `print(string(f"value {n}"))`, the
-enclosing `print` call still controls temporary cleanup.
-See [the lifetime implementation and validation notes](docs/fstring-lifetimes.md).
-
-Expression switches require a default arm unless a runtime enum switch covers
-every named value. Odin checks that coverage; missing enum cases are errors.
-`#partial switch` also works in expression position, with a default supplying
-the omitted cases' result (or `panic(...)`). An unmatched enum value produced
-by an explicit cast panics rather than returning a fabricated zero value.
-Arms may supply one result or a
-comma-separated list of results. They support comma-separated cases and native ranges, check duplicate
-constant cases, evaluate the selector once, and execute only the first matching
-arm. Expected destination/argument/return types supply result context.
-Each result receives its own destination type, including distinct types, enum
-members and inferred record/array literals. Multiple results use ordinary Odin
-multiple-value rules; swaps evaluate every selected RHS before storing results.
-An arm can also call a procedure returning the required number of values.
-
-```odin
-a, angle, b = switch {
-    case rotate: b, other_angle, a
-    case:        break
-}
-
-NUMBER, TEXT :: #switch {
-    case DEBUG: 1, "debug"
-    case:       2, "release"
-}
-```
-
-`break` skips the entire assignment and leaves all destinations unchanged. It is
-allowed only when the switch is the entire RHS of an ordinary `=` assignment
-(parentheses are fine), in any arm. It does not break an enclosing loop. It is
-rejected in declarations, returns, arguments, nested arithmetic and compound
-assignments. Destination locations/indices are evaluated once before switch
-selection, as in native assignment; skipping performs no stores. The same
-default/enum-coverage rule applies. `#switch` supports the same result lists and assignment-only
-skip; compile-time constants and unchecked inactive arms retain native `when`
-behavior. Anonymous Thor allocations discarded into `_` are cleaned up; named
-values remain borrowed. Run the [commented examples](examples/switch-results/demo.thor)
-with `thor run examples/switch-results`.
-A switch result arm may call any procedure declared `-> !`, such as `panic`,
-`unreachable`, or a custom/imported nonreturning procedure. It terminates instead
-of supplying a value, so it does not contribute to result-type inference.
-For example, `direction: Coord > switch { case valid: {-1, 0}; case: panic("invalid move") }`
-is valid. Aliases, procedure-valued parameters and generic specializations follow
-the same rule. Ordinary void calls are not result arms. A switch with only
-nonreturning arms needs an expected result type, or expected types for multiple
-results. Normal argument checking, calling conventions and purity rules apply.
-`#switch` has the same selector forms in statement and expression positions;
-it uses native `when` semantics for constant selection, declaration visibility,
-control flow, and unchecked inactive arms. Later conditions, including those in
-a comma-separated case, stay unchecked after a match. Explicit `#run` follows
-selected compile-time branches and known lazy conditions.
-A selected nonreturning arm in a `#switch` expression also needs an expected
-result type; inactive arms are unchecked. `fn` may call `panic`, and a panic
-reached during `#run` or automatic compile-time execution fails the compilation.
-
-Sets use `|`, `&`, `-`, `~`, `==` and `!=`, with `|=`, `&=`, `-=`, `~=`
-for in-place updates; `+=` inserts one element, while `-=` accepts an element
-or another Set. Binary mathematical results own independent tables. Assignment
-copies a shallow header. Anonymous Thor intermediates are cleaned up automatically:
-`result := a | b | c` reuses one result table; only `result` needs deletion, and
-named operands remain untouched. `clear(s)` keeps the table allocation;
-`delete(s)` releases it. Keys retain their ordinary shallow
-ownership. Native operations on other types keep their Odin meaning.
-
-`to_set` and `to_slice` are available from both `thor:sets` and `thor:basic`:
-
-```odin
-import * "thor:basic"
-
-unique := to_set([1, 2, 2, 3])
-defer delete(unique)
-values := to_slice(unique)
-defer delete(values)
-```
-
-`to_set` accepts fixed arrays, slices and dynamic arrays, including distinct
-sequence types. Duplicates become one key. `to_slice` returns an allocated `[]T`
-with one copy of each key in unspecified order; sort it separately if needed.
-Both produce independent container storage and accept `allocator=` (defaulting
-to `context.allocator`). Element copies are shallow: separately owned strings
-and pointees retain their existing lifetimes. Empty inputs are supported.
-Sets retain their allocator for later insertion and deletion; delete slices
-with the allocator that created them when supplying a custom allocator.
-
-Automatic cleanup covers Thor-owned expressions consumed by operators, queries,
-formatting, indexing, iteration, unused expressions and blank destinations. Loop
-temporaries survive through the loop and are released on exit. Assigning or returning an owned result
-leaves cleanup to the caller. Arbitrary procedure arguments/results, aggregate
-fields and separately allocated Set keys retain Odin's manual ownership rules;
-this does not introduce a general ownership checker. Use named keys when their
-allocations need independent cleanup.
-
-A view that must survive its expression needs a named owner:
-
-```odin
-owner := f"value {n}"
-defer delete(owner)
-view := owner[1:]
-```
-
-Thor diagnoses `view := f"value {n}"[1:]` and equivalent temporary pointer/field
-views. Immediate reads such as `len(f"value {n}"[1:])` keep the owner alive until
-the read completes. Borrowed views through mixed branches are conservatively
-rejected when the owner cannot be carried safely.
-
-Negative signed bounds normalize to `len(sequence) + bound`; unsigned bounds
-keep their type. Strings index UTF-8 bytes. Bounds are checked after normalization
-without clamping; excessively wide signed bounds are checked before machine-index
-conversion. The base and supplied bounds execute once in source order. Map keys,
-enumerated arrays, pointers and multi-pointers retain their native interpretation.
-
-The emitter uses named procedures with explicit lexical inputs, rather than
-closures (which Odin does not provide). Calls stay at the original expression
-site; declarations do no work. The same source maps cover helper bodies and their
-instantiations, so errors point back to fields, arms, elements and accesses.
-Expressions inside `for &row` over SOA views preserve native row references,
-including nested helpers and writes to the original columns.
-Nonallocating helpers also work inside native C/system/contextless procedures;
-allocating features require a context, which such callbacks can assign explicitly.
-
-## Tests and rejection examples
-
-```sh
-THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py
-```
-
-For parallel test workers, prebuild the compiler and protocol fixtures once.
-
-```sh
-cargo build --release --manifest-path rust/Cargo.toml --bin thor-rust --examples -j 2
-```
-
-Set `THOR_TEST_PREBUILT=1` for every worker. This keeps Cargo setup from replacing
-the shared executable during another worker's launch. A missing prebuilt compiler
-is an error. Ordinary sequential test setup continues to build with Cargo.
-
-Linux address-sanitizer tests also require the compiler-rt development package
-matching Clang (for example, `libclang-rt-18-dev` with Ubuntu 24.04's Clang 18).
-Icon regression tests use Python's Pillow package (`python3-pil` on Ubuntu).
-These are test dependencies; ordinary Thor installation and builds do not need
-them.
-
-
-The opt-in [upstream integration run](docs/upstream-integration.md) compares
-pinned Odin projects, migrated Thor copies and vet-corrected copies. Its
-[runner instructions](tests/integration/README.md) document dependencies and
-resource limits.
-
-The suite compiles and runs actual generated programs with Odin. It checks
-accepted programs, rejection behavior, evaluation counts/order, import privacy
-and shadowing, native syntax, generic constraints, contextual/empty/nested arrays,
-mixed packages, command behavior, and the main demo. Each test uses an isolated
-temporary source and output directory.
-The suite also builds TLS and runs stdio LSP tests against the actual executable.
-The [post-v1 audit](AUDIT.md) records cross-feature fixes, coverage and concrete
-remaining editor limitations. Contextual enum navigation, completion and rename
-through switch-arm arrays have dedicated regression coverage.
-The [November hardening report](docs/hardening-2026-11.md) inventories the
-features added since the purity audit, their documentation, interaction tests,
-and remaining conservative boundaries.
-
-Readable rejection examples are under [tests/fixtures](tests/fixtures). Each
-directory includes `main.thor` and the expected diagnostic fragment:
-
-```sh
-./thor check tests/fixtures/generic_constraint
-```
-
-## Implementation and current boundary
-
-- [frontend/parser](frontend/parser) adapts Odin's real tooling parser and retains
-  its original license. [frontend/main.odin](frontend/main.odin) exports AST spans
-  and roles as JSON. [frontend/tokenizer](frontend/tokenizer) owns scanning while
-  retaining installed Odin token/AST types for TLS and formatter compatibility.
-- [thorlang/compiler.py](thorlang/compiler.py) performs AST-based,
-  source-preserving lowering. It uses Odin type intrinsics for contextual array
-  types rather than copying private callee type names into the caller.
-- [thorlang/driver.py](thorlang/driver.py) manages the CLI, frontend build cache,
-  source/import graph, generated output, and Odin invocation.
-- [thorlang/semantics.py](thorlang/semantics.py) tracks lexical bindings, required
-  type shapes, call targets and storage protection. Native type witnesses resolve
-  exact contextual types in the declaration's scope, including private types.
-- [thorlang/expressions.py](thorlang/expressions.py) lowers interpolation,
-  switches, Set operations and negative accesses using expression-local helpers.
-- [thorlang/sourcemap.py](thorlang/sourcemap.py) records composable emission
-  mappings; [thorlang/diagnostics.py](thorlang/diagnostics.py) translates backend
-  locations, ranges, and messages to original source.
-
-The implementation was verified with Odin `dev-2026-10:8169255b9` and Python
-3.11.6. An Odin AST/token API change may require refreshing the shared frontend.
-Cross-target checking is covered; linking a foreign target still requires the
-ordinary Odin toolchain. Linker/toolchain failures without locations are reported
-as compiler-wide errors. The generated manifest records a rebuild command's
-native flags; it is not a standalone packaged SDK or asset bundle.
-
-Thor resolves the type/procedure information its additions require and delegates
-ordinary assignability, overload validity, constraints, and code generation to
-Odin. It preserves unresolved/ambiguous calls for native checking rather than
-choosing arbitrarily. A call with insufficient information to determine a
-contextual literal's element type still needs an explicit type. TLS retains
-OLS's partial semantic resolver; compiler diagnostics use the complete backend.
-For an unconstrained generic receiver, immutable-field checks conservatively
-protect an implicitly promoted `using` field. Write the existing pointer member
-explicitly (`value.pointer.field`) to retain shallow mutation in that case;
-concrete and shape-constrained records resolve pointer promotion directly.
-
-T01–T23 are implemented, including automatic constant evaluation, per-instance
-generic scheduling, persistent caching and independently owned allocated results.
-`fn` and `set` remain valid ordinary Odin identifiers. The
-[language specification](docs/language-spec.md) preserves the numbered reference;
-`demo/main.thor` is the evaluation program. Follow
-[DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.
-
-## Pure functions and compile-time execution
-
-```odin
-square :: fn(value: $T) -> T { value * value }
-SIZE :: square(4) // automatically evaluated: a genuine integer constant
-buffer: [SIZE]int
-NEXT :: #run eligible_proc(SIZE) // ordinary proc execution still needs #run
-```
-
-`fn` is a contextual procedure spelling. It lowers to an Odin procedure with a
-purity contract. A value-returning `fn` implicitly returns its final expression;
-explicit and early `return` statements remain valid. A final declaration,
-assignment, loop, or conditional statement does not supply a result. Only the
-function body's final expression is implicit; nested statement blocks keep their
-normal rules. Trailing comments or semicolons do not discard that value.
-Parenthesize an untyped brace literal, such as `({x, y})`, to distinguish it from
-a statement block. Ordinary `proc` bodies still require explicit returns, and
-void `fn` bodies keep ordinary call-statement behavior. See
-[the example](examples/implicit_returns/demo.thor).
-
-Calls with known values/types are evaluated automatically;
-runtime inputs remain runtime calls. Literals, named constants, supported constant
-expressions, type queries and evaluated results qualify. Mutable variables and
-immutable runtime bindings (`:>`) do not become constants through propagation.
-`#run` also accepts an ordinary `proc` when its relevant transitive call graph
-passes the same checks. Recursion, concrete generic calls, local constants,
-overloads, defaults, named arguments and forward/dependent results are supported.
-Explicit `#run` requires known inputs and reports a runtime argument as an error.
-
-A `fn` may directly call an ordinary Odin or Thor `proc` when that procedure
-and its transitive callees satisfy the pure rules. This applies to runtime calls
-as well as compile-time evaluation:
-
-```odin
-square :: proc(n: int) -> int { return n*n }
-adjusted :: proc(n: int) -> int { return square(n)+1 }
-calculate :: fn(n: int) -> int { return adjusted(n) }
-VALUE :: calculate(3) // 10
-```
-
-Calls from `fn` use checked versions of ordinary bodies, including the same
-scratch cleanup and independent returned storage as `fn`. An ordinary helper may
-mutate storage created within the enclosing `fn`, recursively through other
-helpers. Typed pointers may be used internally to address that storage:
-
-```odin
-set_y :: proc(out: ^int) { out^ = 7 }
-calculate :: fn(x: int) -> int {
-    y: int
-    set_y(&y)
-    return x + y
-}
-```
-
-Numeric casts, including `auto_cast`, keep Odin's type and overload inference.
-Pure code cannot use casts to manufacture pointers or expose pointer identities;
-that restriction also covers pointer elements inside converted arrays/slices.
-Native type queries may still inspect such types without executing a conversion.
-
-The permission follows the affected storage. A local record/header containing an
-input slice still borrows that slice; forwarding it through a pointer, field,
-subslicing, reference loop or another helper does not permit writing its elements.
-Fresh local arrays/buffers and scalar fields may be changed. Helpers may allocate
-buffers through output parameters; their storage lives until the enclosing pure
-invocation finishes. Helpers cannot store references to their own stack locals
-or slice literals through output parameters; use `make` for surviving buffers.
-Pointer-bearing results and public `fn` inputs remain
-outside the supported value subset; pointer identity comparisons and numeric
-address conversions remain forbidden. Provenance joins are conservative across
-branches and reassignments, rather than a full flow-sensitive borrow checker.
-
-Direct ordinary calls
-retain their original behavior and ownership; their known arguments alone do
-not trigger automatic compile-time evaluation. See
-[the transitive-call demo](examples/pure_calls/demo.thor).
-
-Printing, file/stream I/O, and the basic library's `print`, `input`, `read` and
-`write` are excluded from pure call chains. Calls such as `fmt.print(...)` in a
-`fn` report a purity error on the original call, including in an unused
-non-generic `fn`. Use `proc` for I/O. Aliases and transitive calls retain the same
-rule; inactive compile-time branches and unevaluated type queries remain unchecked.
-Formatting into a value is separate from observable I/O and remains subject to
-the usual pure formatting, allocation and input-type rules.
-See [pure-function and evaluation diagnostics](docs/purity-diagnostics.md) for
-the rejection categories, CLI/TLS source locations and execution-failure limits.
-
-Generic `$T`/`$N` bindings are scheduled separately for each resolved instantiation,
-including forwarding through imported procedures and inferred fixed-array counts.
-A normal parameter is still runtime storage inside a generic body. For example:
-
-```odin
-work :: proc($N:int, value:$T) -> int {
-    COUNT :: square(N)
-    WIDTH :: #run bytes(T)
-    data: [COUNT]int
-    return len(data) + WIDTH
-}
-bytes :: fn($T:typeid) -> int { return size_of(T) }
-```
-
-The scheduler follows selected `when`, both `#switch` forms and known lazy
-conditions. Calls under unknown runtime branches/loop bodies remain runtime;
-this avoids executing a failing call on a path that may never be taken. Explicit
-`#run` remains a compile-time directive even in runtime code. Type queries inspect
-types without executing the queried expression. Invalid dependency cycles are
-reported separately from valid native recursion. Unresolved generic `#run` calls
-receive a source diagnostic rather than a fabricated result.
-
-Inputs may contain scalar values, enums, strings, slices, fixed arrays, records,
-bit sets and tagged unions. Borrowed contents are protected through aliases,
-fields, slices, shallow copies, loops, union matches/assertions and calls. Local fixed-array
-copies and fresh buffers can be mutated. Pointers, maps, dynamic-array inputs,
-`any`, procedure values, runtime global storage, ambient context, uninspectable
-foreign/indirect calls, pointer identity observation, pointer/aggregate bit casts, uninitialized
-storage and unapproved operations are rejected. Numeric, boolean, enum and bit-set
-scalar bit casts are eligible. Checks inside
-inactive native `when` branches remain inactive.
-
-Compiler-controlled deterministic operations include numeric conversions/operations,
-length/type/size queries, `make` for local slice/dynamic buffers, `append`, `clear`,
-pop-family operations, `copy`, `delete`,
-assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
-formatters. Other direct calls require inspectable, transitively eligible bodies. Explicit
-allocator overrides and custom record formatters are rejected. Each checked
-invocation uses private tracking scratch storage, including for interpolation;
-mutating ordinary helpers share the enclosing invocation's scratch lifetime;
-all outstanding internal allocations are released on every return. Ordinary
-`proc` results and named f-string owners retain explicit cleanup. Anonymous
-f-string arguments follow the expression lifetime rule described above.
-
-String/slice/dynamic-array results own independent backing storage, including input views and
-repeated aliases inside arrays, records and tagged unions. Promotion uses the
-saved caller allocator after user defers and before local/scratch storage expires.
-Nested calls allocate their returned copies in the receiving function's scratch.
-Temporary work is always released; visible runtime results are caller-managed:
-
-```odin
-import pure "thor:pure"
-message :: fn(n:int)->string { return f"value {n}" }
-text := message(7)
-defer delete(text)
-// For nested allocated fields/elements, call pure.destroy(result) once instead.
-```
-
-Dynamic-array results retain their length and capacity and use the caller's
-allocator, so later `append` and ordinary `delete` work normally. For example:
-
-```odin
-load_points :: fn() -> [dynamic]Pos {
-    points: [dynamic]Pos
-    for point in STARTING_POINTS { append(&points, point) }
-    return points
-}
-points := load_points() // May fold automatically when all inputs are constants.
-defer delete(points)
-compiled := #run load_points()
-defer delete(compiled)
-```
-
-`pure.destroy` recursively frees owned strings/slices/dynamic arrays and their supported
-aggregate members. `pure.clone(value)` creates another deep owned copy. Both
-accept an explicit allocator outside pure code. Ordinary assignments remain
-shallow: destroy an owner once; free an owned field before overwriting it. Do not
-use recursive destruction on borrowed literals or shallow native containers.
-Arbitrary user procedure results and anonymous arguments remain manual Odin
-ownership. Procedures without an Odin context, including `proc "contextless"`
-and C-convention bodies, cannot promote allocated returns;
-use `fn` or a contextful `proc` for those results.
-
-Runtime `x := #run work()` and automatically folded calls materialize fresh owned storage on every execution,
-including loop iterations and cache hits. In constant contexts, strings and fixed
-aggregates containing strings become ordinary borrowed Odin constants. A
-slice- or dynamic-array-containing result needs a runtime binding (`:=`), or a
-pure consumer that returns a scalar constant. Native slice/dynamic-array constants
-are not implemented. Public pure inputs still accept slice views instead of
-dynamic-array headers.
-
-The value protocol preserves arbitrary string bytes, nil/non-nil empty slices,
-zero-sized sequence elements, dynamic-array capacities, fields, active union variants and exact float bits. It
-serializes contents without padding or process addresses.
-
-Explicit `#run` can execute an eligible ordinary Odin or Thor procedure,
-including procedures in the installed `base`, `core` and `vendor` collections.
-Thor discovers their source on demand and checks the implementation and required
-dependencies under the same rules as project code. Library names do not confer
-purity or require an allowlist entry. For example:
-
-```odin
-import "core:math" / round
-
-SIZE :: 1_000
-ARY_SIZE :: int(#run round(SIZE ** .33333))
-values: [ARY_SIZE]int
-```
-
-Eligible overloads, generics, immutable procedure aliases and selected/wildcard
-imports use the same path. Immutable library constants are inspected as
-dependencies; mutable runtime state remains forbidden. Compiler intrinsics are
-separate leaf operations: deterministic numeric/structural queries and known LLVM
-math operations are supported, while clock/cycle counters, memory operations and
-source identity queries such as `type_canonical_name` are not eligible user calls.
-A procedure with an inspectable Odin body can use a non-Odin calling convention;
-an external declaration without a body remains uninspectable. Existing input,
-result and ownership constraints still apply. An optional second return value is
-ignored by a single-value `#run`; non-optional multiple results need a consumer
-that returns one supported value.
-
-`--comptime=required|normal|aggressive|override` controls Thor's execution policy.
-`normal` is the default. `required` keeps explicit `#run` and evaluations needed
-for constants/types, while leaving optional calls at runtime. `aggressive` also
-evaluates eligible ordinary `proc` calls with known inputs; `override` does the
-same while ignoring `#runtime` barriers. Ordinary automatic calls must be proven
-pure and allocation-free and return a self-contained fixed-size value. Borrowed
-or allocated results keep their runtime ownership, and ordinary temporary
-allocator effects are retained. Explicit `#run` and declared `fn` calls keep
-their existing scratch-allocation/result contracts. See
-[compile-time execution modes](docs/comptime-modes.md) for examples, boundaries,
-cache behavior, and the matching `tls.comptime` editor setting.
-
-Compile-time execution uses temporary native helpers containing only
-the required declarations/imports. User entry points, unrelated runtime globals
-and package initializers are excluded; referenced runtime storage is rejected.
-Only selected native overload implementations enter the helper, with private
-implementations kept behind public evaluation bridges. Native source failures
-highlight the original `#run` and include their library source location. Public
-names and overload notes retain their original spelling.
-
-For runtime checked calls into installed Odin libraries, Thor writes a sparse
-SDK overlay under generated output and selects it for the backend compilation.
-Only files containing checked procedures are augmented; untouched packages,
-source files and resources link directly to the installed SDK. Unsaved SDK
-replacements supplied by an editor are emitted into the overlay as well.
-Ordinary and checked library calls therefore share the same nominal types;
-the installed SDK is unchanged. The manifest's `odin_environment` records the
-required `ODIN_ROOT`; use it alongside `odin_flags` when compiling generated Odin
-manually. Ordinary project-only call graphs do not need this SDK overlay.
-
-Run the [commented native-call walkthrough](examples/native_run/demo.thor) with
-`./thor run examples/native_run`.
-Helpers preserve the original defines, `ODIN_TEST` and `ODIN_BUILD_MODE`, including
-dependencies in test-tagged files. Cross-target
-evaluation is rejected. Compilation errors map to original source; execution failures
-point to the original call or `#run` expression. Helpers are deleted after use.
-Helper compilation and execution have no deadline by default or with
-`--run-timeout 0`. Positive limits set a deadline in seconds, for
-example `--run-timeout 0.5`. With a positive execution limit, helper compilation
-allows at least 30 seconds.
-Independent automatic calls to global, non-generic `fn` declarations can share
-a helper in batches of up to 32 compatible scalar results. Each call retains its
-own result-cache key and scratch lifetime. Batch failures return to individual
-evaluation in source order. Explicit `#run`, conditional and loop execution,
-local captures, variadic calls and positive per-call deadlines keep individual
-helpers. Native helper compilation stays serial to bound memory use.
-
-Successful helper results use the shared bounded per-user cache. Keys include emitted transitive code/types/constants/arguments, native
-flags/defines, compiler binary/version, Thor/frontend/runtime and installed
-base/core/vendor source contents, plus static resource contents/existence. Keys are
-conservative: equivalent calls at different sites or irrelevant source edits may
-miss. Dynamic resource paths bypass caching. Partial, corrupt or incompatible
-entries recompute; publication is atomic. Cache storage failures do not prevent
-compilation. Cached entries contain typed contents, never executables or addresses.
-
-```sh
-./thor run demo --cache-report # repeat to see warm hits
-./thor run demo --no-cache
-./thor run demo --clear-cache
-./thor check demo --cache-dir /tmp/thor-evaluations
-```
-
-`THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides project
-records. SDK syntax uses the shared default root, or `THOR_CACHE_DIR` when set.
-Each explicitly selected root has its own 512 MiB budget. See
-[storage and development retention](docs/storage.md).
-`--cache-report` prints opt-in JSON counters on stdout, leaving compiler diagnostics
-on stderr. Evaluation-cache lookups follow eligibility checks. Project analysis
-and final Odin checking still run on every invocation. Late result-cache hits
-hash generated evaluator code in memory and skip writing or compiling the
-temporary evaluator project.
-
-Pure callback types support runtime-selected functions, aliases, generic callbacks,
-and known-callback `#run` calls. They use the same procedure-pointer representation
-as Odin; their effect contracts are checked before lowering. See
-[pure callback types](docs/pure-callbacks.md) for examples and conversion rules.
-
-Current conservative boundaries: the native compiler cannot reflect record
-fields at compile time, so Thor supplies checked source field schemas. Unknown
-external record schemas, some `using`-promoted record shapes and raw unions are
-rejected; a record sharing a known raw union's field-name shape may also be
-rejected. Provenance joins can reject writes to a fresh buffer after it has shared
-a binding with borrowed storage. Compile-time evaluation currently supports direct,
-resolved calls with one result; void/multiple-result `fn` calls retain their native
-runtime behavior. The scheduler uses Thor's partial resolver, so unsupported or
-ambiguous specializations may still need an explicit type or simpler wrapper.
-Enum-indexed array constants support declared keys and zeroed
-unnamed slots; nonzero unnamed slots fail rather than being changed on output.
-Source-location-dependent `#file`, `#directory`, `#line`, `#caller_location`,
-`ODIN_BUILD_PROJECT_NAME` and source/type identity queries, including
-constants derived from them, are rejected in pure execution until their values
-can be kept identical across generated runtime code and helpers. `#defined`
-depends on the declarations in scope and is also excluded. Implicit deferred
-procedure callbacks are also rejected; make eligible calls explicit in the body.
-TLS infers call result types but does not execute procedures for hover values or
-its own branch selection; live compiler checks perform the actual evaluation.
-
-Lifetime and cleanup analysis is available through `thor vet`; see
-[Lifetime and leak checks](docs/lifetime-vet.md) for definite findings, unverified
-boundaries, and `vet_ignore` acknowledgements. These checks add no ordinary-build
-analysis passes or application runtime instrumentation.
+Thor-owned code uses [0BSD](LICENSE). Incorporated software retains its own licenses; see [NOTICE](NOTICE).
