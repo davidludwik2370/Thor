@@ -103,8 +103,12 @@ Bring selected public names, or every public name, into the current file.
 <!-- readme-example: selective-and-wildcard-imports:thor -->
 ```odin
 import "core:fmt" / print, println
-print("Hello, ")
-println("Thor!")
+import _ "core:math" / sqrt
+import * "core:strings"
+
+print("Square root: ")
+println(sqrt(f64(9)))
+println("Has prefix:", has_prefix("Thor", "Th"))
 ```
 
 **Odin**
@@ -112,11 +116,15 @@ println("Thor!")
 <!-- readme-example: selective-and-wildcard-imports:odin -->
 ```odin
 import "core:fmt"
-fmt.print("Hello, ")
-fmt.println("Thor!")
+import "core:math"
+import "core:strings"
+
+fmt.print("Square root: ")
+fmt.println(math.sqrt(f64(9)))
+fmt.println("Has prefix:", strings.has_prefix("Thor", "Th"))
 ```
 
-`import "core:fmt" / print, println` brings just those procedures into scope and retains `fmt.print` / `fmt.println`. Use `import _ "core:fmt" / print, println` to omit the namespace, or `import * "package:path"` to bring in every public name while keeping the namespace. The [basic package example](#importing-basic-helpers) shows the wildcard form. Names are file-local, are not re-exported, and obey privacy and collision checks. Selected mutable package variables require their namespace; wildcard imports preserve live variable access.
+`import "core:fmt" / print, println` selects both procedures and retains the `fmt` namespace. `import _ "core:math" / sqrt` imports only `sqrt` without a `math` namespace. `import * "core:strings"` brings in every public name and retains the `strings` namespace. Names are file-local, are not re-exported, and obey privacy and collision checks. Selected mutable package variables require their namespace; wildcard imports preserve live variable access.
 
 [Import rules](docs/language-guide.md#expressions-arrays-and-ranges).
 

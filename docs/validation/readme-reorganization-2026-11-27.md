@@ -79,3 +79,13 @@ new/updated pairs ran in checked and unchecked builds, and the three structure
 tests checked the full reordered index, code-fence inventory and links. This
 follow-up changed documentation and example expectations only. Results are
 retained locally as `dist/readme-reorganization-2026-11-27/follow-up.json`.
+
+## Native-package import comparison
+
+The opening import pair now combines comma-separated `core:fmt` selections,
+namespace-free `core:math` selection and wildcard `core:strings` imports. The
+Odin counterpart uses the same packages with qualified calls. Both versions
+produce `Square root: 3` and `Has prefix: true` in checked and unchecked builds.
+The example test and all three README structure checks passed (four tests,
+no skips). Results are retained locally as
+`dist/readme-reorganization-2026-11-27/native-imports.json`.

@@ -9,7 +9,7 @@
         "odin"
       ],
       "placement": "body",
-      "stdout": "Hello, Thor!",
+      "stdout": "Square root: 3\nHas prefix: true",
       "comptime_modes": false,
       "no_odin_reason": null
     },
