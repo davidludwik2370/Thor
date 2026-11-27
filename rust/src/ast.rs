@@ -291,14 +291,20 @@ impl Source {
                 .unwrap_or_default();
             if let Some(id) = candidates.into_iter().find(|id| {
                 let k = nodes[id.0].kind.as_str();
-                if kind == "ComprehensionBody" {
+                if kind == "PureFunctionType" {
+                    k == "ProcedureType"
+                } else if kind == "ImplicitReturn" {
+                    k == "Return"
+                } else if kind == "ComprehensionBody" {
                     k == "Procedure"
                 } else {
                     matches!(k, "Call" | "Switch" | "Procedure")
                 }
             }) {
-                if kind == "PureFunction" {
-                    nodes[id.0].data["pure"] = Value::Bool(true);
+                if matches!(kind, "PureFunction" | "PureFunctionType") {
+                    nodes[id.0].data[if kind == "PureFunctionType" { "pure_type" } else { "pure" }] = Value::Bool(true);
+                } else if kind == "ImplicitReturn" {
+                    nodes[id.0].data["implicit_return"] = Value::Bool(true);
                 } else {
                     for (key, value) in feature.as_object().into_iter().flatten() {
                         if matches!(key.as_str(), "roles" | "lists") {

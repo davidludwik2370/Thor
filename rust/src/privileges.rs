@@ -3147,10 +3147,25 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 || s.result
                 || self.s(s.reference).node(s.reference.node).mutable && !s.immutable
         });
+        let callback_targets=if indirect {vec![]}else{self.r.candidates(callee)};
+        let runtime_callback=indirect || callback_targets.is_empty() || callback_targets.iter().any(|target|self.kind(*target)!="Procedure");
+        let callback_type=if runtime_callback && self.r.pure_callbacks_present() {self.typ(callee,c)} else {Type::Unknown};
+        if runtime_callback && (callback_type.pure_callable() || matches!(callback_type,Type::Generic) && self.pure_depth>0) && !self.denotes_type(callee) {
+            let mut outputs=vec![];
+            if let Some(signature)=self.r.signature(callee) {
+                for (_,annotation) in self.r.fields(signature,"results") {
+                    let typ=annotation.map(|annotation| self.specialized_type(annotation,&self.contexts[c].bindings.clone())).unwrap_or(Type::Unknown);
+                    outputs.push(self.value(typ));
+                }
+            }
+            let result=outputs.first().copied().unwrap_or_else(||self.value(typ));
+            self.contexts[c].expressions.insert(r,outputs);
+            return result;
+        }
         let mut candidates = if indirect {
             vec![]
         } else {
-            self.r.candidates(callee)
+            callback_targets
         };
         let plans = { let _phase=crate::profile::span("permissions.call_plans"); if indirect {
             vec![]

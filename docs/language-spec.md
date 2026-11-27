@@ -678,8 +678,18 @@ Anonymous expression lifetimes (also applies to Set expressions):
 
 Declaration syntax:
     square :: fn(x: int) -> int {
-        return x * x
+        x * x
     }
+
+A value-returning fn implicitly returns its body's final expression, using the
+same type, arity, ownership, purity and compile-time rules as an explicit return.
+An explicit early return remains valid. A trailing semicolon or comment does
+not discard the expression. A final statement (including a declaration,
+assignment, block, if, when or loop) does not imply a return from its nested
+expressions. Multi-result calls can forward all results as a single final
+expression. This does not introduce tuple-expression or comma-list syntax.
+An untyped brace literal can be parenthesized to distinguish it from a statement
+block. Void fn bodies and ordinary proc return requirements are unchanged.
 
 Purity means deterministic results from the input values and permitted constants,
 with no externally visible mutation or I/O. Compiler-managed allocation is an

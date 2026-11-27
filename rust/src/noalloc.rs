@@ -515,7 +515,7 @@ impl<'a, 'r> Check<'a, 'r> {
             Type::Scalar { .. }
             | Type::Constant(_)
             | Type::Enum(_)
-            | Type::Procedure(_)
+            | Type::Procedure(_) | Type::Function(_, _)
             | Type::Pointer(_) => return false,
             _ => {}
         }
@@ -559,7 +559,7 @@ impl<'a, 'r> Check<'a, 'r> {
             | Type::Constant(_)
             | Type::Enum(_)
             | Type::String { .. }
-            | Type::Procedure(_)
+            | Type::Procedure(_) | Type::Function(_, _)
             | Type::Pointer(_)
             | Type::Slice(_)
             | Type::Dynamic(_)
@@ -1496,7 +1496,7 @@ impl<'a, 'r> Check<'a, 'r> {
         }
         if !crate::parallelcompile::known_callback(self.r, callee) {
             let typ = self.r.specialized_type(callee, &w.bindings);
-            if let Type::Procedure(signature) = base_type(&typ) {
+            if let Type::Procedure(signature) | Type::Function(signature, _) = base_type(&typ) {
                 let source = &self.r.sources[signature.file];
                 if let Some(decl) = source
                     .node(signature.node)

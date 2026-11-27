@@ -1,0 +1,158 @@
+{
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "machine": "arm64",
+  "rows": [
+    {
+      "case": "ordinary",
+      "runs": [
+        {
+          "elapsed_ms": 53.483583,
+          "callback_ms": 0,
+          "callback_passes": 0,
+          "callback_self_ms": 0
+        },
+        {
+          "elapsed_ms": 53.001167,
+          "callback_ms": 0,
+          "callback_passes": 0,
+          "callback_self_ms": 0
+        },
+        {
+          "elapsed_ms": 53.043667,
+          "callback_ms": 0,
+          "callback_passes": 0,
+          "callback_self_ms": 0
+        },
+        {
+          "elapsed_ms": 53.521833,
+          "callback_ms": 0,
+          "callback_passes": 0,
+          "callback_self_ms": 0
+        },
+        {
+          "elapsed_ms": 51.799083,
+          "callback_ms": 0,
+          "callback_passes": 0,
+          "callback_self_ms": 0
+        }
+      ],
+      "median_ms": 53.043667,
+      "median_callback_ms": 0,
+      "median_callback_self_ms": 0
+    },
+    {
+      "case": "pure_callbacks",
+      "runs": [
+        {
+          "elapsed_ms": 208.6115,
+          "callback_ms": 0.376792,
+          "callback_passes": 2,
+          "callback_self_ms": 0.33445600000000003
+        },
+        {
+          "elapsed_ms": 199.934,
+          "callback_ms": 0.367209,
+          "callback_passes": 2,
+          "callback_self_ms": 0.328627
+        },
+        {
+          "elapsed_ms": 201.918041,
+          "callback_ms": 0.37720899999999996,
+          "callback_passes": 2,
+          "callback_self_ms": 0.333664
+        },
+        {
+          "elapsed_ms": 194.57354199999997,
+          "callback_ms": 0.36845900000000004,
+          "callback_passes": 2,
+          "callback_self_ms": 0.327128
+        },
+        {
+          "elapsed_ms": 200.09474999999998,
+          "callback_ms": 0.36691700000000005,
+          "callback_passes": 2,
+          "callback_self_ms": 0.33041600000000004
+        }
+      ],
+      "median_ms": 200.09474999999998,
+      "median_callback_ms": 0.36845900000000004,
+      "median_callback_self_ms": 0.33041600000000004
+    },
+    {
+      "case": "hilo_test",
+      "runs": [
+        {
+          "elapsed_ms": 264.221041,
+          "callback_ms": 21.863791,
+          "callback_passes": 2,
+          "callback_self_ms": 16.51037699999999
+        },
+        {
+          "elapsed_ms": 259.597666,
+          "callback_ms": 21.233416999999996,
+          "callback_passes": 2,
+          "callback_self_ms": 16.004753999999995
+        },
+        {
+          "elapsed_ms": 260.388791,
+          "callback_ms": 21.001208000000002,
+          "callback_passes": 2,
+          "callback_self_ms": 15.831735999999992
+        },
+        {
+          "elapsed_ms": 261.66916699999996,
+          "callback_ms": 21.483083999999998,
+          "callback_passes": 2,
+          "callback_self_ms": 16.10379799999999
+        },
+        {
+          "elapsed_ms": 260.85425000000004,
+          "callback_ms": 21.128791,
+          "callback_passes": 2,
+          "callback_self_ms": 15.909986999999994
+        }
+      ],
+      "median_ms": 260.85425000000004,
+      "median_callback_ms": 21.233416999999996,
+      "median_callback_self_ms": 16.004753999999995
+    },
+    {
+      "case": "poker_pmap",
+      "runs": [
+        {
+          "elapsed_ms": 687.624458,
+          "callback_ms": 46.038041,
+          "callback_passes": 2,
+          "callback_self_ms": 27.501983000000006
+        },
+        {
+          "elapsed_ms": 664.0666659999999,
+          "callback_ms": 45.5695,
+          "callback_passes": 2,
+          "callback_self_ms": 27.242355000000014
+        },
+        {
+          "elapsed_ms": 658.7707499999999,
+          "callback_ms": 45.958791999999995,
+          "callback_passes": 2,
+          "callback_self_ms": 27.505428999999996
+        },
+        {
+          "elapsed_ms": 681.369,
+          "callback_ms": 46.363125,
+          "callback_passes": 2,
+          "callback_self_ms": 27.606576999999987
+        },
+        {
+          "elapsed_ms": 656.1320830000001,
+          "callback_ms": 46.188709,
+          "callback_passes": 2,
+          "callback_self_ms": 27.63828300000002
+        }
+      ],
+      "median_ms": 664.0666659999999,
+      "median_callback_ms": 46.038041,
+      "median_callback_self_ms": 27.505428999999996
+    }
+  ]
+}

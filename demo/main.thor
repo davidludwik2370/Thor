@@ -99,11 +99,11 @@ known_sum :: proc() -> int {
     values := [2, 3, 5]
     return pure_sum(values[:])
 }
-PURE_SIZE :: #run pure_square(4)
-PURE_NEXT :: #run pure_square(PURE_SIZE)
+PURE_SIZE   :: #run pure_square(4)
+PURE_NEXT   :: #run pure_square(PURE_SIZE)
 PURE_REPORT :: #run pure_report(7)
-PURE_ZERO :: #run pure_negative_zero()
-PURE_SUM :: #run known_sum()
+PURE_ZERO   :: #run pure_negative_zero()
+PURE_SUM    :: #run known_sum()
 
 // T22: independent returned storage, including nested sequences and input views.
 Owned_Report :: struct {title:string, rows:[]string, values:[]int}

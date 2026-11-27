@@ -36,6 +36,7 @@ pub struct Scheduler<'p> {
     explicit_arguments: usize,
     has_pure: bool,
     policy_types: std::collections::HashMap<Type,bool>,
+    callback_result_types: std::collections::HashMap<Type,bool>,
     policy_calls: BTreeMap<(Ref,String),bool>,
     has_runtime: bool,
     runtime_barriers: BTreeMap<(Ref,String),bool>,
@@ -89,6 +90,7 @@ impl<'p> Scheduler<'p> {
             guard_busy: BTreeSet::new(),
             explicit_arguments: 0,
             policy_types: Default::default(),
+            callback_result_types: Default::default(),
             policy_calls: Default::default(),
             has_pure: project
                 .sources
@@ -518,6 +520,10 @@ impl<'p> Scheduler<'p> {
             let pure=self.source(plan.procedure).node(plan.procedure.node).data["pure"] == true;
             // Preserve normal mode's early rejection before signature work.
             if !pure && !policy.aggressive() {return false;}
+            if pure {
+                let typ=self.resolver.type_of(node);
+                if self.callback_result(&typ) {return false;}
+            }
             self.resolver.fields(plan.signature, "results").len() == 1
                 && (pure || self.ordinary_eligible(node))
         } else {
@@ -719,7 +725,7 @@ impl<'p> Scheduler<'p> {
                     let typ = self
                         .resolver
                         .specialized_type(callee, &Substitutions::new());
-                    if matches!(typ, Type::Pointer(_) | Type::Procedure(_))
+                    if matches!(typ, Type::Pointer(_) | Type::Procedure(_) | Type::Function(_, _))
                         || matches!(typ,Type::Scalar {ref name,..}|Type::String {ref name,..} if ["rawptr","cstring","any","typeid"].contains(&name.as_str()))
                     {
                         return Ok(false);
@@ -1273,6 +1279,8 @@ impl<'p> Scheduler<'p> {
             let direct = self.resolver.symbol(callee).is_none_or(|index| {
                 let symbol = &self.resolver.symbols[index];
                 symbol.constant && !symbol.immutable && !symbol.parameter && !symbol.result
+                    || self.resolver.bound_constants.get(&(symbol.reference,symbol.name.clone()))
+                        .is_some_and(|(_,value)|crate::specialization::callback_value(value).is_some())
             });
             let fallback = (direct && plans.is_empty()).then(|| self.resolver.candidates(callee));
             let inspectable = |target| {

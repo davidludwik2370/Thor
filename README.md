@@ -946,7 +946,9 @@ as `E` in `proc(a,b:E)` or `N` in `proc(a:[N]int)`. A dependency appearing only 
 the result/body is currently rejected with a mapped signature diagnostic.
 Callbacks cannot capture enclosing runtime parameters. An independently generic
 literal such as `proc(a,b:$U)` needs an explicit callback parameter type.
-Procedure-valued parameters remain outside the `fn`/`#run` pure-input contract.
+Ordinary `proc` parameters remain outside the `fn`/`#run` pure-input contract.
+Use a `fn(...) -> ...` callback type when the callable itself must be pure; see
+[pure callback types](docs/pure-callbacks.md).
 
 This extension applies to `.thor` declarations; native `.odin` declarations retain
 their source-mapped unsupported-default check. Named generic defaults, concrete
@@ -1586,14 +1588,24 @@ generic scheduling, persistent caching and independently owned allocated results
 ## Pure functions and compile-time execution
 
 ```odin
-square :: fn(value: $T) -> T { return value * value }
+square :: fn(value: $T) -> T { value * value }
 SIZE :: square(4) // automatically evaluated: a genuine integer constant
 buffer: [SIZE]int
 NEXT :: #run eligible_proc(SIZE) // ordinary proc execution still needs #run
 ```
 
 `fn` is a contextual procedure spelling. It lowers to an Odin procedure with a
-purity contract. Calls with known values/types are evaluated automatically;
+purity contract. A value-returning `fn` implicitly returns its final expression;
+explicit and early `return` statements remain valid. A final declaration,
+assignment, loop, or conditional statement does not supply a result. Only the
+function body's final expression is implicit; nested statement blocks keep their
+normal rules. Trailing comments or semicolons do not discard that value.
+Parenthesize an untyped brace literal, such as `({x, y})`, to distinguish it from
+a statement block. Ordinary `proc` bodies still require explicit returns, and
+void `fn` bodies keep ordinary call-statement behavior. See
+[the example](examples/implicit_returns/demo.thor).
+
+Calls with known values/types are evaluated automatically;
 runtime inputs remain runtime calls. Literals, named constants, supported constant
 expressions, type queries and evaluated results qualify. Mutable variables and
 immutable runtime bindings (`:>`) do not become constants through propagation.
@@ -1851,6 +1863,11 @@ on stderr. Evaluation-cache lookups follow eligibility checks. Project analysis
 and final Odin checking still run on every invocation. Late result-cache hits
 hash generated evaluator code in memory and skip writing or compiling the
 temporary evaluator project.
+
+Pure callback types support runtime-selected functions, aliases, generic callbacks,
+and known-callback `#run` calls. They use the same procedure-pointer representation
+as Odin; their effect contracts are checked before lowering. See
+[pure callback types](docs/pure-callbacks.md) for examples and conversion rules.
 
 Current conservative boundaries: the native compiler cannot reflect record
 fields at compile time, so Thor supplies checked source field schemas. Unknown

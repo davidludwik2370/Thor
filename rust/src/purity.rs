@@ -654,7 +654,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     if Self::scalar_transmute(&target)==Some(false) || Self::scalar_transmute(&value)==Some(false) {
                         self.fault(root,node,via,"Pure transmute requires scalar numeric, boolean, enum or bit-set values; pointer and aggregate representations are not eligible.");
                     }
-                } else if self.role(node,"expr").is_some_and(|value| {
+                } else if !target.pure_callable() && self.role(node,"expr").is_some_and(|value| {
                     let typ=self.r.specialized_type(value,bindings);self.pointers(&typ,&mut HashSet::new())
                 }) {
                     self.fault(root,node,via,"Pure code cannot observe pointer identities or convert pointers to numeric values.");
@@ -871,7 +871,13 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let sym = &self.r.symbols[i];
                 sym.parameter || sym.result || !sym.constant
             });
-            if indirect {
+            if target_type.pure_callable() && (indirect || plans.is_empty()
+                || plans.iter().any(|plan| self.kind(plan.procedure)!="Procedure") || self.kind(callee)=="Procedure")
+                || indirect && matches!(target_type,Type::Generic) {
+                // The value boundary checker proves the fn contract, including
+                // runtime-selected callbacks. No body identity is required here.
+                self.walk(root, proc, callee, bindings, via);
+            } else if indirect {
                 self.fault(
                     root,
                     call,
@@ -1185,6 +1191,16 @@ impl<'a, 'r> Purity<'a, 'r> {
                 ["rawptr", "any", "typeid", "cstring", "cstring16"].contains(&name.as_str())
             }
             Type::Map { .. } | Type::Set(_) | Type::Procedure(_) => true,
+            Type::Function(signature, captures) => {
+                let context = captures.iter().cloned().collect();
+                let source = &self.r.sources[signature.file];
+                if !matches!(source.node(signature.node).data["calling_convention"].as_str(), None | Some("") | Some("odin")) { return true; }
+                ["params", "results"].into_iter().flat_map(|role| self.r.fields(*signature, role)).collect::<Vec<_>>()
+                    .iter().filter_map(|(_,annotation)|*annotation).any(|annotation| {
+                        let typ = self.r.specialized_type(annotation, &context);
+                        self.unsafe_storage(&typ, seen)
+                    })
+            },
             Type::Struct(_) | Type::Record(..) if self.raw_union(t) => true,
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r
@@ -1204,7 +1220,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             return false;
         }
         match t {
-            Type::Pointer(_) => true,
+            Type::Pointer(_) | Type::Function(..) => true,
             Type::Scalar { name, .. } => {
                 ["rawptr", "any", "cstring", "typeid"].contains(&name.as_str())
             }

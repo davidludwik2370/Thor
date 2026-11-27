@@ -294,7 +294,7 @@ fn resolve_inner(
         };
         let mut candidates = resolver.candidates(callee);
         if candidates.is_empty() {
-            if let Type::Procedure(signature) = resolver.specialized_type(callee, bindings) {
+            if let Type::Procedure(signature) | Type::Function(signature, _) = resolver.specialized_type(callee, bindings) {
                 candidates.push(signature);
             }
         }
@@ -515,7 +515,7 @@ pub(crate) fn concrete(typ: &Type) -> bool {
     match typ {
         // Procedure signatures have structural identity in Odin; distinct AST
         // references alone are insufficient to reject a result_type override.
-        Type::Unknown | Type::Generic | Type::Procedure(_) => false,
+        Type::Unknown | Type::Generic | Type::Procedure(_) | Type::Function(_, _) => false,
         Type::Array { elem, .. } | Type::Matrix{elem,..}
             | Type::Vector { elem, .. }
         | Type::Slice(elem)

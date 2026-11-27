@@ -251,7 +251,7 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
-         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set:
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,typeinfo.Type_Info_Procedure:
         runtime.mem_copy_non_overlapping(dst,src,info.size)
     case typeinfo.Type_Info_String:
         if item.is_cstring||item.encoding!=.UTF_8 {panic("Unsupported pure string result")}
@@ -311,7 +311,7 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
-         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set:
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,typeinfo.Type_Info_Procedure:
     case typeinfo.Type_Info_String:
         value:=(cast(^string)src)^;if len(value)>0 {delete(value,allocator)}
     case typeinfo.Type_Info_Slice:

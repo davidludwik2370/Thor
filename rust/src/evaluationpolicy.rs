@@ -1,6 +1,24 @@
 //! Opt-in ordinary-call folding. Result eligibility preserves native ownership.
 use super::*;
 impl Scheduler<'_> {
+    // Procedure identities cannot cross the helper-process boundary. Leave
+    // factories inside the enclosing native evaluation, or at runtime. Cache
+    // aggregate walks so repeated calls do not repeatedly inspect their fields.
+    pub(super) fn callback_result(&mut self, typ: &Type) -> bool {
+        if let Some(result)=self.callback_result_types.get(typ) {return *result;}
+        self.callback_result_types.insert(typ.clone(),false);
+        let result=match typ {
+            Type::Function(..)|Type::Procedure(_)=>true,
+            Type::Nominal(_,base)|Type::Array{elem:base,..}|Type::Fixed{elem:base,..}
+            |Type::Slice(base)|Type::Dynamic(base)|Type::Matrix{elem:base,..}
+            |Type::Vector{elem:base,..}|Type::Soa(base)=>self.callback_result(base),
+            Type::Struct(_)|Type::Record(..)|Type::Anonymous(_)=>self.resolver.record_fields(typ)
+                .iter().any(|(_,field)|self.callback_result(field)),
+            Type::Union(..)=>self.resolver.union_variants(typ).iter().any(|field|self.callback_result(field)),
+            _=>false,
+        };
+        self.callback_result_types.insert(typ.clone(),result);result
+    }
     pub(super) fn self_contained(&mut self, typ:&Type)->bool {
         if let Some(eligible)=self.policy_types.get(typ) {return *eligible;}
         self.policy_types.insert(typ.clone(),false);

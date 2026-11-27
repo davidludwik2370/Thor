@@ -780,7 +780,9 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 				append(&list, stmt)
 				if es, es_ok := stmt.derived.(^ast.Expr_Stmt); es_ok && es.expr != nil {
 					if _, pl_ok := es.expr.derived.(^ast.Proc_Lit); pl_ok {
-						error(p, stmt.pos, "procedure literal evaluated but not used")
+						if !thor_fn_literal_at_tail(p) {
+							error(p, stmt.pos, "procedure literal evaluated but not used")
+						}
 					}
 				}
 			}
@@ -1480,6 +1482,11 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 }
 
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
+    if thor_fn_expression_start(p) {
+        stmt:=parse_simple_stmt(p,{Stmt_Allow_Flag.Label})
+        expect_semicolon(p,stmt)
+        return stmt
+    }
 	#partial switch p.curr_tok.kind {
 	// Operands
 	case .Context, // Also allows for 'context = '
@@ -1649,7 +1656,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		case "force_inline", "force_no_inline", "must_tail":
 			expr := parse_inlining_or_tailing_operand(p, true, tag)
-			es := ast.new(ast.Expr_Stmt, expr.pos, expr)
+            start:=tok.pos if thor_fn_has_results(p) else expr.pos
+			es := ast.new(ast.Expr_Stmt, start, expr)
 			es.expr = expr
 			return es
 		case "unroll":
@@ -2507,9 +2515,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.curr_tok.kind = .Proc
 			p.tok.insert_semicolon = false
 			expr := parse_operand(p,lhs)
+			thor_fn_implicit_return(p,expr)
 			append(&p.edits,Edit{start=start,end=start+2,text="proc"})
-			if _,ok:=expr.derived_expr.(^ast.Proc_Lit);!ok {error(p,expr.pos,"A pure fn requires a body")}
-			append(&p.features,Feature{kind="PureFunction",start=expr.pos.offset,end=expr.end.offset})
+			kind := "PureFunction"
+			if _,ok:=expr.derived_expr.(^ast.Proc_Type);ok {kind="PureFunctionType"}
+			append(&p.features,Feature{kind=kind,start=expr.pos.offset,end=expr.end.offset})
 			return expr
 		}
 		if p.thor && p.curr_tok.text == "set" && thor_set_type_follows(p) { return parse_set_type(p) }
@@ -3812,7 +3822,14 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Period:
 		op := advance_token(p)
-		field := parse_ident(p)
+		field: ^ast.Ident
+        if thor_fn_has_results(p) && (p.curr_tok.kind==.Close_Brace || p.curr_tok.kind==.Close_Paren ||
+            p.curr_tok.kind==.Close_Bracket || p.curr_tok.kind==.Semicolon || p.curr_tok.kind==.EOF) {
+            // Retain the enclosing body while the user is typing a tail enum
+            // expression. Consuming its closing delimiter loses return context.
+            error(p,p.curr_tok.pos,"expected an identifier after '.'")
+            field=ast.new(ast.Ident,end_pos(op),end_pos(op))
+        } else {field=parse_ident(p)}
 		ise := ast.new(ast.Implicit_Selector_Expr, op.pos, field)
 		ise.field = field
 		return ise
@@ -3993,7 +4010,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 			if !allow_token(p, .Comma) { break }
 		}
 		lhs = list[:]
-	} else { lhs = parse_lhs_expr_list(p) }
+	} else { lhs = parse_expr_list(p,!thor_fn_has_results(p)) }
 	op := p.curr_tok
 	switch {
 	case tokenizer.is_assignment_operator(op.kind):

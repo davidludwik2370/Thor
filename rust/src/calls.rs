@@ -182,7 +182,7 @@ impl Resolver<'_> {
         let argument_signature=if targets.is_some() {
             let mut typ=self.specialized_type(Ref{file:call.file,node:callee},context);
             while let Type::Nominal(_,inner)=typ {typ=*inner;}
-            let Type::Procedure(signature)=typ else{return vec![];};
+            let Some(signature)=typ.signature() else{return vec![];};
             Some(signature)
         }else{None};
         let mut plans = vec![];
@@ -250,6 +250,7 @@ impl Resolver<'_> {
                 })
                 .collect::<Vec<_>>();
             let mut bindings = context.clone();
+            if let Type::Function(_, captures) = self.specialized_type(Ref { node: callee, ..call }, context) { bindings.extend(captures); }
             bindings.extend(self.parameter_bindings(signature, &types));
             let mut result_default_valid=true;
             for query in crate::resulttypes::default_queries(self,signature) {

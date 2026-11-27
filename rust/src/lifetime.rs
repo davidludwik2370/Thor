@@ -1308,7 +1308,7 @@ impl Analysis<'_, '_> {
             Type::Pointer(inner)
                 if matches!(
                     base(inner),
-                    Type::Scalar { .. } | Type::Enum(_) | Type::Procedure(_)
+                    Type::Scalar { .. } | Type::Enum(_) | Type::Procedure(_) | Type::Function(_, _)
                 ) => {}
             Type::Pointer(_) => {
                 if state
@@ -3227,7 +3227,7 @@ impl Analysis<'_, '_> {
             }
         }
         let callable_type = self.typ(callee, f);
-        if matches!(base(&callable_type), Type::Procedure(_))
+        if matches!(base(&callable_type), Type::Procedure(_) | Type::Function(_, _))
             && !crate::parallelcompile::known_callback(self.r, callee)
             && state.reachable(vs.iter().cloned()).is_empty()
             && !vs.iter().any(|v| v.unknown)
@@ -4458,7 +4458,7 @@ impl Analysis<'_, '_> {
             }
             if matches!(
                 base(t),
-                Type::Scalar { .. } | Type::Enum(_) | Type::Constant(_) | Type::Procedure(_)
+                Type::Scalar { .. } | Type::Enum(_) | Type::Constant(_) | Type::Procedure(_) | Type::Function(_, _)
             ) {
                 return Value::default();
             }

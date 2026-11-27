@@ -496,6 +496,7 @@ impl Lower<'_, '_> {
         }
         let children = match typ {
             Type::Unknown | Type::Generic => return None,
+            Type::Function(..) => return Some(false),
             Type::Pointer(_) | Type::Procedure(_) | Type::Map { .. } | Type::Set(_) => {
                 return Some(true)
             }

@@ -126,7 +126,7 @@ impl Flow {
         }
         *budget -= 1;
         match base_type(typ) {
-            Type::Procedure(_)
+            Type::Procedure(_) | Type::Function(_, _)
             | Type::Pointer(_)
             | Type::Slice(_)
             | Type::Dynamic(_)

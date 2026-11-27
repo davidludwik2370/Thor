@@ -143,7 +143,7 @@ fn possible(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -
         | Type::Fixed { .. }
         | Type::Map { .. }
         | Type::Set(_)
-        | Type::Procedure(_) => false,
+        | Type::Procedure(_) | Type::Function(_, _) => false,
         Type::Scalar { name, .. } | Type::String { name, .. }
             if [
                 "rawptr",

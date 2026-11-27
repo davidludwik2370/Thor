@@ -643,6 +643,15 @@ impl Project {
             crate::scoped::validate(&mut resolver)?;
             self.retain_resolver(resolver);
         }
+        let callbacks_deferred = if crate::purecallbacks::present(&self.sources) {
+            let mut resolver = self.resolver();
+            resolver.prepare_contexts();
+            resolver.set_evaluations(self.evaluated.clone());
+            if let Some(plan)=&self.evaluation {crate::specialization::Specializations::apply_bindings(&plan.bindings,&mut resolver);}
+            let deferred=crate::purecallbacks::validate(&mut resolver,false)?;
+            self.retain_resolver(resolver);
+            deferred
+        } else {false};
         self.schedule_evaluations()?;
         self.check_no_alloc()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root,self.options.native_policy_probe
@@ -658,6 +667,7 @@ impl Project {
         if self.evaluation.is_none() && crate::unused_attributes::present(&self.sources) {
             crate::unused_attributes::validate(&mut resolver, true)?;
         }
+        if callbacks_deferred || !self.evaluated.is_empty() {crate::purecallbacks::validate(&mut resolver,true)?;}
         crate::lower::prime_logical_constants(&mut resolver);
         resolver.begin_symbol_queries();
         let mut privileges = self.permission_cache.borrow_mut().analyze(
@@ -671,7 +681,7 @@ impl Project {
         }
         crate::caller_metadata::validate_with_permissions(&mut resolver,Some(&privileges))?;
         self.editor_info = privileges.editor_info.clone();
-        let purity = if let Some(plan) = &self.evaluation {
+        let mut purity = if let Some(plan) = &self.evaluation {
             if plan.requests.is_empty() {
                 crate::purity::Purity::analyze_entries(&mut resolver, &plan.roots, &plan.entries)
             } else {
@@ -680,6 +690,31 @@ impl Project {
         } else {
             crate::purity::Purity::analyze(&mut resolver)
         };
+        if let Some(plan) = &self.evaluation {
+            // A fn value passed to a checked call is an entry even when its
+            // invocation is indirect. Retained literals still need their body
+            // proofs and owned-result lowering in the compile-time helper.
+            let checked=&purity.checked;
+            let callbacks = self.sources.iter().enumerate().flat_map(|(file, source)| {
+                source.nodes.iter().enumerate().filter_map(move |(index, node)| {
+                    let id=crate::ast::NodeId(index);
+                    (node.kind=="Procedure" && node.data["pure"]==true && !checked.contains(&crate::semantics::Ref{file,node:id})
+                        && plan.files.get(&source.path).is_some_and(|view| view.retains(source,id)
+                            && source.role(id,"body").is_some_and(|body|view.retains(source,body))))
+                        .then_some(crate::semantics::Ref{file,node:id})
+                })
+            }).collect::<Vec<_>>();
+            let extra=crate::purity::Purity::analyze_from(&mut resolver,&callbacks);
+            purity.checked.extend(extra.checked);
+            purity.faults.extend(extra.faults);
+            purity.gaps.extend(extra.gaps);
+            for (call, targets) in extra.targets {purity.targets.entry(call).or_default().extend(targets);}
+            purity.defaults.extend(extra.defaults);
+            purity.call_paths.extend(extra.call_paths);
+            purity.conditional.extend(extra.conditional);
+            purity.parallel_callbacks.extend(extra.parallel_callbacks);
+            purity.entry_roots.extend(extra.entry_roots);
+        }
         if let Some(plan) = &self.evaluation {
             for request in &plan.requests {
                 purity.validate(&resolver, *request)?;

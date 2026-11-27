@@ -19,21 +19,25 @@ generic, ownership, helper-process and editor tests in:
 - The existing `test_pure_calls`, `test_pure_io`, `test_native_run`,
   `test_t18_t20`, `test_t21_t22`, `test_t23` and diagnostic suites.
 
+Pure callback value boundaries are checked through assignments, aliases, generic
+specializations, nested storage and casts before native type erasure. See
+[pure callback types](pure-callbacks.md).
+
 ## Rejection categories
 
 | Category | Restriction and diagnostic location |
 | --- | --- |
-| Missing implementation | `fn` declarations need an inspectable body. Foreign/bodyless prototypes use `proc`. Highlight `fn`; do not emit a Python traceback. |
+| Missing implementation | `fn` definitions need an inspectable body; `fn(...) -> ...` callback types describe a checked effect contract. Foreign/bodyless prototypes use `proc`. Highlight `fn`; do not emit a Python traceback. |
 | Calling convention | Declared `fn` uses Odin's calling convention. An inspectable ordinary contextless/C procedure can still qualify when its operations and value types qualify. |
-| Input/result types | Public fn inputs and checked results reject raw/typed/multiple pointers, runtime type identities, `any`, procedure values, maps/sets and unsupported nested members. Dynamic-array results and internal helper parameters are supported, including nested owned values. Public dynamic-array inputs remain unsupported; pass a slice view instead. Internal ordinary helper parameters may contain typed pointers and fixed-capacity arrays of supported storage. Public signature failures highlight the parameter/result type; helper failures link that annotation from the responsible fn call. Name the rejected instantiated type. |
+| Input/result types | Public fn inputs and checked results reject raw/typed/multiple pointers, runtime type identities, `any`, ordinary `proc` values, maps/sets and unsupported nested members. Dynamic-array results and internal helper parameters are supported, including nested owned values. Public dynamic-array inputs remain unsupported; pass a slice view instead. Internal ordinary helper parameters may contain typed pointers and fixed-capacity arrays of supported storage. Public signature failures highlight the parameter/result type; helper failures link that annotation from the responsible fn call. Name the rejected instantiated type. |
 | String representation | Support bounded UTF-8 `string`; reject `cstring`, `cstring16` and `string16` as pure inputs/results. C strings are pointer storage, rather than ordinary bounded value strings. |
 | Numeric representation | Integer/Rational are logical values. Pure code uses their numeric operators and public properties; inspecting their implementation headers is rejected, including through unconstrained generics. Unrelated user fields with the same names remain valid. |
 | Record schemas | Validate all fields and union variants recursively. Reject raw unions, unresolved schemas and recursive/excessively deep value shapes. A public raw union no longer causes an unrelated normal record with the same field names to fail. |
-| Local storage | Typed local pointers may address supported storage. Reject raw pointers, `any` boxing, procedure values, maps/sets and raw unions introduced through annotations, inference or aggregates. Fresh supported buffers remain allowed. |
+| Local storage | Typed local pointers may address supported storage. Reject raw pointers, `any` boxing, ordinary `proc` values, maps/sets and raw unions introduced through annotations, inference or aggregates. Fresh supported buffers remain allowed. |
 | Nonlocal state | Reject reads/writes of runtime globals and immutable runtime bindings outside the function. Imported storage follows the same rule. Genuine permitted constants remain usable. |
 | Ambient state | Reject explicit context queries, allocator callbacks and unverified stateful native operations. Library violations highlight the user's call and link the offending library implementation. |
 | I/O | Reject console/file/stream I/O, including constant aliases and transitive helpers. In-memory supported formatting remains separate. |
-| Calls | Reject indirect runtime procedure calls, foreign/bodyless calls and unavailable implementations. Keep native undeclared-name and type errors when they are the actual underlying problem. |
+| Calls | Accept runtime calls through `fn` callback types; reject indirect plain `proc` calls, foreign/bodyless calls and unavailable implementations. A `#run` request still needs a known callback identity. Keep native undeclared-name and type errors when they are the actual underlying problem. |
 | Compiler intrinsics | Only verified deterministic intrinsics are eligible. Stateful compiler intrinsics get an explicit ineligible-operation error. |
 | Defaults | Impure defaults fail at the offending default expression. Preserve the signature's syntax/type inference so that a context-dependent default does not turn into a misleading missing-parameter error. Checked call contracts also cover the inspected callee's defaults. |
 | Implicit callbacks | Reject initializer/finalizer and deferred callback contracts that cannot be treated as explicit eligible calls. Ordinary proc usage is unchanged. |

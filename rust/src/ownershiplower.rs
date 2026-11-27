@@ -6,20 +6,24 @@ impl Lower<'_, '_> {
         // Bind callback permissions while selecting its native specialization.
         // Type parameters disappear from the resulting procedure value, so the
         // worker still calls exactly the user's runtime signature.
-        let Some(proc) = self.source.node(id).parent.filter(|proc| {
+        let tags=crate::purecallbacks::callback_slots(self.resolver,self.reference(id));
+        let proc = self.source.node(id).parent.filter(|proc| {
             self.source.node(*proc).kind == "Procedure"
                 && (self.emitting_callbacks.contains(proc) || self.emitting_variants.contains(proc)
                 && self.borrowing.procedures.contains(&self.reference(*proc))
                 && !self.borrowing.entries.contains(&self.reference(*proc)))
-        }) else {
-            return Ok(None);
-        };
+        });
+        if proc.is_none() && tags.is_empty() {return Ok(None);}
+        let proc=proc.unwrap_or(id);
         let params = self.role(id, "params")?;
         let marker = &self.borrow_marker;
         let comma=if self.source.node(params).children.is_empty(){""}else{","};
         let callback=self.emitting_callbacks.contains(&proc);
-        let extra = if callback {format!("${marker}_ownership_Type:typeid{comma}")}
-            else {format!("{comma}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}")};
+        let ownership=self.emitting_callbacks.contains(&proc)||self.emitting_variants.contains(&proc);
+        let mut extra = if callback {format!("${marker}_ownership_Type:typeid{comma}")}
+            else if ownership {format!("{comma}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}")}
+            else {String::new()};
+        for (_,tag) in tags {extra.push_str(&format!("{}{tag}:${tag}_Type=struct{{}}{{}}",if extra.is_empty(){comma}else{","}));}
         let mut fields = vec![];
         for field in self.source.node(params).children.clone() {
             fields.push((

@@ -140,12 +140,13 @@ thor_signature_token :: proc(lexer:^tokenizer.Tokenizer)->tokenizer.Token {
 // Keep fn usable as an ordinary identifier/callee. A procedure signature must
 // be followed by a return type, where clause or body, outside a control header.
 thor_fn_follows :: proc(p:^Parser)->bool {
-    if p.expr_level < 0 {return false}
+    if p.expr_level < 0 && !p.allow_type {return false}
     lexer:=p.tok
     lexer.insert_semicolon=false
     token:=thor_signature_token(&lexer)
     if token.kind==.String {token=thor_signature_token(&lexer)}
     if token.kind!=.Open_Paren{return false}
+    if p.allow_type && p.expr_level < 0 {return true}
     depth:=1
     for depth>0 {
         token=thor_signature_token(&lexer)
@@ -154,10 +155,61 @@ thor_fn_follows :: proc(p:^Parser)->bool {
         if token.kind==.Close_Paren{depth-=1}
     }
     token=thor_signature_token(&lexer)
-    return token.kind==.Arrow_Right||token.kind==.Where||token.kind==.Open_Brace||token.kind==.Do
+    return token.kind==.Arrow_Right||token.kind==.Where||token.kind==.Open_Brace||token.kind==.Do||token.kind==.Undef
 }
 thor_exprs_run :: proc(expr:^ast.Expr)->[]^ast.Expr {
     args:=make([]^ast.Expr,1);args[0]=expr;return args
+}
+
+// Only a value-returning fn's own body has a tail value. Nested statement
+// blocks keep their normal control-flow rules, and void fn calls stay statements.
+thor_fn_has_results :: proc(p:^Parser)->bool {
+    if !p.thor || p.curr_proc==nil {return false}
+    signature,ok:=p.curr_proc.derived.(^ast.Proc_Type)
+    return ok && signature.tok.text=="fn" && signature.results!=nil && len(signature.results.list)>0
+}
+
+thor_fn_expression_start :: proc(p:^Parser)->bool {
+    if !thor_fn_has_results(p) {return false}
+    #partial switch p.curr_tok.kind {
+    case .Open_Bracket,.Period,.Cast,.Transmute,.Auto_Cast,.Mul_Mul,
+         .Typeid,.Distinct,.Struct,.Union,.Enum,.Map,.Undef:
+        return true
+    case .Hash:
+        name:=peek_token(p).text
+        switch name {
+        case "run","runtime","type","config","defined","file","directory","line",
+             "procedure","caller_location","branch_location","caller_expression",
+             "location","exists","load","load_directory","load_hash","hash",
+             "row_major","column_major","soa","simd":return true
+        }
+    }
+    return false
+}
+
+thor_fn_literal_at_tail :: proc(p:^Parser)->bool {
+    if !thor_fn_has_results(p) {return false}
+    lexer:=p.tok
+    token:=p.curr_tok
+    for token.kind==.Semicolon || token.kind==.Comment {token=tokenizer.scan(&lexer)}
+    return token.kind==.Close_Brace
+}
+
+thor_fn_implicit_return :: proc(p:^Parser,expr:^ast.Expr) {
+    literal,ok:=expr.derived.(^ast.Proc_Lit)
+    if !ok || literal.body==nil || literal.type.results==nil || len(literal.type.results.list)==0 {return}
+    body,block:=literal.body.derived.(^ast.Block_Stmt)
+    if !block || len(body.stmts)==0 {return}
+    index:=len(body.stmts)-1
+    tail,expression:=body.stmts[index].derived.(^ast.Expr_Stmt)
+    if !expression || tail.expr==nil {return}
+    returned:=ast.new(ast.Return_Stmt,tail.pos,tail.end)
+    returned.results=thor_exprs_run(tail.expr)
+    returned.state_flags=tail.state_flags
+    body.stmts[index]=returned
+    // Preserve original positions for TLS and diagnostics. The native emitter
+    // supplies the absent keyword only when it copies this return's source.
+    append(&p.features,Feature{kind="ImplicitReturn",start=returned.pos.offset,end=returned.end.offset})
 }
 
 Feature_Case :: struct {

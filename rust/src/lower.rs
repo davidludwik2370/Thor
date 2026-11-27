@@ -43,6 +43,8 @@ mod evaluationresult;
 mod extrema;
 #[path = "ownershiplower.rs"]
 mod ownershiplower;
+#[path = "purecallbacklower.rs"]
+mod purecallbacklower;
 #[path = "purelower.rs"]
 mod purelower;
 #[path = "pureproofs.rs"]
@@ -624,7 +626,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             inserts.extend(storage.inserts);
             for index in 0..self.source.nodes.len() {
                 let call=NodeId(index);
-                if self.source.node(call).kind=="Call" {inserts.extend(self.default_arguments(call)?);inserts.extend(self.caller_arguments(call)?);}
+                if self.source.node(call).kind=="Call" {inserts.extend(self.default_arguments(call)?);inserts.extend(self.caller_arguments(call)?);inserts.extend(self.callback_arguments(call)?);}
             }
             for (declaration, parts) in &self.declaration_helpers {
                 inserts.push((
@@ -1315,6 +1317,17 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Return" {
+            if node.data["implicit_return"]==true {
+                if let [value]=self.source.group(id,"values") {
+                    if self.diverging(*value) {
+                        // A terminating call has no return value. Keep it in a
+                        // nested scope: Odin otherwise rejects the enclosing
+                        // fn's generated defers as unreachable.
+                        let call=self.render(*value,None,constant)?;
+                        return Ok(Code::concat([self.g("{",id),call,self.g("}",id)]));
+                    }
+                }
+            }
             if let Some(code) = self.pure_return(id, constant)? {
                 return Ok(code);
             }
@@ -1561,7 +1574,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 code,
             ));
         }
-        let mut inserts = if kind=="Call" {let mut parts=self.default_arguments(id)?;parts.extend(self.caller_arguments(id)?);parts}else{vec![]};
+        let mut inserts = if kind=="Call" {let mut parts=self.default_arguments(id)?;parts.extend(self.caller_arguments(id)?);parts.extend(self.callback_arguments(id)?);parts}else{vec![]};
+        if kind=="Return" && node.data["implicit_return"]==true {
+            inserts.push((node.span.start,self.g("return ",id)));
+        }
         if let Some(attribute) = readonly_data {
             inserts.push((node.span.start, self.gen(attribute, node.span, "readonly-data")));
         }

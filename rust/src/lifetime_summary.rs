@@ -883,7 +883,7 @@ impl Analysis<'_, '_> {
                     && !node.immutable
                     && values.iter().all(|v| {
                         matches!(self.kind(*v), "Procedure" | "ProcedureGroup")
-                            || matches!(self.typ(*v, f), Type::Procedure(_))
+                            || matches!(self.typ(*v, f), Type::Procedure(_) | Type::Function(_, _))
                     })
                 {
                     return true;

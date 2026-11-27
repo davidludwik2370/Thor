@@ -24,6 +24,7 @@ Type_Info_Matrix :: (^runtime.Type_Info_Matrix) when POINTER_PAYLOADS else runti
 Type_Info_Multi_Pointer :: (^runtime.Type_Info_Multi_Pointer) when POINTER_PAYLOADS else runtime.Type_Info_Multi_Pointer
 Type_Info_Named :: (^runtime.Type_Info_Named) when POINTER_PAYLOADS else runtime.Type_Info_Named
 Type_Info_Pointer :: (^runtime.Type_Info_Pointer) when POINTER_PAYLOADS else runtime.Type_Info_Pointer
+Type_Info_Procedure :: (^runtime.Type_Info_Procedure) when POINTER_PAYLOADS else runtime.Type_Info_Procedure
 Type_Info_Quaternion :: (^runtime.Type_Info_Quaternion) when POINTER_PAYLOADS else runtime.Type_Info_Quaternion
 Type_Info_Rune :: (^runtime.Type_Info_Rune) when POINTER_PAYLOADS else runtime.Type_Info_Rune
 Type_Info_Simd_Vector :: (^runtime.Type_Info_Simd_Vector) when POINTER_PAYLOADS else runtime.Type_Info_Simd_Vector

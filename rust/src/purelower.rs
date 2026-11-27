@@ -17,6 +17,7 @@ impl Lower<'_, '_> {
                 Type::Scalar { name, .. } => name == "bool" || typ.numeric()
                     || name.starts_with("complex") || name.starts_with("quaternion"),
                 Type::Enum(_) => true,
+                Type::Function(..) => true,
                 Type::Nominal(_, base) | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
             | Type::Vector { elem: base, .. }
                 | Type::Fixed { elem: base, .. } => inline(r, base, seen),
@@ -41,17 +42,26 @@ impl Lower<'_, '_> {
         let Some(body) = self.source.role(root.node, "body") else { return false; };
         for node in self.source.descendants(body) {
             let kind = self.source.node(node).kind.as_str();
+            if self.source.ancestors(node).find(|id|self.source.node(*id).kind=="Procedure")!=Some(root.node) {
+                continue; // constructing a noncapturing fn does not execute it
+            }
+            if kind=="Procedure" && self.source.node(node).data["pure"]==true {continue;}
             if !matches!(kind,
                 "Ident" | "Literal" | "Binary" | "Unary" | "Ternary" | "Paren"
                 | "Block" | "Return" | "Declaration" | "Assignment" | "If" | "For"
                 | "Range" | "Branch" | "Label" | "Empty" | "Selector" | "ImplicitSelector"
-                | "Index" | "Compound" | "FieldValue" | "ArrayType") {
+                | "Index" | "Compound" | "FieldValue" | "ArrayType" | "Call") {
                 return false;
             }
+            // A fn callee owns its own scratch lifetime. When only inline
+            // values cross the boundary, this forwarding caller needs none.
+            // Ordinary proc calls still need the checked scratch wrapper.
+            if kind == "Call" && !self.source.role(node,"callee")
+                .is_some_and(|callee|self.typ(callee).pure_callable()) { return false; }
             // A scalar result can hide allocated intermediate arithmetic,
             // e.g. `return BIG_CONSTANT + 1 > 0`. Inspect operand expressions
             // as well as signatures and local bindings.
-            if matches!(kind, "Binary" | "Unary" | "Ternary" | "Compound" | "Index" | "Selector")
+            if matches!(kind, "Binary" | "Unary" | "Ternary" | "Compound" | "Index" | "Selector" | "Call")
                 || kind == "Ident" && self.resolver.expression_reference(self.reference(node)) {
                 let typ = self.typ(node);
                 if !inline(self.resolver, &typ, &mut HashSet::new()) { return false; }
@@ -143,6 +153,36 @@ impl Lower<'_, '_> {
             let prepared = self.prepare_pure(root, false);
             self.evaluation = view;
             prepared?;
+        }
+        if !self.resolver.pure_callbacks_present() {
+            return self.prepare_checked_variants(facts);
+        }
+        let mut callbacks=self.evaluation.as_ref().map(|view|view.callback_values.clone()).unwrap_or_default();
+        // Name callback literals in their original lexical scope. Besides
+        // satisfying Odin's $callback rules, this keeps procedure_of queries
+        // from embedding a second procedure body in the queried call. Odin's
+        // parallel checker can misattribute declarations in such nested bodies.
+        for node in 0..self.source.nodes.len() {
+            let literal=NodeId(node);
+            if self.source.node(literal).kind!="Procedure" || self.source.node(literal).data["pure"]!=true {continue;}
+            let mut parent=self.source.node(literal).parent;
+            while let Some(node)=parent.filter(|node|matches!(self.source.node(*node).kind.as_str(),"Paren"|"FieldValue")) {
+                parent=self.source.node(node).parent;
+            }
+            if parent.is_some_and(|node|self.source.node(node).kind=="Call") {
+                callbacks.insert(literal);
+            }
+        }
+        let mut callbacks=callbacks.into_iter().collect::<Vec<_>>();
+        callbacks.sort_by_key(|node|self.source.node(*node).span.len());
+        for node in callbacks {
+            let view=self.evaluation.take();
+            let code=self.render(node,None,false);
+            self.evaluation=view;
+            let name=format!("{}callback_value_{}",self.source.prefix,node.0);
+            let helper=Code::concat([self.g(format!("\n{name}::"),node),code?,self.g("\n",node)]);
+            self.helpers.insert((self.helper_scope(node),self.source.prefix.clone(),name.clone()),helper);
+            self.switch_replacements.insert(node,self.g(name,node));
         }
         self.prepare_checked_variants(facts)?;
         Ok(())

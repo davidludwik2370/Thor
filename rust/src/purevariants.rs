@@ -316,7 +316,7 @@ impl Lower<'_, '_> {
                 self.render(argument, hint, constant)?
             }));
         }
-        let mut inserts = vec![];
+        let mut inserts = self.callback_arguments(id)?;
         if let Some(profile) = self.ownership_argument(id)? {
             let args = self.source.group(id, "args");
             let offset = args

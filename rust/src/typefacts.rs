@@ -533,6 +533,8 @@ impl Resolver<'_> {
                 .unwrap_or(Type::Unknown)
         };
         match n.kind.as_str() {
+            "ProcedureType" => self.callable_type(r, bindings),
+            "Procedure" => child("type").map(|signature| self.callable_type(signature, bindings)).unwrap_or(Type::Unknown),
             "HelperType"=>{let mut typ=subtype("expr");if let Type::Matrix{row_major,..}=&mut typ{if ["row_major","column_major"].contains(&n.op.as_str()){*row_major=n.op=="row_major";}}typ},
             "Paren" | "Run" | "Runtime" => subtype("expr"),
             "Unary" => {
@@ -703,6 +705,7 @@ impl Resolver<'_> {
                     return Type::Unknown;
                 };
                 let base = self.specialize(callee, bindings, &mut seen.clone());
+                if base.signature().is_some() && self.denotes_type(callee) {return base;}
                 let owner = match &base {
                     Type::Struct(owner) | Type::Record(owner, _) | Type::Union(owner, _) => Some(*owner),
                     _ => None,
@@ -756,7 +759,7 @@ impl Resolver<'_> {
                         return self.record_instance(owner, arguments);
                     }
                 }
-                if !matches!(base, Type::Procedure(_) | Type::Unknown | Type::Generic) {
+                if !matches!(base, Type::Procedure(_) | Type::Function(..) | Type::Unknown | Type::Generic) {
                     base
                 } else {
                     let typ = self.specialized_result(r, 0, bindings);
@@ -782,7 +785,7 @@ impl Resolver<'_> {
     }
     /// Select a value from a multi-result expression without losing generic
     /// substitutions. Assignment slots are not all the first result's type.
-    pub(super) fn specialized_value_result(
+    pub(crate) fn specialized_value_result(
         &mut self,
         r: Ref,
         index: usize,
@@ -1130,14 +1133,14 @@ impl Resolver<'_> {
             }
             (Type::Nominal(a, _), Type::Nominal(b, _)) if a == b => Some(5),
             (Type::Nominal(_, base), value) if value.untyped() => Self::type_score(base, value),
-            (Type::Procedure(_), Type::Procedure(_)) => Some(1), // Odin checks complete calling signatures.
+            (Type::Procedure(_) | Type::Function(..), Type::Procedure(_) | Type::Function(..)) => Some(1), // Odin checks complete calling signatures.
             (Type::Union(..), _) => Some(0), // Native union injection is checked by Odin.
             _ if expected == actual => Some(5),
             _ => None,
         }
     }
     fn bind_shape(
-        &self,
+        &mut self,
         annotation: Ref,
         actual: &Type,
         bindings: &mut Substitutions,
@@ -1155,6 +1158,19 @@ impl Resolver<'_> {
             })
         };
         match n.kind.as_str() {
+            "ProcedureType" => {
+                if let Some(signature) = actual.signature() {
+                    let context = if let Type::Function(_, captures)=actual {captures.iter().cloned().collect()}else{Substitutions::new()};
+                    for role in ["params", "results"] {
+                        for ((_,expected),(_,actual)) in self.fields(annotation,role).into_iter().zip(self.fields(signature,role)) {
+                            if let (Some(expected),Some(actual))=(expected,actual) {
+                                let actual=self.specialized_type(actual,&context);
+                                self.bind_shape(expected,&actual,bindings,&mut seen.clone());
+                            }
+                        }
+                    }
+                }
+            }
             "HelperType"|"Paren"=>{if let Some(expr)=child("expr"){self.bind_shape(expr,actual,bindings,seen);}},
             "PolyType" => {
                 let binding = bindings
@@ -1414,6 +1430,10 @@ impl Resolver<'_> {
         }
         if let Some(symbol) = self.symbol(callee) {
             let symbol = self.symbols[symbol].clone();
+            if let Some(target) = self.bound_constants.get(&(symbol.reference, symbol.name.clone()))
+                .and_then(|(_, value)|crate::specialization::callback_value(value)) {
+                return vec![target];
+            }
             let conditional = self.conditional_procedures(&symbol);
             if conditional.len() > 1 {
                 return conditional

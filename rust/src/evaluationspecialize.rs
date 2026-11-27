@@ -170,7 +170,15 @@ impl Scheduler<'_> {
                     if !self.known(arg)? {
                         return Ok(());
                     }
-                    if let Some(value) = self.constant_integer(arg) {
+                    if typ.signature().is_some() {
+                        let targets=self.resolver.candidates(arg);
+                        let [target]=targets.as_slice() else{return Ok(());};
+                        let source=self.source(*target);
+                        let mut node=target.node;
+                        while let Some(parent)=source.node(node).parent.filter(|p|source.node(*p).kind=="Paren") {node=parent;}
+                        if self.kind(*target)!="Procedure" {return Ok(());}
+                        json!({"kind":"procedure","file":target.file,"node":target.node.0})
+                    } else if let Some(value) = self.constant_integer(arg) {
                         json!({"kind":"integer","value":value.to_string()})
                     } else {
                         match self

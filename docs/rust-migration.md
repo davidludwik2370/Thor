@@ -1740,7 +1740,9 @@ reviewed contract. LLVM primitive recognition is shared with purity checking.
 
 Explicit `#run` entries reject I/O before result-count or argument-readiness
 errors, identify disallowed compiler intrinsics and imported bodyless calls, and
-reject indirect runtime procedure values. Ordinary scalar/enum parameters named
+reject unknown runtime procedure identities. Pure `fn` callback types now allow
+runtime indirect calls inside `fn`; `#run` still requires a known identity. See
+[pure callback types](pure-callbacks.md). Ordinary scalar/enum parameters named
 `allocator` remain ordinary parameters. Real allocator selection retains the
 reference scratch-allocator diagnostic. Nested known arguments and source-location
 dependent compound types follow the same readiness rules as the reference.

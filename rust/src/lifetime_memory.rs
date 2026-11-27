@@ -203,7 +203,7 @@ impl Analysis<'_, '_> {
     fn memory_alignment(&self, t: &Type) -> Option<i128> {
         match base(t) {
             Type::Array { elem, .. } => self.memory_alignment(elem),
-            Type::Pointer(_) | Type::Procedure(_) | Type::Slice(_) | Type::String { .. } => {
+            Type::Pointer(_) | Type::Procedure(_) | Type::Function(_, _) | Type::Slice(_) | Type::String { .. } => {
                 self.r.simple_size(&Type::Scalar {
                     name: "uintptr".into(),
                     untyped: false,

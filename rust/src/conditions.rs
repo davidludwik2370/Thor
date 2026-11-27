@@ -55,6 +55,10 @@ fn type_identity(typ: Type) -> Type {
 
 fn exact_identity(typ: &Type) -> bool {
     match typ {
+        // Signature references/effect qualifiers are not native typeids.
+        // Distinct signatures can describe the same Odin procedure type, and
+        // fn's pure qualifier is deliberately erased in native type queries.
+        Type::Function(..) | Type::Procedure(_) => false,
         Type::Scalar { name, .. } => name != "bit_set",
         Type::Nominal(_, inner)
         | Type::Pointer(inner)
@@ -75,6 +79,152 @@ fn exact_identity(typ: &Type) -> bool {
 }
 
 impl Resolver<'_> {
+    fn effect_qualified_type(
+        &mut self,
+        typ: &Type,
+        bindings: &Substitutions,
+        seen: &mut HashSet<Type>,
+    ) -> bool {
+        match typ {
+            Type::Function(..) => return true,
+            Type::Scalar { .. }
+            | Type::String { .. }
+            | Type::Enum(_)
+            | Type::Unknown
+            | Type::Generic
+            | Type::Constant(_)
+            | Type::BigInteger
+            | Type::BigRational => return false,
+            _ => {}
+        }
+        if !seen.insert(typ.clone()) {
+            return false;
+        }
+        match typ {
+            Type::Procedure(signature) => ["params", "results"]
+                .into_iter()
+                .flat_map(|role| self.fields(*signature, role))
+                .collect::<Vec<_>>()
+                .iter()
+                .filter_map(|(_, annotation)| *annotation)
+                .any(|annotation| {
+                    let typ = self.specialized_type(annotation, bindings);
+                    self.effect_qualified_type(&typ, bindings, seen)
+                }),
+            Type::Nominal(_, t)
+            | Type::Pointer(t)
+            | Type::Slice(t)
+            | Type::Dynamic(t)
+            | Type::Soa(t)
+            | Type::Set(t)
+            | Type::Array { elem: t, .. }
+            | Type::Fixed { elem: t, .. }
+            | Type::Matrix { elem: t, .. }
+            | Type::Vector { elem: t, .. } => self.effect_qualified_type(t, bindings, seen),
+            Type::Map { key, value } => {
+                self.effect_qualified_type(key, bindings, seen)
+                    || self.effect_qualified_type(value, bindings, seen)
+            }
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
+                .record_fields(typ)
+                .iter()
+                .any(|(_, t)| self.effect_qualified_type(t, bindings, seen)),
+            Type::Union(..) => self
+                .union_variants(typ)
+                .iter()
+                .any(|t| self.effect_qualified_type(t, bindings, seen)),
+            _ => false,
+        }
+    }
+    /// Compare concrete procedure shapes after effect erasure. Their syntax
+    /// references are not type identities. Unknown/defaulted/polymorphic native
+    /// signatures stay unknown rather than selecting the wrong `when` arm.
+    fn callable_identity(
+        &mut self,
+        typ: &Type,
+        seen: &mut HashSet<Type>,
+    ) -> Option<serde_json::Value> {
+        if !seen.insert(typ.clone()) {
+            return None;
+        }
+        let result = (|| {
+            let key = match typ {
+                Type::Function(signature, _) | Type::Procedure(signature) => {
+                    let captures = match typ {
+                        Type::Function(_, captures) => captures.iter().cloned().collect(),
+                        _ => Substitutions::new(),
+                    };
+                    let source = &self.sources[signature.file];
+                    if source.text(signature.node).contains(['#', '!'])
+                        || source.text(signature.node).contains("..")
+                        || source
+                            .text(signature.node)
+                            .split(|c: char| !c.is_alphanumeric() && c != '_')
+                            .any(|word| word == "using")
+                        || source.descendants(signature.node).any(|node| {
+                            source.node(node).kind == "PolyType"
+                                || source.node(node).kind == "Field"
+                                    && source.role(node, "default").is_some()
+                        })
+                    {
+                        return None;
+                    }
+                    let cc = source.node(signature.node).data["calling_convention"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("odin")
+                        .to_string();
+                    if !matches!(cc.as_str(), "odin" | "contextless") {
+                        return None;
+                    }
+                    let mut roles = vec![];
+                    for role in ["params", "results"] {
+                        let mut types = vec![];
+                        for (name, annotation) in self.fields(*signature, role) {
+                            let field = self.specialized_type(annotation?, &captures);
+                            types.push(serde_json::json!([
+                                name,
+                                self.callable_identity(&field, seen)?
+                            ]));
+                        }
+                        roles.push(types);
+                    }
+                    serde_json::json!(["procedure", cc, roles])
+                }
+                Type::Pointer(t) => {
+                    serde_json::json!(["pointer", self.callable_identity(t, seen)?])
+                }
+                Type::Slice(t) => serde_json::json!(["slice", self.callable_identity(t, seen)?]),
+                Type::Dynamic(t) => {
+                    serde_json::json!(["dynamic", self.callable_identity(t, seen)?])
+                }
+                Type::Array { elem, length } => serde_json::json!([
+                    "array",
+                    length.as_ref()?,
+                    self.callable_identity(elem, seen)?
+                ]),
+                // Syntax references alone cannot identify anonymous bases or
+                // caller-local/generic native nominal types precisely.
+                Type::Nominal(..)
+                | Type::Struct(_)
+                | Type::Record(..)
+                | Type::Union(..)
+                | Type::Enum(_) => return None,
+                Type::Scalar { .. }
+                | Type::String { .. }
+                | Type::BigInteger
+                | Type::BigRational
+                    if exact_identity(typ) =>
+                {
+                    serde_json::json!(format!("{:?}", type_identity(typ.clone())))
+                }
+                _ => return None,
+            };
+            Some(key)
+        })();
+        seen.remove(typ);
+        result
+    }
     pub(crate) fn native_boolean(&self, reference: Ref) -> Option<bool> {
         let source = &self.sources[reference.file];
         let name = source.text(reference.node);
@@ -168,8 +318,16 @@ impl Resolver<'_> {
                 {
                     let a = self.specialized_type(left, bindings);
                     let b = self.specialized_type(right, bindings);
-                    if a.resolved() && b.resolved() && exact_identity(&a) && exact_identity(&b) {
+                    let erased=self.pure_callbacks_present() && (
+                        self.effect_qualified_type(&a,bindings,&mut HashSet::new())
+                        ||self.effect_qualified_type(&b,bindings,&mut HashSet::new()));
+                    if !erased && a.resolved() && b.resolved() && exact_identity(&a) && exact_identity(&b) {
                         return Some((type_identity(a) == type_identity(b)) == (op == "=="));
+                    }
+                    if a.resolved() && b.resolved() {
+                        if let (Some(a),Some(b))=(self.callable_identity(&a,&mut HashSet::new()),self.callable_identity(&b,&mut HashSet::new())) {
+                            return Some((a==b)==(op=="=="));
+                        }
                     }
                 }
             }
@@ -209,6 +367,7 @@ impl Resolver<'_> {
                                 "type_is_simd_vector" => matches!(base, Type::Vector { .. }),
                                 "type_is_dynamic_array" => matches!(base, Type::Dynamic(_)),
                                 "type_is_pointer" => matches!(base, Type::Pointer(_)),
+                                "type_is_proc" => matches!(base, Type::Procedure(_) | Type::Function(..)),
                                 "type_is_struct" => {
                                     matches!(base, Type::Struct(_) | Type::Record(..))
                                 }

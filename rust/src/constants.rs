@@ -432,7 +432,7 @@ impl Resolver<'_> {
         };
         match typ {
             Type::Nominal(_, base) => self.simple_size(base),
-            Type::Pointer(_) | Type::Procedure(_) => Some(pointer),
+            Type::Pointer(_) | Type::Procedure(_) | Type::Function(_, _) => Some(pointer),
             Type::Slice(_) => Some(2 * pointer),
             Type::String { name, .. } => Some(if name.starts_with("cstring") {
                 pointer

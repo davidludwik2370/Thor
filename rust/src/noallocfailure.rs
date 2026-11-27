@@ -191,7 +191,7 @@ impl Check<'_, '_> {
         let layout = if library.is_some() && !crate::parallelcompile::known_callback(self.r, callee)
         {
             let typ = self.r.specialized_type(callee, &w.bindings);
-            let Type::Procedure(signature) = base_type(&typ) else {
+            let (Type::Procedure(signature) | Type::Function(signature, _)) = base_type(&typ) else {
                 return Err(self.error(
                     w,
                     at,

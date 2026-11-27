@@ -414,7 +414,7 @@ impl Lower<'_, '_> {
                         vec![(id, receiver, "take an implicit mutable address of")]
                     } else if !matches!(typ, Type::Pointer(_)) {
                         let member = self.resolver.member_type(&typ, self.source.text(field));
-                        let pointer = if let Type::Procedure(signature) = member {
+                        let pointer = if let Type::Procedure(signature) | Type::Function(signature, _) = member {
                             self.resolver
                                 .fields(signature, "params")
                                 .first()

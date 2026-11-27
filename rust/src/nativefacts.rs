@@ -423,7 +423,7 @@ impl Project {
                     pending.extend(resolver.shared_record_fields(&typ).iter().map(|(_, typ)| typ.clone()));
                 }
                 Type::Union(..) => pending.extend(resolver.union_variants(&typ)),
-                Type::Procedure(owner) => {
+                Type::Procedure(owner) | Type::Function(owner, _) => {
                     let source = &resolver.sources[owner.file];
                     let signature = if source.node(owner.node).kind == "Procedure" {
                         source.role(owner.node, "type").unwrap_or(owner.node)

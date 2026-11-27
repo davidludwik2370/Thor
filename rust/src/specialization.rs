@@ -164,6 +164,51 @@ impl TypeCode {
             return Ok(format!("{alias}.{name}"));
         }
         match typ {
+            Type::Function(signature, captures) => {
+                let source=&r.sources[signature.file];
+                if captures.is_empty() {
+                    let mut node=signature.node;
+                    while let Some(parent)=source.node(node).parent.filter(|p|source.node(*p).kind=="Paren") {node=parent;}
+                    if let Some(declaration)=source.node(node).parent.filter(|p|source.node(*p).kind=="Declaration") {
+                        let scope=scope(source,declaration);
+                        if scope==NodeId(0) || self.context.is_some_and(|at|at.file==signature.file && (at.node==scope || source.ancestors(at.node).any(|owner|owner==scope))) {
+                            if let Some(name)=source.group(declaration,"names").first() {return self.access(*signature,source.text(*name),r);}
+                        }
+                    }
+                }
+                let span=source.node(signature.node).span;
+                let mut replacements=vec![];
+                for node in std::iter::once(signature.node).chain(source.descendants(signature.node)) {
+                    let ast=source.node(node);
+                    if ast.kind=="ProcedureType" && source.slice(ast.span).starts_with("fn") {
+                        replacements.push((crate::ast::Span::new(ast.span.start,ast.span.start+2),"proc".into()));
+                    }
+                    if matches!(ast.kind.as_str(),"Ident"|"PolyType") {
+                        let name=source.text(node).trim_start_matches('$');
+                        if let Some((_,typ))=captures.iter().find(|(n,_)|n==name) {
+                            replacements.push((ast.span,self.render(typ,r)?));
+                        } else if ast.kind=="Ident" && !ast.parent.is_some_and(|parent|source.node(parent).kind=="Selector" && source.role(parent,"field")==Some(node))
+                            && r.denotes_type(Ref{node,..*signature}) {
+                            if let Some(symbol)=r.symbol(Ref{node,..*signature}).map(|i|&r.symbols[i]).filter(|symbol|symbol.constant) {
+                                replacements.push((ast.span,self.access(symbol.reference,&symbol.name,r)?));
+                            }
+                        }
+                    }
+                }
+                for edit in &source.edits {
+                    if span.contains(edit.span) && !replacements.iter().any(|(span,_)|span.start<edit.span.end && edit.span.start<span.end) {
+                        replacements.push((edit.span,edit.text.clone()));
+                    }
+                }
+                replacements.sort_by_key(|(span,_)|span.start);
+                let mut code=String::new();let mut cursor=span.start;
+                for (replace,text) in replacements {
+                    if replace.start<cursor {continue;}
+                    code.push_str(&source.raw[cursor..replace.start]);code.push_str(&text);cursor=replace.end;
+                }
+                code.push_str(&source.raw[cursor..span.end]);
+                return Ok(code);
+            }
             Type::Constant(Constant::Integer(value)) => return Ok(value.to_string()),
             Type::Constant(Constant::Boolean(value)) => return Ok(value.to_string()),
             Type::Scalar { name, .. } | Type::String { name, .. } => return Ok(name.clone()),
@@ -249,6 +294,27 @@ impl TypeCode {
             return Ok(source.text(owner.node).into());
         }
         Err(Unresolved("The generic type could not be resolved.".into()))
+    }
+    pub(crate) fn binding_value(&mut self, value: &Value, typ: &str, r: &Resolver<'_>) -> Result<String> {
+        if let Some(target)=callback_value(value) {
+            let source=&r.sources[target.file];
+            let mut node=target.node;
+            while let Some(parent)=source.node(node).parent.filter(|p|source.node(*p).kind=="Paren") {node=parent;}
+            let scope=crate::semantics::scope(source,node);
+            if scope!=NodeId(0) && !self.context.is_some_and(|at|at.file==target.file
+                && (at.node==scope || source.ancestors(at.node).any(|owner|owner==scope))) {
+                return Err(Unresolved("A local constant callback needs its original lexical scope.".into()));
+            }
+            let declaration=source.node(node).parent.filter(|p|source.node(*p).kind=="Declaration");
+            let name=declaration.and_then(|d|source.group(d,"names").first()).map(|n|source.text(*n).to_owned())
+                .unwrap_or_else(||format!("{}callback_value_{}",source.prefix,target.node.0));
+            let access=self.access(target,&name,r)?;
+            // Preserve procedure constants: an explicit cast of a caller-local
+            // procedure becomes a runtime value in Odin and cannot bind $cb.
+            // The declared callback parameter supplies its specialization type.
+            return Ok(access);
+        }
+        values::expression(value,typ,&format!("{}meta",r.sources[self.file].prefix)).map_err(|e|Unresolved(e.to_string()))
     }
 }
 
@@ -371,16 +437,16 @@ impl Specializations {
         for ((_, name), binding) in bindings {
             let typ = context.render(&binding.typ, r)?;
             let value = if let Some(value) = &binding.value {
-                values::expression(
-                    value,
-                    &typ,
-                    &format!("{}meta", r.sources[context.file].prefix),
-                )
-                .map_err(|error| Unresolved(error.to_string()))?
+                context.binding_value(value, &typ, r)?
             } else {
                 typ
             };
             lines.push(format!("{name} :: {value}"));
+            if let Some(target)=binding.value.as_ref().and_then(callback_value) {
+                if let Some(tag)=crate::purecallbacks::callback_tag(r,&r.symbols[binding.symbol]) {
+                    lines.push(format!("{tag}:struct{{callback_{}:[0]u8}}",crate::purecallbacks::identity(r,target)));
+                }
+            }
         }
         Ok(lines.join("\n") + "\n")
     }
@@ -392,6 +458,12 @@ impl Specializations {
         let mut predicates = vec![];
         let meta = format!("{}meta", r.sources[context.file].prefix);
         for ((_, name), binding) in bindings {
+            if let Some(target)=binding.value.as_ref().and_then(callback_value) {
+                if let Some(tag)=crate::purecallbacks::callback_tag(r,&r.symbols[binding.symbol]) {
+                    predicates.push(format!("{meta}.type_has_field(type_of({tag}), {})",json!(format!("callback_{}",crate::purecallbacks::identity(r,target)))));
+                    continue;
+                }
+            }
             let typ = match context.render(&binding.typ, r) {
                 Ok(typ) => typ,
                 Err(error) => {
@@ -406,8 +478,7 @@ impl Specializations {
                 }
             };
             let value = if let Some(value) = &binding.value {
-                values::expression(value, &typ, &meta)
-                    .map_err(|error| Unresolved(error.to_string()))?
+                context.binding_value(value, &typ, r)?
             } else {
                 typ
             };
@@ -417,6 +488,10 @@ impl Specializations {
     }
 }
 
+pub(crate) fn callback_value(value: &Value) -> Option<Ref> {
+    if value["kind"]!="procedure" {return None;}
+    Some(Ref{file:value["file"].as_u64()? as usize,node:NodeId(value["node"].as_u64()? as usize)})
+}
 fn shape(typ: &Type, r: &Resolver<'_>) -> Value {
     let origin = |owner: &Ref| {
         json!([
@@ -470,6 +545,7 @@ fn shape(typ: &Type, r: &Resolver<'_>) -> Value {
                 .collect::<Vec<_>>()
         ]),
         Type::Procedure(owner) => json!(["procedure", origin(owner)]),
+        Type::Function(owner, bindings) => json!(["fn", origin(owner), bindings.iter().map(|(name, typ)|json!([name, shape(typ, r)])).collect::<Vec<_>>()]),
         _ => serde_json::to_value(typ).unwrap(),
     }
 }

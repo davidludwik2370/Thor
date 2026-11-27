@@ -214,6 +214,9 @@ impl Lower<'_, '_> {
             record_parts.push(format!("when {predicate}{{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"));
         }
         record_parts.push("}".into());
+        if self.resolver.pure_callbacks_present() {
+            parts.push(format!("else when Mode==0 && {meta}.type_is_proc(T){{}}"));
+        }
         parts.extend([
             format!("else when {meta}.type_is_struct(T){{{name}_record(T,Result,Allow_Owned,Allow_Refs,Depth,Site,Mode)}}"),
             format!("else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T){{when Result && !Allow_Owned && {meta}.type_is_slice(T){{#panic(\"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc\"+Site)}}else{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}}}"),

@@ -676,7 +676,7 @@ impl Check<'_, '_> {
                             .map(|node| Ref { node: *node, ..at })
                             .collect::<Vec<_>>();
                         let typ = self.r.specialized_type(callee, &w.bindings);
-                        let declared = if let Type::Procedure(declared) = base_type(&typ) {
+                        let declared = if let Type::Procedure(declared) | Type::Function(declared, _) = base_type(&typ) {
                             *declared
                         } else if crate::parallelcompile::known_callback(self.r, callee) {
                             signature

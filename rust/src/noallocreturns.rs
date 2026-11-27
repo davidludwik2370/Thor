@@ -10,7 +10,7 @@ fn callable(r: &mut Resolver<'_>, typ: &Type, seen: &mut HashSet<Type>) -> bool 
         return false;
     }
     match base_type(typ) {
-        Type::Procedure(_) => true,
+        Type::Procedure(_) | Type::Function(_, _) => true,
         Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => r
             .record_fields(typ)
             .iter()

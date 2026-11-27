@@ -40,6 +40,7 @@ pub mod privileges;
 pub mod project;
 pub mod project_template;
 pub mod purity;
+mod purecallbacks;
 mod purediagnostics;
 pub mod semantics;
 mod resulttypes;

@@ -61,6 +61,7 @@ pub struct FileView {
     pub aliases: BTreeSet<String>,
     pub imports: BTreeMap<String, String>,
     pub bridges: Vec<Bridge>,
+    pub callback_values: BTreeSet<NodeId>,
     pub request: Option<Request>,
     pub entry: Option<EntryRequest>,
 }
@@ -104,6 +105,7 @@ impl FileView {
     pub fn retains(&self, source: &crate::ast::Source, node: NodeId) -> bool {
         node == NodeId(0)
             || source.role(NodeId(0), "package") == Some(node)
+            || self.callback_values.iter().any(|literal| *literal==node || source.is_descendant(node,*literal))
             || self.keep.iter().any(|kept| {
                 *kept == node
                     || source.is_descendant(node, *kept)
@@ -214,20 +216,18 @@ impl Plan {
         } else {
             context.batch.to_vec()
         };
-        let definitions = context
-            .bindings
-            .values()
-            .filter_map(|binding| Extraction::type_definition(&binding.typ))
-            .filter_map(|owner| {
-                r.sources[owner.file]
-                    .node(owner.node)
-                    .parent
-                    .filter(|node| r.sources[owner.file].node(*node).kind == "Declaration")
-                    .map(|node| Ref {
-                        file: owner.file,
-                        node,
-                    })
-            });
+        let definitions = context.bindings.values().flat_map(|binding| {
+            binding.value.as_ref().and_then(crate::specialization::callback_value).into_iter()
+                .chain(Extraction::type_definition(&binding.typ))
+        }).filter_map(|owner| {
+            let source=&r.sources[owner.file];
+            let mut node=owner.node;
+            while let Some(parent)=source.node(node).parent.filter(|p|source.node(*p).kind=="Paren") {node=parent;}
+            source.node(node).parent
+                .filter(|node|r.sources[owner.file].node(*node).kind=="Declaration")
+                .map(|node|Ref{file:owner.file,node})
+                .or_else(||(r.sources[owner.file].node(owner.node).kind=="Procedure").then_some(owner))
+        });
         let graph = Extraction::build(
             r,
             &roots.iter().copied().chain(definitions).collect::<Vec<_>>(),
@@ -251,9 +251,21 @@ impl Plan {
         for source in r.sources {
             plan.files.insert(source.path.clone(), FileView::default());
         }
+        for binding in context.bindings.values() {
+            if let Some(target)=binding.value.as_ref().and_then(crate::specialization::callback_value) {
+                let source=&r.sources[target.file];
+                let mut node=target.node;
+                while let Some(parent)=source.node(node).parent.filter(|p|source.node(*p).kind=="Paren") {node=parent;}
+                if !source.node(node).parent.is_some_and(|p|source.node(p).kind=="Declaration") {
+                    let view=plan.files.get_mut(&source.path).unwrap();
+                    view.callback_values.insert(target.node);
+                }
+            }
+        }
         let mut locals: BTreeMap<usize, BTreeMap<NodeId, Vec<NodeId>>> = BTreeMap::new();
         for kept in &graph.keep {
             let source = &r.sources[kept.file];
+            if plan.files[&source.path].callback_values.iter().any(|literal|*literal==kept.node || source.is_descendant(kept.node,*literal)) {continue;}
             let owner = source
                 .ancestors(kept.node)
                 .find(|id| source.node(*id).kind == "Procedure")
@@ -654,7 +666,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
     fn type_definition(typ: &Type) -> Option<Ref> {
         match typ {
             Type::Nominal(owner, _)
-            | Type::Struct(owner)
+            | Type::Function(owner, _) | Type::Struct(owner)
             | Type::Record(owner, _)
             | Type::Enum(owner)
             | Type::Union(owner, _) => Some(*owner),
@@ -800,6 +812,11 @@ impl<'a, 'r> Extraction<'a, 'r> {
         })
     }
     fn visit(&mut self, node: Ref) -> Result<()> {
+        if self.kind(node)=="Procedure" {
+            self.graph.procedures.insert(node);
+            self.graph.keep.insert(node);
+            if !self.visited.insert(node) {return Ok(());}
+        }
         if let Some((code, typ)) = self.query(node) {
             self.graph.queries.insert(node, code);
             let mut definitions=vec![];
@@ -874,16 +891,22 @@ impl<'a, 'r> Extraction<'a, 'r> {
             if let [plan] = plans.as_slice() {
                 let target = plan.procedure;
                 if self.kind(target) == "Procedure" && self.role(target, "body").is_some() {
-                    self.graph
-                        .calls
-                        .insert(callee, CallTarget::Procedure(target));
+                    // A parameter's default body is not its runtime identity.
+                    // Keep the typed indirect call (and its native argument
+                    // labels), including constant callback specializations.
+                    if self.r.symbol(callee).is_none_or(|index| {
+                        let symbol=&self.r.symbols[index];
+                        symbol.constant && !symbol.parameter && !symbol.result
+                    }) {
+                        self.graph.calls.insert(callee, CallTarget::Procedure(target));
+                    }
                     self.graph.procedures.insert(target);
                     if let Some(declaration) = self.r.sources[target.file].node(target.node).parent
                     {
-                        self.declaration(Ref {
+                        if self.r.sources[target.file].node(declaration).kind=="Declaration" {self.declaration(Ref {
                             file: target.file,
                             node: declaration,
-                        })?;
+                        })?;} else {self.visit(target)?;}
                     }
                     if let Some(symbol) = self.r.symbol(callee) {
                         for alternative in self.conditional_alternatives(symbol) {

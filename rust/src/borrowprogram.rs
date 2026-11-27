@@ -156,7 +156,7 @@ impl Model {
                     || eval.approved(*node) && !crate::parallelcompile::is_call(eval.resolver,*node)
                     || eval
                         .role(*node, "callee")
-                        .is_some_and(|callee| eval.resolver.denotes_type(callee))
+                        .is_some_and(|callee| eval.resolver.denotes_type(callee) || matches!(eval.resolver.type_of(callee),Type::Function(..)|Type::Generic))
                     || self
                         .targets
                         .get(node)
@@ -295,7 +295,7 @@ impl Model {
                     || eval.io_call(*node)
                     || eval
                         .role(*node, "callee")
-                        .is_some_and(|callee| eval.resolver.denotes_type(callee))
+                        .is_some_and(|callee| eval.resolver.denotes_type(callee) || matches!(eval.resolver.type_of(callee),Type::Function(..)|Type::Generic))
                 {
                     continue;
                 }

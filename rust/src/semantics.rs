@@ -99,8 +99,16 @@ pub enum Type {
     Enum(Ref),
     Union(Ref, Vec<(String, Type)>),
     Procedure(Ref),
+    /// Compile-time effect contract; emitted as an ordinary Odin procedure.
+    Function(Ref, Vec<(String, Type)>),
 }
 impl Type {
+    pub(crate) fn signature(&self) -> Option<Ref> {
+        match self { Self::Procedure(r) | Self::Function(r, _) => Some(*r), Self::Nominal(_, t) => t.signature(), _ => None }
+    }
+    pub(crate) fn pure_callable(&self) -> bool {
+        match self { Self::Function(..) => true, Self::Nominal(_, t) => t.pure_callable(), _ => false }
+    }
     pub fn big_name(&self) -> Option<&'static str> {
         match self {
             Self::BigInteger => Some("Integer"),
@@ -266,6 +274,7 @@ pub struct Resolver<'a> {
     logical_activation: std::cell::OnceCell<bool>,
     runtime_root: std::cell::OnceCell<std::path::PathBuf>,
     pub(crate) set_activation: std::cell::OnceCell<bool>,
+    pub(crate) pure_callback_activation: std::cell::OnceCell<bool>,
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
@@ -431,6 +440,7 @@ impl<'a> Resolver<'a> {
             logical_activation: std::cell::OnceCell::new(),
             runtime_root: std::cell::OnceCell::new(),
             set_activation: std::cell::OnceCell::new(),
+            pure_callback_activation: std::cell::OnceCell::new(),
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
@@ -995,7 +1005,7 @@ impl<'a> Resolver<'a> {
     }
     pub fn signature(&mut self, reference: Ref) -> Option<Ref> {
         match self.type_of(reference) {
-            Type::Procedure(signature) => Some(signature),
+            Type::Procedure(signature) | Type::Function(signature, _) => Some(signature),
             _ => None,
         }
     }
@@ -1600,8 +1610,8 @@ impl<'a> Resolver<'a> {
                 name: "typeid".into(),
                 untyped: false,
             },
-            "ProcedureType" => Type::Procedure(r),
-            "Procedure" => child("type").map(Type::Procedure).unwrap_or(Type::Unknown),
+            "ProcedureType" => self.callable_type(r, &Substitutions::new()),
+            "Procedure" => child("type").map(|signature| self.callable_type(signature, &Substitutions::new())).unwrap_or(Type::Unknown),
             "Compound" => {
                 if let Some(typ) = child("type") {
                     return self.type_of(typ);
@@ -1747,8 +1757,9 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 let callee_type = self.type_of(callee);
+                if callee_type.signature().is_some() && self.denotes_type(callee) {return callee_type;}
                 match callee_type {
-                    Type::Procedure(signature) => {
+                    Type::Procedure(signature) | Type::Function(signature, _) => {
                         let specialized = self.specialized_result(r, 0, &Substitutions::new());
                         if !specialized.is_unknown() {
                             return specialized;

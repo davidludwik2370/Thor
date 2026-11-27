@@ -57,7 +57,7 @@ fn contract(source: &Source, signature: NodeId) -> Vec<Option<String>> {
 }
 fn procedure(typ: &Type) -> Option<Ref> {
     match typ {
-        Type::Procedure(r) => Some(*r),
+        Type::Procedure(r) | Type::Function(r, _) => Some(*r),
         Type::Nominal(_, inner) => procedure(inner),
         _ => None,
     }

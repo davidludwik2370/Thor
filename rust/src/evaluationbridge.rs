@@ -11,13 +11,21 @@ fn template(source: &crate::ast::Source, node: NodeId) -> String {
             .unwrap_or_else(|| source.names.get(source.node(node).name).to_string());
     }
     let mut code = source.text(node).to_string();
-    for child in source.node(node).children.iter().rev() {
-        let span = source.node(*child).span;
+    let children=&source.node(node).children;
+    let mut replacements=children.iter().map(|child|(source.node(*child).span,template(source,*child))).collect::<Vec<_>>();
+    for edit in &source.edits {
+        if source.node(node).span.contains(edit.span) && !children.iter().any(|child|source.node(*child).span.contains(edit.span)) {
+            replacements.push((edit.span,edit.text.clone()));
+        }
+    }
+    replacements.sort_by_key(|(span,_)|std::cmp::Reverse(span.start));
+    for (span,replacement) in replacements {
         code.replace_range(
             span.start - source.node(node).span.start..span.end - source.node(node).span.start,
-            &template(source, *child),
+            &replacement,
         );
     }
+    if source.node(node).kind=="ProcedureType" && code.starts_with("fn") {code.replace_range(..2,"proc");}
     code
 }
 
@@ -87,12 +95,7 @@ impl Plan {
                         })
                         .unwrap_or_else(|| typ.clone());
                     parameters.push(format!("${slot}:{annotation}"));
-                    crate::values::expression(
-                        value,
-                        &typ,
-                        &format!("{}meta", r.sources[origin.file].prefix),
-                    )
-                    .map_err(|error| Error::new(error.to_string()))?
+                    origin_types.binding_value(value,&typ,r).map_err(|error|Error::new(error.to_string()))?
                 } else {
                     parameters.push(format!("${slot}:typeid"));
                     type_names.push(slot.clone());
