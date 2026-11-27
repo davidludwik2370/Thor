@@ -1,7 +1,7 @@
 # README feature tour — 2026-11-27
 
-The README now starts with the logo and installation commands, followed by a
-linked index of 45 named Thor extensions. The detailed sections follow that
+The first reorganization (revision `78061bd`) starts with the logo and installation
+commands, followed by a linked index of 45 named Thor extensions. The detailed sections follow that
 order, with small Thor examples, Odin comparisons, ownership/contract caveats
 and links to full references. Numbered implementation milestones are omitted.
 Compiler commands, vet, VS Code/TLS and compatibility follow the feature tour.
@@ -62,3 +62,20 @@ Raw logs/results are retained locally in
 `dist/readme-reorganization-2026-11-27`. No downloaded binary release is
 published as part of this documentation change; the README explains how to
 install the checked-out revision with `--from-source`.
+
+## Follow-up: imports and introduction order
+
+The feature tour now introduces immutability and slice permissions immediately
+after imports, before later examples use them. The selective-import example uses
+`import "core:fmt" / print, println`. A new basic-package import example uses
+`import * "thor:basic"`; the basic helpers remain together in the final feature
+section, while the separate `thor:format` package is beside formatted strings.
+The linked index and example manifest use the same order. The prior
+`basic-library` anchor remains available.
+
+There are now 46 indexed entries, 49 example groups and 94 displayed snippets.
+All six affected-example and structure tests passed, with no skips: the three
+new/updated pairs ran in checked and unchecked builds, and the three structure
+tests checked the full reordered index, code-fence inventory and links. This
+follow-up changed documentation and example expectations only. Results are
+retained locally as `dist/readme-reorganization-2026-11-27/follow-up.json`.

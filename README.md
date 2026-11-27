@@ -22,9 +22,14 @@ This tour assumes familiarity with Odin. [Odin’s overview](https://odin-lang.o
 
 The index and sections below use the same order. Odin comparisons demonstrate equivalent behavior for the example; Thor-only compiler guarantees are called out explicitly.
 
-**Data and expressions**
+**Imports and bindings**
 
 - [Selective and wildcard imports](#selective-and-wildcard-imports) — Bring selected public names, or every public name, into the current file.
+- [Immutable bindings and views](#immutable-bindings-and-views) — Initialize once at runtime with `:>` and prevent writes through that binding.
+- [Read-only and writable slice parameters](#read-only-and-writable-slice-parameters) — Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
+
+**Data and expressions**
+
 - [Inferred array literals](#inferred-array-literals) — Write a fixed array without repeating its length and element type.
 - [Membership and intervals](#membership-and-intervals) — Test collections and numeric or ordered intervals with `in` and `not_in`.
 - [Membership in generic constraints](#membership-in-generic-constraints) — Express allowed types and constant values as membership constraints.
@@ -35,6 +40,7 @@ The index and sections below use the same order. Odin comparisons demonstrate eq
 - [Struct operators](#struct-operators) — Apply arithmetic, bitwise operations, shifts, power and complement field by field.
 - [Typed loop bindings](#typed-loop-bindings) — Choose a numeric range’s value type or a sequence loop’s index type.
 - [Formatted strings](#formatted-strings) — Embed expressions in quoted or raw strings, with optional formatting.
+- [Formatting helpers](#formatting-helpers) — Use the native formatting support package directly when interpolation is not needed.
 - [Collection comprehensions](#collection-comprehensions) — Build collections with an output expression, iteration and an optional filter.
 - [Sets](#sets) — Use `set[T]`, deduplicating literals and mathematical set operations.
 - [Negative indices and slices](#negative-indices-and-slices) — Count backward from the end of sequences.
@@ -62,16 +68,15 @@ The index and sections below use the same order. Odin comparisons demonstrate eq
 
 **Ownership and contracts**
 
-- [Immutable bindings and views](#immutable-bindings-and-views) — Initialize once at runtime with `:>` and prevent writes through that binding.
-- [Read-only and writable slice parameters](#read-only-and-writable-slice-parameters) — Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
 - [Scoped owners](#scoped-owners) — Attach shallow end-of-scope cleanup to a local declaration with `~`.
 - [Arbitrary-precision numbers](#arbitrary-precision-numbers) — Use predefined `Integer` and exact `Rational` values, literals and operators.
 - [Allocation-free contracts](#allocation-free-contracts) — Check `@(no_alloc)` procedures or an entire `#+vet no_alloc` file.
 - [Unused declaration contracts](#unused-declaration-contracts) — Mark declarations intentionally unused and reject later references to them.
 - [Local vet suppressions](#local-vet-suppressions) — Silence selected vet advice on one declaration using named enum options.
 
-**Basic library**
+**Basic package**
 
+- [Importing basic helpers](#importing-basic-helpers) — Use the namespace, selected names or `import * "thor:basic"`.
 - [Mapping and filtering](#mapping-and-filtering) — Allocate mapped and filtered slices with polymorphic callbacks inferred from the data.
 - [Parallel mapping](#parallel-mapping) — Run a mapping callback with bounded workers and ordered results.
 - [Sorted copies](#sorted-copies) — Sort an allocated copy while keeping the input unchanged.
@@ -80,7 +85,6 @@ The index and sections below use the same order. Odin comparisons demonstrate eq
 - [Allocation-free value hashing](#allocation-free-value-hashing) — Hash supported logical contents without allocating.
 - [Named zip views](#named-zip-views) — Give parallel slices field names without allocating a new array of records.
 - [Printing conversion and reductions](#printing-conversion-and-reductions) — Use small printing, parsing and collection helpers with explicit ownership.
-- [Formatting helpers](#formatting-helpers) — Use the native formatting support package directly when interpolation is not needed.
 
 Also: [compiler commands](#compiler-commands), [vetting](#thor-vetting), [VS Code and TLS](#vs-code-and-tls), and [compatibility and development](#compatibility-and-development).
 
@@ -88,7 +92,7 @@ Also: [compiler commands](#compiler-commands), [vetting](#thor-vetting), [VS Cod
 
 Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. The tests compile the exact displayed snippets, run both languages, compare their output and check rejection examples in checked and unchecked builds.
 
-## Data and expressions
+## Imports and bindings
 
 ### Selective and wildcard imports
 
@@ -98,23 +102,93 @@ Bring selected public names, or every public name, into the current file.
 
 <!-- readme-example: selective-and-wildcard-imports:thor -->
 ```odin
-import _ "core:math" / sqrt
-import * "core:strings"
-fmt.println(sqrt(f64(9)), has_prefix("Thor", "Th"))
+import "core:fmt" / print, println
+print("Hello, ")
+println("Thor!")
 ```
 
 **Odin**
 
 <!-- readme-example: selective-and-wildcard-imports:odin -->
 ```odin
-import "core:math"
-import "core:strings"
-fmt.println(math.sqrt(f64(9)), strings.has_prefix("Thor", "Th"))
+import "core:fmt"
+fmt.print("Hello, ")
+fmt.println("Thor!")
 ```
 
-`import "core:math" / sqrt` also retains the `math` namespace. `import *` retains its namespace; `import _ ... / names` omits it. Names are file-local, are not re-exported, and obey privacy and collision checks. Selected mutable package variables require their namespace; wildcard imports preserve live variable access.
+`import "core:fmt" / print, println` brings just those procedures into scope and retains `fmt.print` / `fmt.println`. Use `import _ "core:fmt" / print, println` to omit the namespace, or `import * "package:path"` to bring in every public name while keeping the namespace. The [basic package example](#importing-basic-helpers) shows the wildcard form. Names are file-local, are not re-exported, and obey privacy and collision checks. Selected mutable package variables require their namespace; wildcard imports preserve live variable access.
 
 [Import rules](docs/language-guide.md#expressions-arrays-and-ranges).
+
+### Immutable bindings and views
+
+Initialize once at runtime with `:>` and prevent writes through that binding.
+
+**Thor**
+
+<!-- readme-example: immutable-bindings-and-views:thor -->
+```odin
+number := 3
+value :> number+1
+values :> [2]int{10, 20}
+fmt.println(value, values[0])
+```
+
+**Odin**
+
+<!-- readme-example: immutable-bindings-and-views:odin -->
+```odin
+number := 3
+value := number+1
+values := [2]int{10, 20}
+fmt.println(value, values[0])
+```
+
+The Odin code reproduces the values, not the write restrictions. Thor also supports `name: Type > expression`. Records/fixed arrays protect directly stored subobjects; slices become read-only views. Existing writable aliases may still change shared backing storage. Pointer targets and dynamic-array contents retain their documented native behavior. `:>` is not a compile-time constant or a general ownership guarantee.
+
+[Immutability, aliases and storage](docs/slice-access.md).
+
+**Rejected in Thor**
+
+<!-- readme-example: immutable-write-rejected:thor -->
+```odin
+value :> 3
+value = 4
+```
+
+### Read-only and writable slice parameters
+
+Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
+
+**Thor**
+
+<!-- readme-example: read-only-and-writable-slice-parameters:thor -->
+```odin
+copy_values :: proc(#ro source, #mut destination: []int) { copy(destination, source) }
+source :> []int{1, 2}
+destination := make([]int, 2)
+defer delete(destination)
+copy_values(source, destination)
+fmt.println(destination)
+```
+
+**Odin**
+
+<!-- readme-example: read-only-and-writable-slice-parameters:odin -->
+```odin
+copy_values :: proc(source, destination: []int) { copy(destination, source) }
+source := []int{1, 2}
+destination := make([]int, 2)
+defer delete(destination)
+copy_values(source, destination)
+fmt.println(destination)
+```
+
+`#ro` prevents writes through the parameter, even with writable caller storage. `#mut` requires a writable view and applies to the next name only; omitted requirements are inferred from use and transitive calls. Returned/stored aliases retain permissions. These are Thor compile-time checks, not qualifiers carried in Odin’s native slice representation.
+
+[Slice access and alias propagation](docs/slice-access.md).
+
+## Data and expressions
 
 ### Inferred array literals
 
@@ -398,6 +472,34 @@ fmt.println(text)
 Supports nested expressions, raw backticks, escaped braces, precision, grouping, Unicode padding and dynamic widths. Named results own their strings. Anonymous f-string arguments are cleaned up after the enclosing expression; `f!"..."` opts out for an API that takes ownership. Other referenced values retain their normal ownership.
 
 [Formatting grammar](docs/interpolation-formatting.md) and [temporary ownership](docs/language-guide.md#interpolation-switches-sets-and-negative-indices).
+
+### Formatting helpers
+
+Use the native formatting support package directly when interpolation is not needed.
+
+**Thor**
+
+<!-- readme-example: formatting-helpers:thor -->
+```odin
+import f "thor:format"
+text := f.format(1234567, grouping=true)
+defer delete(text)
+fmt.println(text)
+```
+
+**Odin**
+
+<!-- readme-example: formatting-helpers:odin -->
+```odin
+import f "thor:format"
+text := f.format(1234567, grouping=true)
+defer delete(text)
+fmt.println(text)
+```
+
+Both languages can call this ordinary Odin library. It supports grouping, width, alignment and Unicode fills; returned strings belong to the caller. The formatting package also supports explicit native fmt registration for logical numbers.
+
+[Formatting and ownership](docs/language-guide.md#expressions-arrays-and-ranges), [big-number formatting](runtime/big/README.md#language-integration-helpers).
 
 ### Collection comprehensions
 
@@ -910,74 +1012,6 @@ Statement-form `#switch` corresponds to an Odin `when` / `else when` chain. Sele
 
 ## Ownership and contracts
 
-### Immutable bindings and views
-
-Initialize once at runtime with `:>` and prevent writes through that binding.
-
-**Thor**
-
-<!-- readme-example: immutable-bindings-and-views:thor -->
-```odin
-number := 3
-value :> number+1
-values :> [10, 20]
-fmt.println(value, values[0])
-```
-
-**Odin**
-
-<!-- readme-example: immutable-bindings-and-views:odin -->
-```odin
-number := 3
-value := number+1
-values := [2]int{10, 20}
-fmt.println(value, values[0])
-```
-
-The Odin code reproduces the values, not the write restrictions. Thor also supports `name: Type > expression`. Records/fixed arrays protect directly stored subobjects; slices become read-only views. Existing writable aliases may still change shared backing storage. Pointer targets and dynamic-array contents retain their documented native behavior. `:>` is not a compile-time constant or a general ownership guarantee.
-
-[Immutability, aliases and storage](docs/slice-access.md).
-
-**Rejected in Thor**
-
-<!-- readme-example: immutable-write-rejected:thor -->
-```odin
-value :> 3
-value = 4
-```
-
-### Read-only and writable slice parameters
-
-Enforce `#ro` readers and `#mut` writers, with inferred writable requirements.
-
-**Thor**
-
-<!-- readme-example: read-only-and-writable-slice-parameters:thor -->
-```odin
-copy_values :: proc(#ro source, #mut destination: []int) { copy(destination, source) }
-source :> []int{1, 2}
-destination := make([]int, 2)
-defer delete(destination)
-copy_values(source, destination)
-fmt.println(destination)
-```
-
-**Odin**
-
-<!-- readme-example: read-only-and-writable-slice-parameters:odin -->
-```odin
-copy_values :: proc(source, destination: []int) { copy(destination, source) }
-source := []int{1, 2}
-destination := make([]int, 2)
-defer delete(destination)
-copy_values(source, destination)
-fmt.println(destination)
-```
-
-`#ro` prevents writes through the parameter, even with writable caller storage. `#mut` requires a writable view and applies to the next name only; omitted requirements are inferred from use and transitive calls. Returned/stored aliases retain permissions. These are Thor compile-time checks, not qualifiers carried in Odin’s native slice representation.
-
-[Slice access and alias propagation](docs/slice-access.md).
-
 ### Scoped owners
 
 Attach shallow end-of-scope cleanup to a local declaration with `~`.
@@ -1150,9 +1184,35 @@ fmt.println(value)
 
 [Suppression options](docs/attributes-and-directives.md#attr-vet_ignore) and [vet policy](docs/compiler-guide.md#thor-vetting).
 
-## Basic library
+<a id="basic-library"></a>
+
+## Basic package
 
 `import "thor:basic"` exposes bundled conveniences. This package uses Thor syntax and is consumed with Thor; its ordinary Odin support packages can also be used directly from Odin. All allocating results retain their documented ownership.
+
+### Importing basic helpers
+
+Use the package namespace, select individual names, or import all public helpers.
+
+**Thor**
+
+<!-- readme-example: basic-imports:thor -->
+```odin
+import * "thor:basic"
+print("Hello, Thor!")
+```
+
+**Odin**
+
+<!-- readme-example: basic-imports:odin -->
+```odin
+import "core:fmt"
+fmt.println("Hello, Thor!")
+```
+
+With `import * "thor:basic"`, both `print(...)` and `basic.print(...)` work. For selected helpers, use `import "thor:basic" / print, range`; for namespace-only access, use `import "thor:basic"`. The Odin example uses `fmt` for the same output; `thor:basic` itself is a Thor package.
+
+[Basic API and ownership](runtime/basic/README.md).
 
 ### Mapping and filtering
 
@@ -1435,34 +1495,6 @@ fmt.println(number, total, true && false)
 Allocating helpers use their supplied allocator or `context.allocator`. Boolean reduction procedures may stop traversing values early, but ordinary call arguments are all evaluated before the procedure starts; use `&&`/`||` for lazy expressions. The table below groups the remaining API, with full contracts in the linked reference.
 
 [Complete basic API](runtime/basic/README.md).
-
-### Formatting helpers
-
-Use the native formatting support package directly when interpolation is not needed.
-
-**Thor**
-
-<!-- readme-example: formatting-helpers:thor -->
-```odin
-import f "thor:format"
-text := f.format(1234567, grouping=true)
-defer delete(text)
-fmt.println(text)
-```
-
-**Odin**
-
-<!-- readme-example: formatting-helpers:odin -->
-```odin
-import f "thor:format"
-text := f.format(1234567, grouping=true)
-defer delete(text)
-fmt.println(text)
-```
-
-Both languages can call this ordinary Odin library. It supports grouping, width, alignment and Unicode fills; returned strings belong to the caller. The formatting package also supports explicit native fmt registration for logical numbers.
-
-[Formatting and ownership](docs/language-guide.md#expressions-arrays-and-ranges), [big-number formatting](runtime/big/README.md#language-integration-helpers).
 
 ### More basic helpers
 

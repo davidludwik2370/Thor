@@ -9,7 +9,40 @@
         "odin"
       ],
       "placement": "body",
-      "stdout": "3 true",
+      "stdout": "Hello, Thor!",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "immutable-bindings-and-views",
+      "section": "immutable-bindings-and-views",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "4 10",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "immutable-write-rejected",
+      "section": "immutable-bindings-and-views",
+      "engines": [
+        "thor"
+      ],
+      "placement": "body",
+      "error": "immutable"
+    },
+    {
+      "id": "read-only-and-writable-slice-parameters",
+      "section": "read-only-and-writable-slice-parameters",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "[1, 2]",
       "comptime_modes": false,
       "no_odin_reason": null
     },
@@ -130,6 +163,18 @@
       ],
       "placement": "body",
       "stdout": "Hello Ada: 3",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "formatting-helpers",
+      "section": "formatting-helpers",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "1,234,567",
       "comptime_modes": false,
       "no_odin_reason": null
     },
@@ -349,39 +394,6 @@
       "no_odin_reason": null
     },
     {
-      "id": "immutable-bindings-and-views",
-      "section": "immutable-bindings-and-views",
-      "engines": [
-        "thor",
-        "odin"
-      ],
-      "placement": "body",
-      "stdout": "4 10",
-      "comptime_modes": false,
-      "no_odin_reason": null
-    },
-    {
-      "id": "immutable-write-rejected",
-      "section": "immutable-bindings-and-views",
-      "engines": [
-        "thor"
-      ],
-      "placement": "body",
-      "error": "immutable"
-    },
-    {
-      "id": "read-only-and-writable-slice-parameters",
-      "section": "read-only-and-writable-slice-parameters",
-      "engines": [
-        "thor",
-        "odin"
-      ],
-      "placement": "body",
-      "stdout": "[1, 2]",
-      "comptime_modes": false,
-      "no_odin_reason": null
-    },
-    {
       "id": "scoped-owners",
       "section": "scoped-owners",
       "engines": [
@@ -456,6 +468,18 @@
       ],
       "placement": "body",
       "stdout": "4",
+      "comptime_modes": false,
+      "no_odin_reason": null
+    },
+    {
+      "id": "basic-imports",
+      "section": "importing-basic-helpers",
+      "engines": [
+        "thor",
+        "odin"
+      ],
+      "placement": "body",
+      "stdout": "Hello, Thor!",
       "comptime_modes": false,
       "no_odin_reason": null
     },
@@ -552,18 +576,6 @@
       ],
       "placement": "body",
       "stdout": "42 6 false",
-      "comptime_modes": false,
-      "no_odin_reason": null
-    },
-    {
-      "id": "formatting-helpers",
-      "section": "formatting-helpers",
-      "engines": [
-        "thor",
-        "odin"
-      ],
-      "placement": "body",
-      "stdout": "1,234,567",
       "comptime_modes": false,
       "no_odin_reason": null
     }
