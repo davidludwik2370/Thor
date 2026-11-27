@@ -333,7 +333,7 @@ fi
         data=self.root/'code data';extensions=self.root/'extensions';profile=data/'User/profiles/profile-id'
         if existing:
             profile.mkdir(parents=True)
-            (profile/'settings.json').write_text('// custom comments\n{"workbench.colorTheme":"My Theme"}')
+            (profile/'settings.json').write_text('// custom comments\n{"workbench.colorTheme":"My Theme","thor.colors.recommended":false}')
             (profile/'keybindings.json').write_text('[{"key":"cmd+r","command":"custom"}]')
             storage=data/'User/globalStorage/storage.json';storage.parent.mkdir(parents=True)
             storage.write_text(json.dumps({'userDataProfiles':[dict(location='profile-id',name='Thor')]}))
@@ -373,6 +373,9 @@ if '--install-extension' in a:
   (profile/'extensions.json').write_text(json.dumps([{'identifier':{'id':'thor-local.thor-language'},'location':{'scheme':'file','path':str(extension)}}]))
 if '--new-window' in a:
  p=d/'User/globalStorage/storage.json';p.parent.mkdir(parents=True,exist_ok=True)
+ if os.environ.get('CODE_TEST_INITIAL_PROFILE_SETTINGS'):
+  settings=d/'User/profiles/profile-id/settings.json';settings.parent.mkdir(parents=True,exist_ok=True)
+  settings.write_text(os.environ['CODE_TEST_INITIAL_PROFILE_SETTINGS'])
  value=json.dumps({'userDataProfiles':[{'location':'profile-id','name':a[a.index('--profile')+1]}]})
  if os.environ.get('CODE_TEST_DELAYED_PROFILE'):
   import subprocess
@@ -473,6 +476,58 @@ if '--new-window' in a:
         self.invoke(self.bundle(),'--vscode','--profile','Thor','--no-colors','--code',str(code),'--code-user-data',str(data))
         self.assertFalse(json.loads((profile/'settings.json').read_text())['thor.colors.recommended'])
 
+    def test_profile_reinstall_restores_missing_theme_and_color_defaults(self):
+        code,data,extensions,profile=self.fake_code()
+        flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.invoke(self.bundle(),*flags)
+        for _ in range(2):
+            self.invoke(None,'--uninstall')
+            self.assertTrue((data/'User/globalStorage/storage.json').exists())
+            self.invoke(self.bundle(),*flags)
+            settings=json.loads((profile/'settings.json').read_text())
+            self.assertEqual(settings['workbench.colorTheme'],'Dark Modern')
+            self.assertIs(settings['thor.colors.recommended'],True)
+
+    def test_editor_created_profile_settings_receive_only_missing_defaults(self):
+        code,data,extensions,profile=self.fake_code()
+        self.env['CODE_TEST_INITIAL_PROFILE_SETTINGS']='// editor initialization\n{"editor.fontSize":15,}'
+        flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.invoke(self.bundle(),*flags)
+        text=(profile/'settings.json').read_text()
+        self.assertIn('// editor initialization',text)
+        self.assertIn('"editor.fontSize":15',text)
+        self.assertIn('"workbench.colorTheme":"Dark Modern"',text)
+        self.assertIn('"thor.colors.recommended":true',text)
+
+    def test_existing_profile_missing_defaults_preserves_comments_and_explicit_choices(self):
+        code,data,extensions,profile=self.fake_code(existing=True)
+        for original,expected in [
+            ({'editor.fontSize':15},{'workbench.colorTheme':'Dark Modern','thor.colors.recommended':True}),
+            ({'workbench.colorTheme':'My Theme'},{'workbench.colorTheme':'My Theme','thor.colors.recommended':True}),
+            ({'thor.colors.recommended':False},{'workbench.colorTheme':'Dark Modern','thor.colors.recommended':False}),
+        ]:
+            with self.subTest(original=original):
+                settings=profile/'settings.json'
+                settings.write_text('// keep user choices\n'+json.dumps(original))
+                self.invoke(self.bundle(),'--vscode','--profile','Thor','--colors','--code',str(code),'--code-user-data',str(data))
+                text=settings.read_text()
+                self.assertIn('// keep user choices',text)
+                actual=json.loads(text.split('\n',1)[1])
+                for key,value in {**original,**expected}.items():self.assertEqual(actual[key],value)
+
+    def test_reinstall_preserves_a_theme_chosen_after_the_initial_install(self):
+        code,data,extensions,profile=self.fake_code()
+        flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.invoke(self.bundle(),*flags)
+        settings=profile/'settings.json';value=json.loads(settings.read_text())
+        value['workbench.colorTheme']='My Theme';value['thor.colors.recommended']=False
+        settings.write_text(json.dumps(value))
+        self.invoke(None,'--uninstall')
+        self.invoke(self.bundle(),*flags)
+        actual=json.loads(settings.read_text())
+        self.assertEqual(actual['workbench.colorTheme'],'My Theme')
+        self.assertIs(actual['thor.colors.recommended'],False)
+
     def test_default_profile_install_does_not_change_settings(self):
         code,data,extensions,profile=self.fake_code()
         result=self.invoke(self.bundle(),'--vscode','--code',str(code),'--code-user-data',str(data))
@@ -536,7 +591,7 @@ if '--new-window' in a:
     @unittest.skipUnless(NATIVE_OLS,'native OLS fallback targets ARM64 Linux')
     def test_native_ols_preserves_custom_server_without_building(self):
         code,data,extensions,profile=self.fake_code(existing=True)
-        settings=profile/'settings.json';settings.write_text('// keep\n{"ols.server.path":"/custom/ols", "other":[1,],}')
+        settings=profile/'settings.json';settings.write_text('// keep\n{"ols.server.path":"/custom/ols", "other":[1,],"workbench.colorTheme":"My Theme","thor.colors.recommended":false,}')
         before=settings.read_bytes()
         self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
         self.assertEqual(settings.read_bytes(),before)

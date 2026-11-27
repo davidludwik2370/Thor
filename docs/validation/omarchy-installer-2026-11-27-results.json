@@ -1,0 +1,32 @@
+{
+  "success": true,
+  "platform": "linux",
+  "checks": [
+    "install-reinstall-doctor",
+    "ordinary-login-and-interactive-shell-path",
+    "checked-and-unchecked-execution",
+    "installed-extension-activation",
+    "native-odin-fixture-present",
+    "native-odin-document-opened",
+    "standard-ols-owns-odin-language-grammar-and-icons",
+    "automatic-native-ols-build-and-language-services",
+    "terminal-path-without-shell-profile",
+    "tls-hover-private-sdk",
+    "tls-field-completion",
+    "profile-theme-and-thor-only-colors",
+    "optional-color-enable-and-restore",
+    "run-without-shell-path",
+    "codelldb-source-breakpoint",
+    "debug-clean-exit",
+    "default-profile-preserved",
+    "repeated-uninstall-project-preserved"
+  ],
+  "seconds": 97.08,
+  "distribution": "Omarchy 4.0.0.r7969.g459b90c",
+  "architecture": "aarch64",
+  "source_commit": "60f088a2d61e67b54373f9f879405fb1c259dc78",
+  "release": "0.41.12",
+  "candidate_changes": [
+    "install/prerequisites.sh: pacman VS Code acquisition"
+  ]
+}

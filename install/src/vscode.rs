@@ -112,6 +112,32 @@ fn profile_directory(data: &Path, requested: &str) -> Result<Option<PathBuf>> {
     }
     Ok(result)
 }
+fn configure_profile(prefix:&Path,directory:&Path,template:&Value,colors:Option<bool>)->Result<()> {
+    let file=directory.join("settings.json");
+    let before=match fs::read_to_string(&file) {Ok(text)=>Some(text),Err(e) if e.kind()==std::io::ErrorKind::NotFound=>None,Err(e)=>return Err(err(e))};
+    let mut defaults:Value=serde_json::from_str(field(template,"settings")?).map_err(err)?;
+    defaults["thor.colors.recommended"]=json!(colors.unwrap_or(true));
+    let mut text=before.clone().unwrap_or_else(||"{}\n".into());
+    // A retained profile registration is not evidence that its defaults remain:
+    // uninstall restores installer-owned settings but deliberately keeps the
+    // profile. Reapply missing defaults, retaining every explicit user value.
+    for (key,value) in defaults.as_object().ok_or("invalid profile defaults")? {
+        text=jsonc::Document::parse(text)?.set_missing(key,value)?;
+    }
+    if before.as_deref()==Some(&text) {return Ok(());}
+    fs::create_dir_all(directory).map_err(err)?;
+    if before.is_some() {
+        if fs::symlink_metadata(&file).map_err(err)?.file_type().is_symlink() {return Err("Profile settings are a symlink; preserved. Configure the profile through VS Code.".into());}
+        if fs::read_to_string(&file).map_err(err)?!=before.as_deref().unwrap() {return Err("VS Code profile settings changed during setup; preserved. Rerun --vscode to finish.".into());}
+        atomic_write(&file,text.as_bytes())?;
+    } else {
+        let mut output=fs::OpenOptions::new().create_new(true).write(true).open(&file)
+            .map_err(|e|format!("Could not initialize profile settings; existing files were preserved. Rerun --vscode to finish: {e}"))?;
+        output.write_all(text.as_bytes()).map_err(err)?;
+    }
+    lifecycle::track_file(prefix,&file,before,&text)?;
+    Ok(())
+}
 pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     let data=data_dir(o)?;
     let record=registered()?;
@@ -130,24 +156,8 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
                 if directory.is_some(){break;}
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
-            let directory=directory.ok_or("VS Code did not register the requested profile within two minutes. Check that its window starts in your logged-in desktop session, then rerun the installer. Headless Linux validation needs a graphical session such as Xvfb.")?;
-            let template=read_json(&root.join("install/profiles/Thor.code-profile"))?;
-            let mut settings:Value=serde_json::from_str(field(&template,"settings")?).map_err(err)?;
-            settings["thor.colors.recommended"]=json!(o.colors.unwrap_or(true));
-            fs::create_dir_all(&directory).map_err(err)?;
-            let file=directory.join("settings.json");
-            // A setting written during profile creation wins, even on first run.
-            // create_new makes this safe against concurrent edits by the editor.
-            match fs::OpenOptions::new().create_new(true).write(true).open(&file) {
-                Ok(mut f)=>{
-                    let text=serde_json::to_string_pretty(&settings).map_err(err)?;
-                    f.write_all(text.as_bytes()).map_err(err)?;
-                    lifecycle::track_file(&prefix,&file,None,&text)?;
-                },
-                Err(e) if e.kind()==std::io::ErrorKind::AlreadyExists=>println!("Profile settings already exist and were preserved. Enable Thor colors with the extension command if desired."),
-                Err(e)=>return Err(err(e)),
-            }
-        } else { println!("Existing profile {name}: settings and keybindings preserved."); }
+            directory.ok_or("VS Code did not register the requested profile within two minutes. Check that its window starts in your logged-in desktop session, then rerun the installer. Headless Linux validation needs a graphical session such as Xvfb.")?;
+        }
     }
     let mut state=lifecycle::state(&prefix)?;
     let mut listing=cli(code,o,&bin,root)?;
@@ -170,6 +180,11 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
             profile_directory(&data,name)?.ok_or("VS Code profile not found")?
         } else {data.join("User")};
         ols::configure(root,Path::new(field(&registered()?,"prefix")?),&directory.join("settings.json"))?;
+        if let Some(name)=&o.profile {
+            let template=read_json(&root.join("install/profiles/Thor.code-profile"))?;
+            configure_profile(&prefix,&directory,&template,o.colors)?;
+            println!("Profile {name}: missing Thor defaults initialized; explicit settings and keybindings preserved.");
+        }
     }
     for extension in [root.join("editors/thor-language.vsix").to_string_lossy().into_owned(),"DanielGavin.ols".into(),"vadimcn.vscode-lldb".into()] {
         let mut cmd=cli(code,o,&bin,root)?;

@@ -12,6 +12,75 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipIf(os.name=='nt','POSIX prerequisite script')
 class PrerequisiteTests(unittest.TestCase):
+    def exercise_pacman_editor(self, *, available=True, present=False, version='1.146.0', install_status=0, editor=True):
+        with tempfile.TemporaryDirectory(prefix='thor-pacman-editor-') as temporary:
+            root=Path(temporary);bin=root/'bin';bin.mkdir()
+            def executable(name, body):
+                path=bin/name;path.write_text(body);path.chmod(0o755)
+            for name in ('mktemp','rm','dirname','cat','awk','head','grep'):
+                (bin/name).symlink_to(shutil.which(name))
+            executable('uname','#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo aarch64;; esac\n')
+            executable('id','#!/bin/sh\necho 0\n')
+            executable('ps','#!/bin/sh\nexit 0\n')
+            executable('curl','#!/bin/sh\necho "Unexpected download" >&2; exit 99\n')
+            executable('clang',f'''#!{sys.executable}
+import pathlib,sys
+p=pathlib.Path(sys.argv[sys.argv.index('-o')+1]);p.write_text('#!/bin/sh\\nexit 0\\n');p.chmod(0o755)
+''')
+            code=root/'system/usr/share/code/bin/code'
+            if present:
+                code.parent.mkdir(parents=True);code.write_text('#!/bin/sh\necho '+version+'\n');code.chmod(0o755)
+            executable('pacman',f'''#!{sys.executable}
+import json,os,pathlib,sys
+with open(os.environ['FIXTURE_LOG'],'a') as f:f.write(json.dumps(sys.argv[1:])+'\\n')
+if sys.argv[1:]==['-Si','visual-studio-code-bin']:sys.exit({0 if available else 1})
+if sys.argv[1:]!=['-S','--needed','--noconfirm','visual-studio-code-bin']:sys.exit(94)
+if {install_status}:sys.exit({install_status})
+p=pathlib.Path(os.environ['FIXTURE_CODE']);p.parent.mkdir(parents=True,exist_ok=True)
+p.write_text('#!/bin/sh\\necho {version}\\n');p.chmod(0o755)
+''')
+            text=(ROOT/'install/prerequisites.sh').read_text()
+            for prefix in ('/usr/local','/usr/pkg','/usr/share/code'):
+                text=text.replace(prefix,str(root/'system'/prefix.lstrip('/')))
+            script=root/'prerequisites.sh';script.write_text(text)
+            shutil.copy2(ROOT/'install/vscode-minimum',root/'vscode-minimum')
+            log=root/'pacman.jsonl'
+            value=subprocess.run(['/bin/sh',str(script),*(['--vscode'] if editor else [])],capture_output=True,text=True,timeout=20,
+                env={**os.environ,'PATH':str(bin),'HOME':str(root/'home'),'FIXTURE_LOG':str(log),'FIXTURE_CODE':str(code)})
+            calls=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+            return value,calls
+
+    def test_omarchy_installs_the_repositorys_official_editor_binary(self):
+        value,calls=self.exercise_pacman_editor()
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr)
+        self.assertEqual(calls,[['-Si','visual-studio-code-bin'],['-S','--needed','--noconfirm','visual-studio-code-bin']])
+        self.assertIn('VS Code 1.146.0 installed',value.stdout)
+
+    def test_pacman_editor_reuses_a_compatible_existing_installation(self):
+        value,calls=self.exercise_pacman_editor(present=True)
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr);self.assertEqual(calls,[])
+
+    def test_pacman_editor_unavailable_does_not_bootstrap_an_aur_build(self):
+        value,calls=self.exercise_pacman_editor(available=False)
+        self.assertNotEqual(value.returncode,0)
+        self.assertEqual(calls,[['-Si','visual-studio-code-bin']])
+        self.assertIn('configured pacman repositories do not provide',value.stderr)
+
+    def test_pacman_editor_package_failure_propagates(self):
+        value,calls=self.exercise_pacman_editor(install_status=42)
+        self.assertEqual(value.returncode,42,value.stdout+value.stderr)
+        self.assertEqual(len(calls),2);self.assertNotIn('VS Code 1.146.0 installed',value.stdout)
+
+    def test_pacman_editor_still_requires_a_supported_version(self):
+        value,calls=self.exercise_pacman_editor(version='1.80.0')
+        self.assertNotEqual(value.returncode,0)
+        self.assertEqual(len(calls),2)
+        self.assertIn('did not provide version',value.stderr)
+
+    def test_pacman_toolchain_only_install_does_not_install_an_editor(self):
+        value,calls=self.exercise_pacman_editor(editor=False)
+        self.assertEqual(value.returncode,0,value.stdout+value.stderr);self.assertEqual(calls,[])
+
     def exercise_linux_editor_ssl(self, present=False, editor=True, runtime_only=False):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);bin=root/'bin';bin.mkdir()

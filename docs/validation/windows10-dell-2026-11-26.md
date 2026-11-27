@@ -134,7 +134,12 @@ Original source projects, VS Code and developer tools were preserved. About
 1,487.8 MiB of superseded local staging archives were also removed; only the
 current native release archives and small verification evidence remain.
 
-First-time development-tool acquisition on a clean Windows 11 VM remains deferred
-at the user's request. The Dell supplies real Windows 10 and first-time MSVC/SDK
-coverage, but it is not a pristine OS image. Automated editor API and debugger
-checks do not measure visual spacing, scaling or every compositor/driver.
+First-time development-tool acquisition on a clean Windows 11 VM was deferred
+during this round. The [November 27 fresh-VM follow-up](windows11-fresh-install-2026-11-27-results.json)
+subsequently passed automatic MSVC/SDK and VS Code acquisition, ordinary-terminal
+PATH, editor/debugger checks and repeated uninstall/reinstall on Windows 11 build
+26300. Its visual follow-up also records the retained-profile color defect and
+the candidate installer fix; public 0.41.12 still needs that fix. The Dell
+supplies real Windows 10 and first-time MSVC/SDK coverage, but it
+is not a pristine OS image. Automated editor API and debugger checks do not
+measure visual spacing, scaling or every compositor/driver.

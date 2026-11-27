@@ -14,6 +14,9 @@ async function until(label,callback,ms=90000) {
 async function run() {
     const checks=[];
     const result=process.env.THOR_INSTALL_GUI_RESULT;
+    // Fresh profiles use the template. Lifecycle callers can instead assert
+    // the known theme retained by an existing profile after reinstall.
+    const expectedTheme=process.env.THOR_INSTALL_GUI_EXPECTED_THEME||'Dark Modern';
     const check=label=>{checks.push(label);fs.writeFileSync(result,JSON.stringify({success:false,in_progress:true,checks,timings},null,2));};
     try {
         const extension=vscode.extensions.getExtension('thor-local.thor-language');
@@ -98,10 +101,10 @@ async function run() {
         assert.ok(completions.includes('age'));check('tls-field-completion');
         const palette=await until('optional colors',()=>vscode.workspace.getConfiguration('editor').get('semanticTokenColorCustomizations')?.rules);
         assert.equal(palette['variable.thorCompileTime:thor'],'#8582DE');
-        assert.equal(vscode.workspace.getConfiguration('workbench').get('colorTheme'),'Dark Modern');
+        assert.equal(vscode.workspace.getConfiguration('workbench').get('colorTheme'),expectedTheme);
         check('profile-theme-and-thor-only-colors');
         await vscode.commands.executeCommand('thor.restoreRecommendedColors');
-        assert.equal(vscode.workspace.getConfiguration('workbench').get('colorTheme'),'Dark Modern');
+        assert.equal(vscode.workspace.getConfiguration('workbench').get('colorTheme'),expectedTheme);
         // The installer opens a real profile window before the test host. Its
         // startup activation can already add colors; extension-test hosts use
         // separate mementos and cannot claim that other host's ownership. Clear
@@ -159,7 +162,7 @@ async function run() {
         await until('debug program exit',()=>terminated);
         tracker.dispose();end.dispose();vscode.debug.removeBreakpoints([breakpoint]);
         check('debug-clean-exit');
-        fs.writeFileSync(result,JSON.stringify({success:true,checks,timings},null,2));
+        fs.writeFileSync(result,JSON.stringify({success:true,checks,timings,expectedTheme},null,2));
     } catch(error) {
         fs.writeFileSync(result,JSON.stringify({success:false,checks,timings,error:error.stack||String(error)},null,2));
         throw error;

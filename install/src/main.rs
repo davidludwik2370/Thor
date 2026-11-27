@@ -23,8 +23,8 @@ Usage: thor-install [options]
   --prefix DIR            Per-user installation directory
   --vscode                Install Thor, standard Odin/OLS and CodeLLDB in VS Code
   --profile NAME          Create/use a named VS Code profile; requires --vscode
-  --colors                Enable recommended Thor colors in a NEW profile
-  --no-colors             Leave recommended colors disabled in a NEW profile
+  --colors                Default to recommended Thor colors in a named profile
+  --no-colors             Default to no Thor color preset in a named profile
   --code PATH             VS Code CLI executable (otherwise discover it)
   --code-user-data DIR    Use a separate VS Code user-data directory
   --extensions-dir DIR    Use a separate VS Code extensions directory
@@ -72,7 +72,7 @@ fn parse(args: Vec<String>) -> Result<Options> {
     }
     if o.profile.is_some() && !o.vscode { return Err("--profile requires --vscode".into()); }
     if o.colors.is_some() && o.profile.is_none() {
-        return Err("--colors/--no-colors requires a named --profile; existing settings are never rewritten. Use the extension's Apply Recommended Colors command instead.".into());
+        return Err("--colors/--no-colors requires a named --profile; explicit settings are never overwritten. Use the extension's Apply Recommended Colors command to change an existing choice.".into());
     }
     if o.profile.as_ref().is_some_and(|s| s.trim().is_empty() || s.chars().any(char::is_control)) {
         return Err("profile names must be nonempty and contain no control characters".into());

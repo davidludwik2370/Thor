@@ -5,6 +5,10 @@ struct Token {start:usize,end:usize,kind:u8}
 pub(super) struct Document {pub value:Value,text:String,tokens:Vec<Token>}
 
 impl Document {
+    pub fn set_missing(&self,key:&str,value:&Value)->Result<String> {
+        if self.value.get(key).is_some() {return Ok(self.text.clone());}
+        self.edit(key,Some(value))
+    }
     fn edit(&self,key:&str,value:Option<&Value>)->Result<String> {
         let mut depth=0;let mut found=Vec::new();
         for (i,t) in self.tokens.iter().enumerate() {
@@ -115,6 +119,20 @@ pub(super) fn restore_managed(current:&str,before:&str,after:&str)->Result<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn missing_defaults_keep_explicit_values_comments_and_other_settings() {
+        let text="\u{feff}{ // keep\n\"workbench.colorTheme\":\"café\",\"thor.colors.recommended\":false,\"explicitNull\":null,\"nested\":{\"keep\":1},}";
+        let doc=Document::parse(text.into()).unwrap();
+        for key in ["workbench.colorTheme","thor.colors.recommended","explicitNull"] {
+            let unchanged=doc.set_missing(key,&json!("default")).unwrap();
+            assert_eq!(unchanged,text);
+        }
+        let edited=doc.set_missing("missing",&json!(true)).unwrap();
+        let value=Document::parse(edited.clone()).unwrap().value;
+        let mut expected=doc.value;expected["missing"]=json!(true);
+        assert_eq!(value,expected);
+        assert!(edited.contains("// keep"));
+        assert!(edited.starts_with('\u{feff}'));
+    }
     #[test] fn restores_only_unchanged_managed_keys_and_keeps_comments() {
         let before="{\"theme\":\"mine\",\"old\":{\"nested\":[1,2]}}";
         let after="{\"theme\":\"Thor\",\"old\":{\"nested\":[3]},\"thor\":true}";

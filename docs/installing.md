@@ -53,8 +53,11 @@ native executables and shared libraries, including native vendor libraries.
 Linux support here means glibc-based systems; Alpine/musl is a separate,
 unvalidated configuration. The macOS ARM64 baseline is macOS 13 (tested on
 13.5.1); Windows desktop validation covers Windows 11 x64 and Windows 10 Pro
-22H2 x64 (build 19045), including first-time MSVC/SDK acquisition on the Dell.
-See the [Windows and Linux follow-up results](validation/windows10-dell-2026-11-26.md). See `release/linux-compatibility.json` and
+22H2 x64 (build 19045), including first-time MSVC/SDK acquisition on the Dell and
+a [fresh Windows 11 build 26300 VM](validation/windows11-fresh-install-2026-11-27-results.json).
+The fresh VM also passed automatic VS Code acquisition, ordinary-terminal PATH,
+TLS/OLS services, a source breakpoint, and uninstall/reinstall using the public
+release. See the [Windows and Linux follow-up results](validation/windows10-dell-2026-11-26.md), `release/linux-compatibility.json` and
 `release/macos-minimum` for the enforced release bounds.
 
 
@@ -72,8 +75,10 @@ without rebooting the computer. Rerun the same command afterward.
 
 `--vscode` also installs VS Code when missing: an official signed application in
 `~/Applications` on macOS, the official Debian/RPM package on supported Linux
-systems, or Microsoft's signed per-user installer on Windows. Existing editor
-installations are reused; `--code PATH` selects one explicitly. BSD editor
+systems, Omarchy's `visual-studio-code-bin` repository package, or Microsoft's
+signed per-user installer on Windows. On pacman systems the package must be in an
+already configured repository; the installer does not bootstrap an AUR build.
+Existing editor installations are reused; `--code PATH` selects one explicitly. BSD editor
 availability is separate from compiler support: FreeBSD uses its `vscode` port;
 NetBSD/OpenBSD require an available compatible editor and `--code PATH`.
 
@@ -281,9 +286,12 @@ installed or required. Existing extensions are not automatically uninstalled.
 `--profile Thor` instead creates/uses that named
 profile. New profiles use the
 [starter template](../install/profiles/Thor.code-profile): Dark Modern plus the
-Thor-only color preset. `--no-colors` disables the preset for a new profile;
-`--colors` explicitly selects it. Existing themes and keybindings are always
-preserved, including with `--colors`; native OLS adds only its managed server setting. The installer never edits VS Code's profile
+Thor-only color preset. Setup also fills missing template settings in retained
+profiles, so uninstall/reinstall restores the same defaults. `--no-colors` selects
+an initially disabled preset; `--colors` selects an initially enabled one. Explicit
+theme and color choices and existing keybindings are preserved, including with
+`--colors`. To change a previously selected color preference, use the extension's
+color commands. Native OLS adds only its managed server setting. The installer never edits VS Code's profile
 registry directly.
 
 Profiles apply to windows/workspaces, not automatically to `.thor` extensions.
@@ -354,6 +362,13 @@ Workspace Trust or trust arbitrary projects.
 For your own newly created project, choose **Yes, I trust the authors** when
 VS Code first opens the folder. If it is already in Restricted Mode, use
 **Manage Workspace Trust** to review that folder.
+
+On a fresh macOS account, the first debug launch can display **Developer Tools
+Access**. Approve it with that account's administrator credentials to let the
+debugger control the test program. If the launch timed out while the prompt was
+waiting, start debugging again after approving it. This permission is separate
+from installing Command Line Tools; normal Run, hover and completion do not
+require it.
 
 The extension registers terminal PATH support after editor startup, even before
 a Thor file is opened. TLS itself starts only when a Thor file is open. Removing

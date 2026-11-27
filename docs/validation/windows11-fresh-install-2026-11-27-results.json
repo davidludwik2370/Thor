@@ -1,0 +1,206 @@
+{
+  "date": "2026-11-27",
+  "success": true,
+  "scope": "Fresh Windows 11 prerequisite acquisition, public binary installation, editor/debugger verification, repeated uninstall and reinstall. This supplements the full language-suite platform reports.",
+  "source": {
+    "repository": "https://github.com/davidludwik2370/Thor",
+    "commit": "60f088a2d61e67b54373f9f879405fb1c259dc78",
+    "acquisition": "Public GitHub source ZIP; normal repository bootstrap and published release; no bundle or release-base override",
+    "release": "0.41.12",
+    "installed_version_directory": "0.41.12-c64e532c3d9b",
+    "product_source_changes_required": true,
+    "follow_up_note": "The initial published-release checks passed. Subsequent visual review exposed missing profile defaults after uninstall/reinstall; an installer-only fix was tested natively below and is not yet in the published 0.41.12 payload."
+  },
+  "guest": {
+    "os": "Microsoft Windows 11 Enterprise Evaluation",
+    "build": "26300",
+    "version": "10.0.26300",
+    "architecture": "x64",
+    "hypervisor": "Hyper-V generation 2",
+    "memory_gib": 8,
+    "virtual_processors": 4,
+    "secure_boot": true,
+    "virtual_tpm": true,
+    "maximum_dynamic_disk_gib": 80
+  },
+  "pristine_preflight": {
+    "Elevated": false,
+    "HasMSVCInstaller": false,
+    "HasVSCode": false,
+    "HasThorRecord": false,
+    "Commands": []
+  },
+  "first_install": {
+    "success": true,
+    "seconds": 386.67,
+    "automatic_prerequisites": [
+      "MSVC Build Tools 2022",
+      "Windows SDK",
+      "VS Code"
+    ],
+    "user_permission": "Expected Windows UAC consent for the signed Microsoft Build Tools installer. Remaining acquisition and verification completed through the normal bootstrap."
+  },
+  "ordinary_terminal": {
+    "path_injection": false,
+    "checks": [
+      "fresh-desktop-terminal-path-without-environment-injection",
+      "installed-doctor",
+      "checked-runtime-verdict",
+      "unchecked-release-runtime-verdict"
+    ]
+  },
+  "first_editor": {
+    "success": true,
+    "checks": [
+      "installed-extension-activation",
+      "native-odin-fixture-present",
+      "native-odin-document-opened",
+      "standard-ols-owns-odin-language-grammar-and-icons",
+      "automatic-native-ols-build-and-language-services",
+      "terminal-path-without-shell-profile",
+      "tls-hover-private-sdk",
+      "tls-field-completion",
+      "profile-theme-and-thor-only-colors",
+      "optional-color-enable-and-restore",
+      "run-without-shell-path",
+      "codelldb-source-breakpoint",
+      "debug-clean-exit"
+    ],
+    "timings": {
+      "automatic native OLS hover": 225,
+      "automatic native OLS semantic tokens": 3,
+      "automatic native OLS completion": 4,
+      "terminal PATH": 611,
+      "terminal PATH probe close": 210,
+      "TLS hover": 480,
+      "TLS fields": 3,
+      "optional colors": 0,
+      "color preset enable": 0,
+      "color preset restore": 0,
+      "Cmd+R program": 6461,
+      "mapped source breakpoint": 0,
+      "debug program exit": 210
+    }
+  },
+  "lifecycle": {
+    "success": true,
+    "checks": [
+      "restored-public-install-without-overrides",
+      "doctor-before-uninstall",
+      "default-uninstall-from-installed-state",
+      "repeated-uninstall",
+      "project-source-preserved",
+      "vscode-and-developer-tools-retained",
+      "unrelated-path-entries-preserved",
+      "default-editor-settings-and-keybindings-preserved",
+      "public-reinstall-without-overrides",
+      "final-doctor",
+      "final-version-command",
+      "default-editor-preferences-preserved-on-reinstall"
+    ],
+    "after_uninstall": {
+      "launcher_exists": false,
+      "installation_record_exists": false,
+      "remaining_prefix_items": [],
+      "retained_path_entries": [
+        "Microsoft WindowsApps",
+        "Microsoft VS Code/bin"
+      ]
+    },
+    "final_version_directories": [
+      "0.41.12-c64e532c3d9b"
+    ]
+  },
+  "post_reinstall_editor": {
+    "success": true,
+    "checks": [
+      "installed-extension-activation",
+      "native-odin-fixture-present",
+      "native-odin-document-opened",
+      "standard-ols-owns-odin-language-grammar-and-icons",
+      "automatic-native-ols-build-and-language-services",
+      "terminal-path-without-shell-profile",
+      "tls-hover-private-sdk",
+      "tls-field-completion",
+      "profile-theme-and-thor-only-colors",
+      "optional-color-enable-and-restore",
+      "run-without-shell-path",
+      "codelldb-source-breakpoint",
+      "debug-clean-exit"
+    ],
+    "timings": {
+      "automatic native OLS hover": 221,
+      "automatic native OLS semantic tokens": 3,
+      "automatic native OLS completion": 3,
+      "terminal PATH": 416,
+      "terminal PATH probe close": 214,
+      "TLS hover": 253,
+      "TLS fields": 18,
+      "optional colors": 0,
+      "color preset enable": 0,
+      "color preset restore": 0,
+      "Cmd+R program": 4412,
+      "mapped source breakpoint": 0,
+      "debug program exit": 213
+    },
+    "expectedTheme": "Dark 2026"
+  },
+  "verification_harness_corrections": [
+    "Closed the ordinary VS Code welcome instance before running extension tests; VS Code requires an independent test host.",
+    "Captured native stdout and stderr separately and checked the exit code; PowerShell 5.1 otherwise converted a benign VS Code Node deprecation warning into an exception.",
+    "The initial post-reinstall check allowed the effective Dark 2026 fallback. Subsequent visual review showed that no explicit workbench.colorTheme remained; accepting the fallback had missed an installer defect. Explicit user choices still need preservation; missing profile defaults need restoration."
+  ],
+  "local_checks": {
+    "assertion_hygiene": "7 passed",
+    "javascript_syntax": "node --check passed"
+  },
+  "storage": {
+    "temporary_iso_removed": true,
+    "vm_disk_gib": 30.16,
+    "maximum_vm_disk_gib": 80.0,
+    "automatic_checkpoints": false,
+    "checkpoint_count": 0,
+    "owned_scheduled_tasks_remaining": 0,
+    "host_c_free_gib": 92.91,
+    "installed_version_directories": 1
+  },
+  "evidence_sha256": {
+    "preflight.json": "0ad8d3d1f8d8505b201b96ddd994a3241f7bbe7ba66e47ee1404626e733337f6",
+    "first-install-result.json": "ded3941db84d88ab180df36f4b25ff95103a3b54be9a39dadad5923e273241b7",
+    "editor-result.json": "5c6f6154cfd48da1efdba9a773c37bff62d9aa4232ab67d38298e8116460f2ff",
+    "lifecycle-result.json": "8614d8592512f87664480af2faa445ecde67681650b50bf24fd85dad2f083a17",
+    "post-reinstall-editor-result.json": "742afffa01eb6bb40b7d3a1bd2b01a992914734de7ef68ce90620d5200515705",
+    "lifecycle-final-doctor.log": "52682c503d5ef7a32b2e8b9942bbe294c385a049a3444a92872e86f260f89792"
+  },
+  "theme_follow_up": {
+    "date": "2026-11-27",
+    "success": true,
+    "issue": "Uninstall restores installer-owned settings but retains the profile registration. Setup previously skipped defaults for every existing registration, so reinstall lost Dark Modern and sometimes the Thor color preset.",
+    "fix": "Fill only absent template settings in the selected named profile, including after reinstall and when VS Code has already created settings.json. Preserve explicit values, comments, keybindings, and the Default profile; track additions for safe uninstall.",
+    "native_installer_sha256": "5fda17c21caa5451982f542d749a16ce8f195edc6fd20f9bd12b3869dd023c56",
+    "windows11_vm": {
+      "after": {
+        "theme": "Dark Modern",
+        "colors": true
+      },
+      "before": {
+        "theme": null,
+        "colors": true
+      },
+      "success": true,
+      "exit_code": 0
+    },
+    "windows10_dell": {
+      "theme": "Dark Modern",
+      "thor.colors.recommended": true,
+      "installed_compiler_tls_ols_verification": "passed",
+      "visual_code_window": "verified"
+    },
+    "local_checks": {
+      "installer_regressions": 67,
+      "rust_unit_checks": 16,
+      "assertion_hygiene": 7
+    },
+    "publication": "Working-tree fix tested with a privately built Windows installer; published release remains unchanged."
+  }
+}

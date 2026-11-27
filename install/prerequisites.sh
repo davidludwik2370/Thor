@@ -286,6 +286,15 @@ if $editor; then
             elif command -v dnf >/dev/null 2>&1; then
                 download "https://update.code.visualstudio.com/latest/linux-rpm-$arch/stable" "$work/code.rpm"
                 elevate dnf install -y "$work/code.rpm"
+            elif command -v pacman >/dev/null 2>&1; then
+                # Omarchy ships Microsoft's prebuilt editor in its configured
+                # repository, including ARM64. Let pacman handle dependencies,
+                # desktop integration and updates; never bootstrap an AUR build.
+                if pacman -Si visual-studio-code-bin >/dev/null 2>&1; then
+                    packages visual-studio-code-bin
+                else
+                    echo 'The configured pacman repositories do not provide visual-studio-code-bin. Install Microsoft VS Code (or pass --code PATH), then rerun --vscode.' >&2; exit 1
+                fi
             else
                 echo 'Install VS Code from your distribution (or pass --code PATH), then rerun --vscode.' >&2; exit 1
             fi;;

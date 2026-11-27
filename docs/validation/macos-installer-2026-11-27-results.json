@@ -1,0 +1,57 @@
+{
+  "success": true,
+  "platform": "darwin",
+  "checks": [
+    "install-reinstall-doctor",
+    "ordinary-login-and-interactive-shell-path",
+    "checked-and-unchecked-execution",
+    "original-installation-record-restored",
+    "installed-extension-activation",
+    "native-odin-fixture-present",
+    "native-odin-document-opened",
+    "standard-ols-owns-odin-language-grammar-and-icons",
+    "automatic-native-ols-build-and-language-services",
+    "terminal-path-without-shell-profile",
+    "tls-hover-private-sdk",
+    "tls-field-completion",
+    "profile-theme-and-thor-only-colors",
+    "optional-color-enable-and-restore",
+    "run-without-shell-path",
+    "codelldb-source-breakpoint",
+    "debug-clean-exit",
+    "default-profile-preserved",
+    "repeated-uninstall-project-preserved"
+  ],
+  "seconds": 125.9,
+  "os_version": "macOS Sequoia 15.6 (24G84)",
+  "architecture": "arm64",
+  "source_commit": "60f088a2d61e67b54373f9f879405fb1c259dc78",
+  "release": "0.41.12",
+  "vscode_version": "1.148.0",
+  "initial_prerequisites": {
+    "command_line_tools": false,
+    "vscode": false
+  },
+  "first_debug_launch": "Failed while waiting for first-use macOS Developer Tools Access; retry after approval passed",
+  "normal_install_lifecycle": {
+    "initial_install": true,
+    "uninstall": true,
+    "repeated_uninstall": true,
+    "absent_from_fresh_login_shell_after_uninstall": true,
+    "vscode_and_developer_tools_retained": true,
+    "source_preserved": true,
+    "reinstall": true,
+    "final_doctor": true
+  },
+  "published_release_limitations": [
+    "Retained profile loses theme and recommended-color defaults after uninstall/reinstall; fresh-profile harness passes but does not cover this case."
+  ],
+  "candidate_retained_profile_repair": {
+    "source": "working tree install/src/vscode.rs",
+    "applied_to_real_vm_profile": true,
+    "theme_restored": "Dark Modern",
+    "recommended_colors_restored": true,
+    "doctor": true,
+    "published": false
+  }
+}

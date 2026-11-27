@@ -121,8 +121,13 @@ user installations were preserved (see the follow-up report).
 ## Remaining scope
 
 Windows 10 testing on the Dell is complete, including first-time MSVC/SDK
-acquisition, editor/debugger checks and repeated uninstall/reinstall. First-time
-MSVC installation on a clean Windows 11 VM remains explicitly deferred. macOS Intel and BSD source-install paths have
+acquisition, editor/debugger checks and repeated uninstall/reinstall. The
+[November 27 fresh Windows 11 VM follow-up](windows11-fresh-install-2026-11-27-results.json)
+also passed first-time MSVC/SDK and VS Code acquisition, ordinary-terminal PATH,
+editor/debugger checks and repeated uninstall/reinstall using the public 0.41.12
+release. Visual review then caught missing color defaults in a retained profile;
+the follow-up records the separately tested installer fix, which is not in that
+published payload. macOS Intel and BSD source-install paths have
 less direct desktop coverage than the configurations above. Container results
 verify real native application APIs; they do not assess display scaling, visual
 spacing or every desktop compositor. No universal claim about arbitrary OS,
