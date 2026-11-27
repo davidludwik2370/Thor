@@ -83,6 +83,62 @@ mod scopedlower;
 #[path = "nativeview.rs"]
 mod nativeview;
 
+/// The same expression lifetime is used by emission and by fn result checking.
+pub(crate) fn temporary_fstring_argument(resolver: &mut Resolver, site: Ref) -> Option<NodeId> {
+    let source = &resolver.sources[site.file];
+    let id = site.node;
+    let node = source.node(id);
+    if node.data["manual_lifetime"] == true { return None; }
+    for parent in source.ancestors(id) {
+        let p = source.node(parent);
+        if p.kind == "Call" {
+            let callee = source.role(parent, "callee");
+            let query = callee.is_some_and(|callee| {
+                matches!(
+                    source.text(callee),
+                    "type_of"
+                        | "typeid_of"
+                        | "size_of"
+                        | "align_of"
+                        | "offset_of"
+                        | "type_info_of"
+                        | "#assert"
+                        | "#config"
+                        | "#defined"
+                ) && resolver.symbol(Ref { node: callee, ..site }).is_none()
+            });
+            if query {
+                break;
+            }
+            if callee
+                .is_some_and(|callee| resolver.denotes_type(Ref { node: callee, ..site }))
+                && resolver.logical_constructor(Ref { node: parent, ..site }).is_none()
+            {
+                continue;
+            }
+            if source
+                .group(parent, "args")
+                .iter()
+                .any(|arg| source.node(*arg).span.contains(node.span))
+            {
+                return Some(parent);
+            }
+        }
+        if matches!(
+            p.kind.as_str(),
+            "Interpolation"
+                | "Procedure"
+                | "Declaration"
+                | "Return"
+                | "Assignment"
+                | "Field"
+        ) {
+            break;
+        }
+    }
+    None
+}
+
 #[derive(Clone, Debug)]
 pub struct Hint {
     pub constant_literal:bool,
@@ -2913,56 +2969,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             if node.kind != "Interpolation" || node.data["manual_lifetime"] == true {
                 continue;
             }
-            let mut argument = None;
-            for parent in self.source.ancestors(id) {
-                let p = self.source.node(parent);
-                if p.kind == "Call" {
-                    let callee = self.source.role(parent, "callee");
-                    let query = callee.is_some_and(|callee| {
-                        matches!(
-                            self.source.text(callee),
-                            "type_of"
-                                | "typeid_of"
-                                | "size_of"
-                                | "align_of"
-                                | "offset_of"
-                                | "type_info_of"
-                                | "#assert"
-                                | "#config"
-                                | "#defined"
-                        ) && self.resolver.symbol(self.reference(callee)).is_none()
-                    });
-                    if query {
-                        break;
-                    }
-                    if callee
-                        .is_some_and(|callee| self.resolver.denotes_type(self.reference(callee)))
-                        && self.big_constructor_type(parent).is_none()
-                    {
-                        continue;
-                    }
-                    if self
-                        .source
-                        .group(parent, "args")
-                        .iter()
-                        .any(|arg| self.source.node(*arg).span.contains(node.span))
-                    {
-                        argument = Some(parent);
-                        break;
-                    }
-                }
-                if matches!(
-                    p.kind.as_str(),
-                    "Interpolation"
-                        | "Procedure"
-                        | "Declaration"
-                        | "Return"
-                        | "Assignment"
-                        | "Field"
-                ) {
-                    break;
-                }
-            }
+            let argument = temporary_fstring_argument(self.resolver, Ref { file: self.file, node: id });
             if let Some(call) = argument {
                 let mut root = call;
                 let switches = self

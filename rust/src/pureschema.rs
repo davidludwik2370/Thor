@@ -74,9 +74,9 @@ impl Lower<'_, '_> {
             if depth > 24 { return self.pure_validator(site); }
             if !seen.insert(typ.clone()) { continue; }
             match typ {
-                Type::Unknown | Type::Generic | Type::Set(_) | Type::Soa(_) | Type::SoaStorage(_) =>
+                Type::Unknown | Type::Generic | Type::Set(_) =>
                     return self.pure_validator(site),
-                Type::Nominal(_, inner) | Type::Slice(inner) | Type::Dynamic(inner)
+                Type::Soa(inner) | Type::SoaStorage(inner) | Type::Nominal(_, inner) | Type::Slice(inner) | Type::Dynamic(inner)
                 | Type::Pointer(inner) | Type::Array {elem:inner,..} | Type::Matrix{elem:inner,..}
                 | Type::Fixed {elem:inner,..} => pending.push((*inner, depth + 1)),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
@@ -218,6 +218,7 @@ impl Lower<'_, '_> {
             parts.push(format!("else when Mode==0 && {meta}.type_is_proc(T){{}}"));
         }
         parts.extend([
+            format!("else when {meta}.type_is_struct(T) && len(type_of({module}.soa_shape(T)))>0{{Shape::type_of({module}.soa_shape(T));when len(Shape)>1 && Mode!=0{{#panic(\"Pure code cannot expose SOA column addresses.\"+Site)}}else when len(Shape)>1 && Result && !Allow_Owned{{#panic(\"SOA slice results require a caller allocator.\"+Site)}}else when len(Shape)==3 && !Result && !Allow_Refs{{#panic(\"Pass a slice view of the dynamic SOA to this fn.\"+Site)}}else{{{name}({meta}.type_elem_type(Shape),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}}}"),
             format!("else when {meta}.type_is_struct(T){{{name}_record(T,Result,Allow_Owned,Allow_Refs,Depth,Site,Mode)}}"),
             format!("else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T){{when Result && !Allow_Owned && {meta}.type_is_slice(T){{#panic(\"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc\"+Site)}}else{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}}}"),
             format!("else when {meta}.type_is_union(T){{{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site,Mode)}}"),

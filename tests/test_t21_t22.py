@@ -20,6 +20,7 @@ class CacheStorageTests(unittest.TestCase):
         project=Project.__new__(Project)
         project.entry=Path('/source')
         project.file_entry=False
+        project.native_policy_checked=False
         project.flags=['-o:speed','-collection:user=/original']
         project.collections={'user':Path('/original'),'thor':Path('/runtime')}
         project.default_collections={'thor','__thor_runtime'}
@@ -175,7 +176,7 @@ VALUE::#run work()
 
     def test_allocated_cache_packets_are_contents_and_rematerialize(self):
         source=self.program('a:=#run work();b:=#run work();a[0]="changed";assert(b[0]=="hello");delete(b[0]);delete(a);delete(b)',
-            'work::fn()->[]string{data:=make([]string,1);data[0]="hello";return data}\n')
+            'work::fn()->[]string{data:=make([]string,1);data[0]=f"hello";return data}\n')
         # Free the original a[0] before replacing its independently owned value.
         source=source.replace('a[0]="changed"','delete(a[0]);a[0]="changed"')
         root,_=self.invoke(source,flags=['--cache-report'])
@@ -228,7 +229,7 @@ a:=view(input);b:=view(input)
 testing.expect(t,a=="ello"&&b==a&&raw_data(a)!=raw_data(input[1:])&&raw_data(a)!=raw_data(b))
 delete(a);delete(b)
 text:=message(7);testing.expect(t,text=="value 7");delete(text)
-''','view::fn(s:string)->string{return s[1:]}\nmessage::fn(n:int)->string{return f"value {n}"}\n')
+''','view::fn(s:string)->string{return pure.clone(s[1:])}\nmessage::fn(n:int)->string{return f"value {n}"}\n')
 
     def test_slice_results_and_return_defers(self):
         self.memory('''
@@ -238,7 +239,7 @@ testing.expect(t,input[0]==1&&b[0]==1&&a[0]==9)
 pure.destroy(a);pure.destroy(b)
 later:=deferred();testing.expect(t,later[0]==9);pure.destroy(later)
 ''','''
-duplicate::fn(values:[]int)->[]int{return values}
+duplicate::fn(values:[]int)->[]int{return pure.clone(values)}
 deferred::fn()->[]int{data:=make([]int,1);data[0]=1;defer data[0]=9;return data}
 ''')
 
@@ -254,7 +255,7 @@ testing.expect(t,value.rows[1][0]=="one"&&input[0]=="one")
 pure.destroy(value)
 ''','''
 Record::struct{rows:[2][]string}
-make_record::fn(input:[]string)->Record{return {[input,input]}}
+make_record::fn(input:[]string)->Record{values:=pure.clone(input);return {[values,values]}}
 ''')
 
     def test_nested_fn_calls_recursion_generics_and_multiple_results(self):
@@ -263,10 +264,10 @@ value:=recurse("abc",3);testing.expect(t,value=="abc");delete(value)
 a,b:=both("text");testing.expect(t,a=="text"&&b[1]==2);delete(a);pure.destroy(b)
 array:=repeat(2,"hi");testing.expect(t,array[0]=="hi"&&raw_data(array[0])!=raw_data(array[1]));pure.destroy(array)
 ''','''
-identity::fn(input:$T)->T{return input}
+identity::fn(input:$T)->T{return pure.clone(input)}
 recurse::fn(input:string,n:int)->string{if n==0{return identity(input)};return recurse(input,n-1)}
-both::fn(input:string)->(text:string,values:[]int){data:=make([]int,2);data[1]=2;return input,data}
-repeat::fn($N:int,input:string)->[N]string{result:[N]string;for i in 0..<N{result[i]=input};return result}
+both::fn(input:string)->(text:string,values:[]int){data:=make([]int,2);data[1]=2;return pure.clone(input),data}
+repeat::fn($N:int,input:string)->[N]string{result:[N]string;for i in 0..<N{result[i]=pure.clone(input)};return result}
 ''')
 
     def test_run_materializes_fresh_storage_in_each_loop_iteration(self):
@@ -288,12 +289,12 @@ choice:=#run choose();data,ok:=choice.([]string);testing.expect(t,ok&&data[0]=="
 ''','''
 Record::struct{name:string,values:[]int}
 Choice::union{int,[]string}
-work::fn()->Record{data:=make([]int,2);data[1]=2;return {"abc",data}}
-choose::fn()->Choice{data:=make([]string,1);data[0]="hello";return data}
+work::fn()->Record{data:=make([]int,2);data[1]=2;return {f"abc",data}}
+choose::fn()->Choice{data:=make([]string,1);data[0]=f"hello";return data}
 ''')
 
     def test_constant_strings_and_slice_constant_diagnostic(self):
-        self.invoke(self.program('assert(VALUE=="hello")','work::fn()->string{return "hello"}\nVALUE::#run work()\n'))
+        self.invoke(self.program('assert(VALUE=="hello")','work::fn()->string{return f"hello"}\nVALUE::#run work()\n'))
         self.invoke(self.program('_=VALUE','work::fn()->[]int{return nil}\nVALUE::#run work()\n'),command='check',fail='slice-containing #run result needs a runtime binding')
 
     def test_nil_empty_and_zero_size_slice_elements(self):
@@ -304,7 +305,7 @@ pure.destroy(a);pure.destroy(b);pure.destroy(c);pure.destroy(d)
 e:=zero();f:=#run zero();testing.expect(t,len(e)==3&&len(f)==3);pure.destroy(e);pure.destroy(f)
 ''','''
 Empty::struct{}
-empty::fn(nonnull:bool)->[]int{if nonnull{data:=[7];return data[:0]};return nil}
+empty::fn(nonnull:bool)->[]int{if nonnull{data:=[7];return pure.clone(data[:0])};return nil}
 zero::fn()->[]Empty{return make([]Empty,3)}
 ''')
 
@@ -314,25 +315,25 @@ a:=letters();b:=#run letters()
 testing.expect(t,a[.One]=="one"&&b[.Two]=="\\x00\\xff");pure.destroy(a);pure.destroy(b)
 ''','''
 Key::enum{One,Two}
-letters::fn()->[Key]string{return {.One="one",.Two="\\x00\\xff"}}
+letters::fn()->[Key]string{return {.One=f"one",.Two=f"\\x00\\xff"}}
 ''')
         self.invoke(self.program('a:=#run library.work();assert(a.text=="private");pure.destroy(a)',
             'import "library"\nimport pure "thor:pure"\n'),files={'library/main.thor':
-                'package library\n@(private) Hidden::struct{text:string}\nwork::fn()->Hidden{return {"private"}}\n'})
+                'package library\n@(private) Hidden::struct{text:string}\nwork::fn()->Hidden{return {f"private"}}\n'})
 
     def test_constants_nested_runs_and_type_witness_dependencies(self):
         self.invoke(self.program('assert(COUNT==3);value:=#run work();assert(value=="abc");delete(value)', '''
-work::fn()->string{return "abc"}
+work::fn()->string{return f"abc"}
 TEXT::#run work()
 count::fn(input:string)->int{return len(input)}
 COUNT::#run count(TEXT)
 '''))
         self.memory('value:=#run outer();testing.expect(t,value=="nested");delete(value)', '''
-inner::fn()->string{return "nested"}
+inner::fn()->string{return f"nested"}
 outer::fn()->string{return #run inner()}
 ''')
         self.invoke(self.program('assert(COUNT==3)', '''
-numbers::fn()->[]int{data:=[1,2,3];return data[:]}
+numbers::fn()->[]int{return make([]int,3)}
 count::fn(input:[]int)->int{return len(input)}
 COUNT::#run count(#run numbers())
 '''))
@@ -343,10 +344,10 @@ a:=defaults();b:=blank(7);c:=named();d:=procedure_name()
 testing.expect(t,a=="default"&&b=="blank"&&c=="named"&&d=="procedure_name")
 delete(a);delete(b);delete(c);delete(d)
 ''','''
-defaults::fn(input:string="default")->string{return input}
-blank::fn(_:int)->string{return "blank"}
-named::fn()->(result:string){result="named";return}
-procedure_name::fn()->string{return #procedure}
+defaults::fn(input:string="default")->string{return pure.clone(input)}
+blank::fn(_:int)->string{return f"blank"}
+named::fn()->(result:string){result=f"named";return}
+procedure_name::fn()->string{return pure.clone(#procedure)}
 ''')
 
     def test_variadic_where_local_types_and_early_returns(self):
@@ -355,26 +356,26 @@ a:=constrained("where");b:=varargs("first","second");c:=local_type(true)
 testing.expect(t,a=="where"&&b=="first"&&c.text=="early")
 delete(a);delete(b);pure.destroy(c)
 ''','''
-constrained::fn(input:$T)->T where T in [string,int]{return input}
-varargs::fn(input:..string)->string{return input[0]}
+constrained::fn(input:$T)->T where T in [string,int]{return pure.clone(input)}
+varargs::fn(input:..string)->string{return pure.clone(input[0])}
 local_type::fn(early:bool)->struct{text:string}{
- Local::struct{text:string};item:=Local{"early"}
- if early{return {item.text}};return {"late"}
+ Local::struct{text:string};item:=Local{f"early"}
+ if early{return {item.text}};return {f"late"}
 }
 ''')
 
     def test_returned_input_becomes_mutable_without_mutating_input(self):
         self.memory('a:=outer();testing.expect(t,a[0]==9);pure.destroy(a)', '''
-identity::fn(input:[]int)->[]int{return input}
+identity::fn(input:[]int)->[]int{return pure.clone(input)}
 outer::fn()->[]int{input:=[1,2];result:=identity(input[:]);result[0]=9;assert(input[0]==1);return result}
 ''')
 
     def test_local_array_view_is_promoted_after_user_defers(self):
         self.memory('''
 a:=local();b:=#run local();testing.expect(t,a[0]==9&&b[0]==9);pure.destroy(a);pure.destroy(b)
-''','local::fn()->[]int{data:=[1,2];defer data[0]=9;return data[:]}\n')
+''','local::fn()->[]int{data:=make([]int,2);defer data[0]=9;return data}\n')
         self.invoke(self.program('a:=#run local();assert(a[0]==9);pure.destroy(a)',
-            'import pure "thor:pure"\nlocal::fn()->[]int{data:=[1,2];defer data[0]=9;return data[:]}\n'),
+            'import pure "thor:pure"\nlocal::fn()->[]int{data:=make([]int,2);defer data[0]=9;return data}\n'),
             flags=['-warnings-as-errors'])
 
     def test_promotion_copies_named_and_multiple_results_in_checked_and_unchecked_builds(self):
@@ -390,16 +391,17 @@ folded:=#run local(3)
 defer delete(folded)
 if len(folded)!=2 || folded[0]!=9 || folded[1]!=4 {panic("compile-time result")}
 ''','''
+import pure "thor:pure"
 both::fn(n:int)->(first:[]int,second:[]int){
-    data:=[n,n+1]
+    data:=make([]int,2);data[0],data[1]=n,n+1
     defer data[0]=9
-    first,second=data[:],data[1:]
+    first,second=data,pure.clone(data[1:])
     return
 }
 local::fn(n:int)->[]int{
-    data:=[n,n+1]
+    data:=make([]int,2);data[0],data[1]=n,n+1
     defer data[0]=9
-    if n>0 do return data[:]
+    if n>0 do return data
     return nil
 }
 ''')
@@ -414,20 +416,20 @@ a,ok:=outer(false);testing.expect(t,!ok&&a=="before");delete(a)
 b,good:=outer(true);testing.expect(t,good&&b=="success");delete(b)
 c,err:=outer_error();testing.expect(t,c=="prefix"&&err.(string)=="failed");delete(c);pure.destroy(err)
 ''','''
-read::fn(ok:bool)->(value:string,success:bool){return "success",ok}
-outer::fn(ok:bool)->(text:string,success:bool){text="before";value:=read(ok) or_return;return value,true}
+read::fn(ok:bool)->(value:string,success:bool){return f"success",ok}
+outer::fn(ok:bool)->(text:string,success:bool){text=f"before";value:=read(ok) or_return;return value,true}
 Error::union{string}
-read_error::fn()->(string,Error){return "unused",Error("failed")}
-outer_error::fn()->(text:string,err:Error){text="prefix";value:=read_error() or_return;return value,nil}
+read_error::fn()->(string,Error){return f"unused",Error(f"failed")}
+outer_error::fn()->(text:string,err:Error){text=f"prefix";value:=read_error() or_return;return value,nil}
 ''')
 
     def test_missing_returns_and_invalid_return_arity_still_fail(self):
-        self.invoke(self.program('_=bad(true)','bad::fn(flag:bool)->string{if flag{return "yes"}}\n'),command='check',fail='Missing return')
-        self.invoke(self.program('_=bad()','bad::fn()->string{return "yes",7}\n'),command='check',fail='count mismatch')
+        self.invoke(self.program('_=bad(true)','bad::fn(flag:bool)->string{if flag{return f"yes"}}\n'),command='check',fail='Missing return')
+        self.invoke(self.program('_=bad()','bad::fn()->string{return f"yes",7}\n'),command='check',fail='count mismatch')
 
     def test_out_of_memory_promotion_fails_instead_of_returning_empty(self):
         self.invoke(self.program('context.allocator=mem.nil_allocator();a:=work();_=a',
-            'import "core:mem"\nwork::fn()->string{return "hello"}\n'),fail='Pure result allocation failed')
+            'import "core:mem"\nwork::fn()->string{return f"hello"}\n'),fail='Pure result allocation failed')
 
     def test_ordinary_eligible_proc_results_and_runtime_local_capture(self):
         self.memory('a:=#run work();testing.expect(t,a[0]=="proc");pure.destroy(a)', '''

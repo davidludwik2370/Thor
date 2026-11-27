@@ -854,7 +854,7 @@ number := 4
 fmt.println(square(number))
 ```
 
-The Odin procedure has the same result but does not enforce purity. Thor rejects I/O, ambient mutable state, escaping mutation and unverified calls, including transitive effects. Supported scratch allocation is allowed: purity does not imply allocation-free execution. Runtime string/slice results own independent storage; nested results may need `pure.destroy`.
+The Odin procedure has the same result but does not enforce purity. Thor rejects I/O, ambient mutable state, escaping mutation and unverified calls, including transitive effects. Supported scratch allocation is allowed: purity does not imply allocation-free execution. A `fn` that returns allocated data must construct or explicitly clone it. It can forward an owned helper result directly. To return a tail of an input slice, write `slice.clone(values[1:])`. Fixed SOAs and SOA slice inputs support read-only row and column access. Use `pure.destroy` for nested owned results.
 
 [Purity and supported values](docs/purity-diagnostics.md), [result ownership](docs/language-guide.md#pure-functions-and-compile-time-execution).
 

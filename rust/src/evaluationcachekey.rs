@@ -104,7 +104,7 @@ impl EvaluationCache {
         }
         let native = PathBuf::from(std::str::from_utf8(&commands[1].1).ok()?.trim());
         let compiler = std::env::current_exe().and_then(crate::project::canonicalize).ok()?;
-        let config = json!({"schema":SCHEMA,"engine":"rust","platform":std::env::consts::OS,"machine":std::env::consts::ARCH});
+        let config = json!({"schema":SCHEMA,"engine":"rust","exact_literal_digits":crate::bigvalues::literal_limit().ok(),"platform":std::env::consts::OS,"machine":std::env::consts::ARCH});
         let trees = [
             root.join("rust/src"),
             root.join("frontend"),

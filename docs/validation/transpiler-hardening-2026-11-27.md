@@ -46,7 +46,7 @@ After the suites finished, baseline and final release binaries alternated agains
 
 Full vet changed by 12.2 ms (0.8%) on this workload. The SDK fixture benefited from avoiding speculative edit validation. These timings cover warm caches on this machine.
 
-## Remaining design questions
+## Follow-up decisions
 
-- Literal parsing permits exact decimal exponents beyond the size budget for serialized evaluation results. Applying an input budget would change which source programs are accepted. A separate configurable literal budget would allow large legitimate constants to opt in.
-- The existing pure-function record validator cannot inspect all SOA layouts. Extending it to accept fixed SOA values would require validating their row fields and preserving the distinction between inline arrays and borrowed or owned column storage. Ordinary procedures already accept these layouts.
+- Exact numeric source literals now have a configurable input budget. The default allows 16,000,000 digits per component. See the [arbitrary-precision reference](../arbitrary-precision.md#types-construction-and-literals).
+- The agreed pure-function rule applies to ordinary and structure-of-arrays (SOA) slices. A `fn` may read supported input rows and columns directly. Returning a slice backed by an input, including one inside an aggregate, requires an explicit allocation and copy. A function may forward a helper result whose independent ownership the compiler can prove. Returning an inline value such as an `f64` needs no allocation. See the [pure result examples](../language-guide.md#pure-functions-and-compile-time-execution).

@@ -105,20 +105,20 @@ PURE_REPORT :: #run pure_report(7)
 PURE_ZERO   :: #run pure_negative_zero()
 PURE_SUM    :: #run known_sum()
 
-// T22: independent returned storage, including nested sequences and input views.
+// T22: independent returned storage, including nested sequences and explicitly cloned inputs.
 Owned_Report :: struct {title:string, rows:[]string, values:[]int}
 pure_owned :: fn(text:string)->Owned_Report {
     rows:=make([]string,2)
-    rows[0]=text; rows[1]=text
+    rows[0]=pure.clone(text); rows[1]=pure.clone(text)
     values:=make([]int,2)
     values[0]=7; values[1]=8
     return {f"report {text}",rows,values}
 }
 pure_label :: fn(value:int)->string {return f"label {value}"}
 pure_local_view :: fn()->[]int {
-    values:=[1,2]
+    values:=pure.clone([]int{1,2})
     defer values[0]=9
-    return values[:]
+    return values
 }
 PURE_LABEL :: #run pure_label(7) // a borrowed Odin string constant
 

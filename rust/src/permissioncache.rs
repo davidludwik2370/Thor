@@ -17,6 +17,7 @@ struct Inputs {
     logical_constants: BTreeMap<Ref, serde_json::Value>,
     bound_types: BTreeMap<(Ref, String), Type>,
     bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
+    callbacks: std::collections::HashSet<(Ref, crate::semantics::Substitutions)>,
     contexts: HashMap<Ref, ContextHint>,
     witnesses: BTreeMap<Ref, ParameterWitness>,
 }
@@ -33,6 +34,7 @@ impl Inputs {
             bound_types: resolver.bound_types.clone(),
             bound_constants: resolver.bound_constants.clone(),
             contexts: resolver.context_hints.clone(),
+            callbacks: resolver.callback_instances.clone(),
             witnesses: resolver.parameter_witnesses.clone(),
         }
     }
@@ -56,11 +58,12 @@ impl Inputs {
             && self.bound_types == resolver.bound_types
             && self.bound_constants == resolver.bound_constants
             && self.contexts == resolver.context_hints
+            && self.callbacks == resolver.callback_instances
             && self.witnesses == resolver.parameter_witnesses
     }
     fn extends(&self, resolver: &Resolver<'_>, flags: &[String], editor: bool) -> bool {
         let count = self.sources.len();
-        if resolver.sources.len() < count || self.flags != flags || self.resolver_flags != resolver.flags
+        if self.callbacks != resolver.callback_instances || resolver.sources.len() < count || self.flags != flags || self.resolver_flags != resolver.flags
             || self.editor != editor || self.logical_mode != Self::logical_mode(resolver) { return false; }
         if !self.sources.iter().zip(resolver.sources).all(|(old,current)|
             old.shares_syntax(current) && old.shared_native == current.shared_native

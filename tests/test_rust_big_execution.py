@@ -33,7 +33,7 @@ expect(a.value,"123456789012345678901234567890");expect(a.ratio,"1/3");expect(a.
 a.value+=1;if a.value==b.value{panic("independence")};pure.destroy(a);pure.destroy(b)
 ''','''import "thor:pure"
 Report::struct{value:Integer,ratio:Rational,rows:[]Integer}
-identity::fn(value:Integer)->Integer{return value}
+identity::fn(value:Integer)->Integer{return Integer(value)}
 make_report::fn()->Report{
  number:=Integer(123456789012345678901234567890);defer delete(number)
  rows:=make([]Integer,2);rows[0]=Integer(7);rows[1]=Integer(8)
@@ -45,7 +45,7 @@ make_report::fn()->Report{
         self.tracked(self.numeric('''LOCAL::#run Integer(5)
 for _ in 0..<3{a:=#run identity(VALUE);b:=#run identity(VALUE);a+=1;if a==b{panic("independence")};expect(b,"123456789012345678901234567890");delete(a);delete(b)}
 c:=LOCAL;expect(c,"5");delete(c)
-''','VALUE::Integer(123456789012345678901234567890)\nidentity::fn(value:Integer)->Integer{return value}\n'))
+''','VALUE::Integer(123456789012345678901234567890)\nidentity::fn(value:Integer)->Integer{return Integer(value)}\n'))
 
     def test_big_conditions_select_native_requests_lazily(self):
         self.tracked(self.numeric('''a:=SELECTED;b:=CHOICE;expect(a,"22");expect(b,"33");delete(a);delete(b)
@@ -65,7 +65,7 @@ VALUE::#run value()
 '''}
         self.tracked(self.numeric('''a:=library.VALUE;b:=#run identity(library.VALUE);a+=1
 expect(a,"124");expect(b,"123");expect(library.VALUE,"123");delete(a);delete(b)
-''','import "library"\nidentity::fn(value:Integer)->Integer{return value}\n'),files=files)
+''','import "library"\nidentity::fn(value:Integer)->Integer{return Integer(value)}\n'),files=files)
         self.compare(self.numeric('delete(library.VALUE)','import "library"\n'),files=files,command='check',fail='read-only')
 
     def test_numeric_aggregate_constants_require_runtime_bindings(self):

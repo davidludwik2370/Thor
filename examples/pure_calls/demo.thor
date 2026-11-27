@@ -4,6 +4,7 @@ package main
 
 import "core:fmt" / println
 import "core:math"
+import "core:slice"
 
 square :: proc(n: int) -> int { return n*n }
 adjusted :: proc(n: int) -> int { return square(n)+1 }
@@ -22,10 +23,10 @@ COMPILED_ROOT :: root(16.0)
 #assert(COMPILED_ROOT == 4)
 
 view :: proc(input: []int) -> []int { return input[1:] }
+copy_tail :: fn(input: []int) -> []int { return slice.clone(input[1:]) }
 change_copy :: fn(input: []int) -> []int {
-    // Calls from fn use independent returned storage. Changing this result
-    // therefore cannot mutate the borrowed input.
-    result := view(input)
+    // The helper allocated this result, so the caller can edit and forward it.
+    result := copy_tail(input)
     result[0] = 9
     return result
 }

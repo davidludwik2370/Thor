@@ -91,7 +91,8 @@ if text!="number 3"||values[2]!=9||len(growing)!=3||growing[2]!=5||copy[0]!=12||
 ''','''words::fn(n:int)->string{return f"number {n}"}
 build::fn(n:int)->[]int{result:=make([]int,n);for i in 0..<n{result[i]=i+n};defer result[n-1]=9;return result}
 grow::fn(n:int)->[dynamic]int{result:[dynamic]int;for i in 0..<n {append(&result,i+n)};return result}
-view::fn(values:[]int)->[]int{return values}
+import "core:slice"
+view::fn(values:[]int)->[]int{return slice.clone(values)}
 ''')
         for flags in (['-debug'],UNCHECKED+['--track-allocations=basic']):
             with self.subTest(flags=flags):
@@ -113,7 +114,7 @@ if a[0]!=9||b!="value 3" {panic("defer results")}
         source=self.program('n:=7;if consume(n)!=7 {panic("nested pure")};text:=named(n);defer delete(text);fmt.println(text)','''import "core:fmt"
 build::fn(n:int)->[]int{values:=make([]int,1);values[0]=n;return values}
 consume::fn(n:int)->int{values:=build(n);return values[0]}
-named::fn(n:int)->string{_=n;return #procedure}
+named::fn(n:int)->string{_=n;original:=#procedure;return f"{original}"}
 ''')
         for flags in (['-debug'],UNCHECKED+['--track-allocations=basic']):
             with self.subTest(flags=flags):

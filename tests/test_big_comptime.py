@@ -99,7 +99,7 @@ a.value+=1;assert(a.value!=b.value)
 pure.destroy(a);pure.destroy(b)
 ''','''import "thor:pure"
 Report::struct{value:Integer,ratio:Rational,rows:[]Integer}
-identity::fn(value:Integer)->Integer{return value}
+identity::fn(value:Integer)->Integer{return Integer(value)}
 make_report::fn()->Report{
  number:=Integer(123456789012345678901234567890)
  defer delete(number)
@@ -127,7 +127,7 @@ for _ in 0..<3 {
  delete(a);delete(b)
 }
 ''','''VALUE::Integer(123456789012345678901234567890)
-identity::fn(value:Integer)->Integer{return value}
+identity::fn(value:Integer)->Integer{return Integer(value)}
 ''')
 
     def test_imported_big_constants_are_values_and_local_constants_stay_readonly(self):

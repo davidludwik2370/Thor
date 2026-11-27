@@ -16,14 +16,13 @@ class RustPureCallErrorTests(unittest.TestCase):
                 self.compare(self.program('',definition+'\n'),command='check',fail='Undeclared name: Missing')
 
     def test_soa_schema_errors_identify_the_pure_contract(self):
-        for schema in ('#soa []Row', '#soa [2]Row', '#soa [dynamic]Row'):
-            with self.subTest(schema=schema):
-                self.source.write_text(self.program('', 'Row::struct{x,y:int}\nwork::fn(value:'+schema+')->int{return len(value)}\n'))
-                result = self.invoke('rust', 'check')
-                self.assertEqual(result.returncode, 1, result.stderr)
-                self.assertIn("Pure functions cannot verify the fields of the structure-of-arrays type", result.stderr)
-                self.assertIn("main.thor(3:", result.stderr)
-                self.assertNotIn("type_has_shared_fields", result.stderr)
+        schema = "#soa [dynamic]Row"
+        self.source.write_text(self.program('', 'Row::struct{x,y:int}\nwork::fn(value:'+schema+')->int{return len(value)}\n'))
+        result = self.invoke('rust', 'check')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("Pass a slice view of the dynamic SOA", result.stderr)
+        self.assertIn("main.thor(3:", result.stderr)
+        self.assertNotIn("type_has_shared_fields", result.stderr)
 
         code = self.program('_=i.type_has_shared_fields(#soa[2]Row, Row)',
                             'import i "base:intrinsics"\nRow::struct{x,y:int}\n')

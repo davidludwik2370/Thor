@@ -18,8 +18,9 @@ frozen :> values
 if work(frozen)!=9||values[0]!=3{panic("checked result copy")}
 alias:=borrow(values);values[0]=7
 if alias[0]!=7{panic("ordinary shallow result")}
-''','''borrow::proc(values:[]int)->[]int{return values}
-work::fn(values:[]int)->int{copy:=borrow(values);copy[0]=9;return copy[0]}
+''','''import "core:slice"
+borrow::proc(values:[]int)->[]int{return values}
+work::fn(values:[]int)->int{copy:=slice.clone(borrow(values));copy[0]=9;return copy[0]}
 ''')
         for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']):
             with self.subTest(flags=flags):
@@ -93,11 +94,11 @@ for flag in [false,true] {
     delete(value)
 }
 ''','''
-leaf::proc(flag:bool)->string{if flag do return f"yes";return "no"}
+leaf::proc(flag:bool)->string{if flag do return f"yes";return f"no"}
 work::fn(flag:bool)->string{return leaf(flag)}
 ''')
         self.invoke(self.program('assert(VALUE=="yes")','''
-leaf::fn(flag:bool)->string{if flag do return f"yes";return "no"}
+leaf::fn(flag:bool)->string{if flag do return f"yes";return f"no"}
 VALUE::leaf(true)
 '''))
 
@@ -151,9 +152,10 @@ delete(result)
 ordinary:=view(input[:]);ordinary[0]=7
 testing.expect(t,input[1]==7)
 ''','''
+import "core:slice"
 view::proc(input:[]int)->[]int{return input[1:]}
 middle::proc(input:[]int)->[]int{return view(input)}
-work::fn(input:[]int)->[]int{result:=middle(input);result[0]=9;return result}
+work::fn(input:[]int)->[]int{result:=slice.clone(middle(input));result[0]=9;return result}
 ''')
 
     def test_allocations_nested_results_and_early_exits_do_not_leak(self):
@@ -168,7 +170,7 @@ for i in 0..<5{
 import "thor:pure"
 Report::struct{text:string,rows:[]string}
 leaf::proc(text:string)->Report{
-    rows:=make([]string,2);rows[0]=text;rows[1]=text
+    rows:=make([]string,2);rows[0]=f"{text}";rows[1]=f"{text}"
     return {f"value {text}",rows}
 }
 report::fn(text:string)->Report{return leaf(text)}
@@ -326,10 +328,10 @@ second::fn(n:int)->int{return helper(n)}
 
     def test_procedure_names_and_result_requirements_are_preserved(self):
         self.memory('result:=work();testing.expect(t,result=="name");delete(result)', '''
-name::proc()->string{return #procedure}
+name::proc()->string{original:=#procedure;return f"{original}"}
 work::fn()->string{return name()}
 ''')
-        self.invoke(self.program('_=VALUE','name::proc()->string{return #procedure}\nwork::fn()->string{return name()}\nVALUE::work()\n#assert(VALUE=="name")\n'))
+        self.invoke(self.program('_=VALUE','name::proc()->string{original:=#procedure;return f"{original}"}\nwork::fn()->string{return name()}\nVALUE::work()\n#assert(VALUE=="name")\n'))
         self.invoke(self.program('n:=3;work(n)','''
 @(require_results)
 leaf::proc(n:int)->int{return n}
@@ -340,7 +342,7 @@ work::fn(n:int){leaf(n)}
         self.memory('result:=work("hello");testing.expect(t,result=="hello");delete(result)', '''
 leaf::proc(input:string)->(string,bool){return input,true}
 check::proc(ok:bool){assert(ok)}
-work::fn(input:string)->string{value,ok:=leaf(input);check(ok);return value}
+work::fn(input:string)->string{value,ok:=leaf(input);check(ok);return f"{value}"}
 ''')
         self.invoke(self.program('n:=3;assert(work(n,n+1)==7)','''
 sum::proc(values:..int)->int{result:=0;for value in values{result+=value};return result}

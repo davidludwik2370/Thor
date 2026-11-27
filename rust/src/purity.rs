@@ -561,7 +561,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let name=source.names.get(source.node(node.node).name);
                 if ["file","line","directory","caller_location","defined"].contains(&name) {
                     self.fault(root,node,via,"Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.");
-                } else if !["assert","config","type","procedure"].contains(&name) {
+                } else if !["assert","config","type","procedure","soa"].contains(&name) {
                     self.fault(root,node,via,format!("Directive '#{name}' is not permitted in pure code."));
                 }
             }
@@ -839,7 +839,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     .first()
                     .map(|r| self.r.specialized_type(*r, bindings))
                     .unwrap_or(Type::Unknown);
-                if !matches!(typ, Type::Slice(_) | Type::Dynamic(_)) {
+                if !matches!(typ.storage_shape(), Type::Slice(_) | Type::Dynamic(_) | Type::Soa(_)) {
                     self.fault(
                         root,
                         call,
@@ -847,7 +847,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                         "Pure allocation supports fresh slice/dynamic buffers only.",
                     );
                 }
-                let limit = if matches!(typ, Type::Dynamic(_)) {
+                let limit = if matches!(typ.storage_shape(), Type::Dynamic(_)) {
                     3
                 } else {
                     2

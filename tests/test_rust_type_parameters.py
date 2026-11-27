@@ -29,7 +29,8 @@ work::fn(n:int)->int{return width(int,helper(int,n))}
 result:=identity([]int,values);defer delete(result)
 result[0]=9
 if values[0]!=3||result[0]!=9{panic("typed owned result")}
-''','''identity::fn($T:typeid,value:T)->T{return value}
+''','''import "thor:pure"
+identity::fn($T:typeid,value:T)->T{return pure.clone(value)}
 '''))
 
     def test_grouped_type_parameters_and_multiple_owned_results(self):
@@ -37,7 +38,8 @@ if values[0]!=3||result[0]!=9{panic("typed owned result")}
 left,right:=pair(int,[]int,n,original);defer delete(right)
 right[0]=9
 if left!=3||original[0]!=3||right[0]!=9{panic("typed tuple")}
-''','''pair::fn($T,$U:typeid,a:T,b:U)->(T,U){return a,b}
+''','''import "thor:pure"
+pair::fn($T,$U:typeid,a:T,b:U)->(T,U){return a,pure.clone(b)}
 '''))
 
     def test_type_arguments_and_integer_arguments_select_distinct_overloads(self):

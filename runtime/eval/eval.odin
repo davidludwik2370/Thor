@@ -163,6 +163,10 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
         }
         strings.write_string(builder,` ]}`)
     case typeinfo.Type_Info_Struct:
+        if variant.soa_kind!=.None {
+            write_soa(builder,value.data,variant,depth)
+            return
+        }
         assert(.raw_union not_in variant.flags,"Raw unions cannot be serialized")
         strings.write_string(builder,`{"kind":"record","fields":[`)
         written:=0
@@ -233,6 +237,47 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
         strings.write_byte(builder,'}')
     case:panic("Unsupported compile-time value type")
     }
+}
+
+// Encode logical rows. Column pointers, padding and allocator handles are
+// local to the evaluator process and cannot appear in a cached result.
+write_soa :: proc(builder:^strings.Builder,data:rawptr,s:typeinfo.Type_Info_Struct,depth:int) {
+    columns:=typeinfo.soa_columns(s)
+    count:=typeinfo.soa_length(s,data)
+    storage:="array"
+    if s.soa_kind==.Slice {storage="slice"}
+    if s.soa_kind==.Dynamic {storage="dynamic"}
+    strings.write_string(builder,`{"kind":"sequence","soa":true,"storage":"`)
+    nil_backing:=false
+    if s.soa_kind!=.Fixed {
+        nil_backing=true
+        if columns>0 {
+            first,_:=typeinfo.soa_column(s,data,0)
+            nil_backing=first==nil
+        }
+    }
+    fmt.sbprintf(builder,`%s","nil":%t,"zero_sized":%t`,storage,nil_backing,s.soa_base_type.size==0)
+    if s.soa_kind==.Dynamic {
+        capacity:=(cast(^int)(uintptr(data)+s.offsets[columns+1]))^
+        fmt.sbprintf(builder,`,"capacity":%d`,capacity)
+    }
+    strings.write_string(builder,`,"values":[`)
+    row:=runtime.type_info_base(s.soa_base_type)
+    buffer,err:=runtime.mem_alloc_bytes(max(1,row.size),row.align)
+    if err!=.None || raw_data(buffer)==nil {panic("Unable to serialize SOA row")}
+    defer delete(buffer)
+    for i in 0..<count {
+        if i!=0 {strings.write_byte(builder,',')}
+        for col in 0..<columns {
+            column,elem:=typeinfo.soa_column(s,data,col)
+            field_offset:=col*elem.size
+            if rec,ok:=row.variant.(typeinfo.Type_Info_Struct);ok {field_offset=int(rec.offsets[col])}
+            if elem.size>0 {runtime.mem_copy_non_overlapping(rawptr(uintptr(raw_data(buffer))+uintptr(field_offset)),
+                rawptr(uintptr(column)+uintptr(i*elem.size)),elem.size)}
+        }
+        write_dynamic(builder,any{raw_data(buffer),s.soa_base_type.id},depth+1)
+    }
+    strings.write_string(builder,` ]}`)
 }
 
 emit :: proc(value:$T) {

@@ -533,7 +533,7 @@ make_header::proc()->^[]int{values :> []int{1};return new_clone(values)}
             with self.subTest(body=body):self.invoke('#+feature dynamic-literals\n'+self.program(body,prefix),command='check',fail='read-only slice')
 
     def test_pure_result_cloning_restores_independent_writable_access(self):
-        prefix='copy_values::fn(values:[]int)->[]int{return values}\n'
+        prefix='import "core:slice"\ncopy_values::fn(values:[]int)->[]int{return slice.clone(values)}\n'
         self.invoke(self.program('''storage:=make([]int,1);defer delete(storage);storage[0]=1
 values :> storage;result:=copy_values(values);defer delete(result);result[0]=9
 if values[0]!=1||result[0]!=9{panic("independent fn result")}

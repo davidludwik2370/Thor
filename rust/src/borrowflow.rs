@@ -256,6 +256,14 @@ impl Arena {
             value.location
         };
         self.values[child].location = location;
+        // A copied SOA header continues to point at the original columns.
+        // Indexing a column, including through a local pointer alias, writes
+        // the rows in that storage.
+        if matches!(base(&value.typ), Type::Soa(_)) {
+            let target = self.deref(child, resolver);
+            let borrowed = self.values[child].borrowed.clone();
+            self.values[target].location = self.values[target].location.join(&borrowed);
+        }
         if let Some(element) = value.element {
             self.merge(child, element);
         }

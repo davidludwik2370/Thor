@@ -4,10 +4,10 @@ import "thor:basic"
 
 classify :: fn(n: int) -> string {
     return switch n {
-    case < 0:   "negative"
-    case <= 10: "zero through ten"
-    case != 20: "above ten, except twenty"
-    case:       "twenty"
+    case < 0:   f"negative"
+    case <= 10: f"zero through ten"
+    case != 20: f"above ten, except twenty"
+    case:       f"twenty"
     }
 }
 

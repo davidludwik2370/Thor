@@ -172,6 +172,7 @@ pub(crate) fn approved_format(r: &Resolver<'_>, callee: Ref) -> bool {
 pub(crate) fn approved_library(r: &Resolver<'_>, callee: Ref) -> Option<(String, String)> {
     for (path, names) in [
         ("thor:parallel", &["pmap"][..]),
+        ("thor:pure", &["clone"][..]),
         ("core:slice", &["clone"][..]),
         ("core:strings", &["clone"][..]),
         ("thor:format", PURE_FORMAT_PROCEDURES),
@@ -345,7 +346,7 @@ pub(crate) fn explicit_allocator(r: &mut Resolver<'_>, call: Ref) -> bool {
         .as_ref()
         .map(|(path, name)| (path.as_str(), name.as_str()))
     {
-        Some(("core:strings" | "core:slice", "clone") | ("thor:format", "group_integer")) => {
+        Some(("core:strings" | "core:slice" | "thor:pure", "clone") | ("thor:format", "group_integer")) => {
             count > 1
         }
         Some(("thor:format", name)) => {

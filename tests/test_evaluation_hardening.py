@@ -73,7 +73,7 @@ VALUE::#run bad(7)
     def test_runtime_arguments_and_slice_constant_context_explain_the_required_change(self):
         cases=[
             (self.program('n:>7;_= #run bad(n)','bad::fn(n:int)->int{return n}\n'),'runtime storage is not a constant','n)'),
-            (self.program('_=VALUE','bad::fn()->[]int{return []int{1,2}}\nVALUE::#run bad()\n'),'runtime binding (:=)','#run bad()'),
+            (self.program('_=VALUE','bad::fn()->[]int{return make([]int,2)}\nVALUE::#run bad()\n'),'runtime binding (:=)','#run bad()'),
             (self.program('_=VALUE','bad::proc "contextless"()->string{return "text"}\nVALUE::#run bad()\n'),'Contextless compile-time procedures cannot return strings/slices','string'),
         ]
         for text,message,needle in cases:

@@ -45,6 +45,16 @@ y := max(u128) * 2       // Compile error; no automatic promotion to Integer.
 Rationals are reduced with positive denominators. Logical zero is `0/1`.
 Zero-initialized numbers and zero values need not allocate.
 
+An exact numeric source literal has a default budget of **16,000,000 digits**
+for each of its numerator and denominator. Thor checks the expanded size before
+constructing either number. For example, `Rational(1e-100000000)` needs
+100,000,001 denominator digits. Decimal literals discard insignificant zeros
+before the check and before fraction reduction. Prefixed integers count
+significant digits in their written base. Set `THOR_MAX_LITERAL_DIGITS` to a
+positive whole number to change the budget for a compiler invocation. The
+separate limits on compile-time arithmetic and serialized results still apply.
+Runtime text parsers such as `Rational(text)` accept their usual inputs.
+
 ## Read-only components
 
 ```odin

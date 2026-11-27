@@ -19,7 +19,7 @@ out.rows[0][0]=9
 if out.rows[1][0]!=3||source[0]!=3||out.text!="value 3"{panic("record ownership")}
 ''','''import "thor:pure"
 Report::struct{rows:[][]int,text:string}
-leaf::proc(input:[]int)->Report{rows:=make([][]int,2);rows[0],rows[1]=input,input;return {rows,f"value {input[0]}"}}
+leaf::proc(input:[]int)->Report{rows:=make([][]int,2);values:=pure.clone(input);rows[0],rows[1]=values,values;return {rows,f"value {input[0]}"}}
 work::fn(input:[]int)->Report{return leaf(input)}
 '''))
 
@@ -95,7 +95,7 @@ work::fn(values:[]int)->int{inner:=Inner{values};outer:=Outer{&inner};fill(&oute
             with self.subTest(write=write):
                 self.compare(self.program('values:=[]int{3};_=work(values)', '''
 Report::struct{rows:[][]int}
-leaf::proc(input:[]int)->Report{rows:=make([][]int,1);rows[0]=input;'''+write+''';return {rows}}
+leaf::proc(input:[]int)->Report{rows:=make([][]int,1);rows[0]=input;'''+write+''';return {}}
 work::fn(input:[]int)->Report{return leaf(input)}
 '''),command='check',fail='borrowed from an input')
 
@@ -128,4 +128,4 @@ bad::fn(value:'''+typ+''')->int{return 0}
 Report::struct{rows:[][]int}
 leaf::proc(input:[]int)->Report{rows:=make([][]int,1);rows[0]=input;return {rows}}
 work::fn(input:[]int)->Report{return leaf(input)}
-'''),command='check',fail='read-only slice')
+'''),command='check',fail='borrowed storage')

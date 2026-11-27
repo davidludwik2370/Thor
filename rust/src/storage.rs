@@ -104,7 +104,10 @@ impl Lower<'_, '_> {
                 let query = self.storage_query(node.node)?;
                 match trait_ {
                     Trait::Pointer=>Ok(format!("{meta}.type_is_pointer({query})")),
-                    Trait::Sequence=>Ok(format!("({meta}.type_is_slice({query}) || {meta}.type_is_dynamic_array({query}) || {meta}.type_is_string({query}))")),
+                    Trait::Sequence=>{
+                        let pure=self.module("pure");
+                        Ok(format!("({meta}.type_is_multi_pointer({query}) || {meta}.type_is_slice({query}) || {meta}.type_is_dynamic_array({query}) || {meta}.type_is_string({query}) || len(type_of({pure}.soa_shape({query})))>1)"))
+                    },
                     Trait::Big|Trait::NotBig=>{let module=self.module("big");let predicate=format!("({query}=={module}.Integer || {query}=={module}.Rational)");Ok(if *trait_==Trait::NotBig{format!("!{predicate}")}else{predicate})},
                 }
             }

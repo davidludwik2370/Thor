@@ -64,7 +64,7 @@ check::proc(text:string){if text!="value 1"&&text!="value 2"&&text!="value 3"{pa
         self.tracked(self.program('''n:=7
 text,count:=pair(f"value {n}");defer delete(text)
 if text!="value 7"||count!=7{panic("owned tuple")}
-''','pair::fn(text:string)->(string,int){return text,len(text)}\n'))
+''','pair::fn(text:string)->(string,int){return f"{text}",len(text)}\n'))
 
     def test_named_and_manual_arguments_keep_their_ownership_contracts(self):
         self.tracked(self.program('''named:=f"named {2}";defer delete(named)

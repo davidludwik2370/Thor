@@ -540,6 +540,9 @@ impl Checker<'_, '_> {
         let source = &self.r.sources[at.file];
         let node = source.node(at.node);
         let kind = node.kind.clone();
+        if kind == "Procedure" && node.data["pure"] == true && !context.is_empty() {
+            self.r.callback_instances.insert((at, context.clone()));
+        }
         if kind == "When" || kind == "WhenExpr" {
             if let Some(value) = self
                 .role(at, "cond")

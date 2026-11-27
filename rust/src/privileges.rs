@@ -40,12 +40,38 @@ enum Aspect {
     All,
     // Resolve a particular subtree against the caller's argument graph.
     References,
+    NonOwner,
+    // An ordinary proc called from a fn gets a writable promoted copy. Keep
+    // its source provenance solely for the fn's explicit return contract.
+    CopiedData,
+    CopiedStorage,
+    CopiedReferences,
+    CopiedAll,
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Origin {
     path: Path,
     aspect: Aspect,
     seed: Option<Ref>,
+}
+impl Origin {
+    fn for_checked_copy(mut self) -> Self {
+        self.aspect = match self.aspect {
+            Aspect::Data => Aspect::CopiedData,
+            Aspect::Storage | Aspect::Inline => Aspect::CopiedStorage,
+            Aspect::References => Aspect::CopiedReferences,
+            Aspect::All => Aspect::CopiedAll,
+            aspect => aspect,
+        };
+        self
+    }
+    fn copy_provenance(&self) -> bool {
+        matches!(self.aspect, Aspect::CopiedData | Aspect::CopiedStorage | Aspect::CopiedReferences | Aspect::CopiedAll)
+    }
+    fn non_owner(site: Ref) -> Self {
+        Self { path: Path { qualified: false, index: 0, steps: Shared::new() },
+            aspect: Aspect::NonOwner, seed: Some(site) }
+    }
 }
 type Origins = Shared<BTreeSet<Origin>>;
 
@@ -117,6 +143,7 @@ pub struct Facts {
     pub verified_parameters: BTreeSet<Ref>,
     pub readonly: BTreeSet<Ref>,
     pub invalid: HashMap<Ref, String>,
+    pub borrowed_results: BTreeMap<Ref, Ref>,
     pub pure_faults: BTreeMap<Ref, Vec<Issue>>,
     pub unresolved: BTreeMap<Ref, Ref>,
     pub editor_info: Vec<serde_json::Value>,
@@ -392,7 +419,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     continue;
                 }
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
-                this.summary(proc, Substitutions::new(), None, editor || this.reader_targets.contains(&proc));
+                this.summary(proc, Substitutions::new(), None, editor || this.pure_depth > 0 || this.reader_targets.contains(&proc));
                 this.pure_depth = 0;
                 if discovering && this.r.has_demanded_packages() {
                     crate::profile::event("permissions.incomplete", || serde_json::json!({
@@ -408,6 +435,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
             this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }
+        for (target, bindings) in this.r.callback_instances.clone() {
+            this.pure_depth = 1;
+            this.summary(target, bindings, None, true);
+        }
+        this.pure_depth = 0;
         if !this.vet_exhausted {this.settle_recursive();}
         this.facts.validation_exhausted=this.vet_exhausted&&this.validation_budget.is_some();
         for c in 0..this.contexts.len() {
@@ -428,6 +460,24 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
             let sig = this.role(proc, "type").unwrap_or(proc);
             let params = this.params(sig);
+            // Result graphs already contain transitive stores, projections and
+            // instantiated procedure results. Inspect those same graphs once
+            // after convergence, including named results modified by defer.
+            this.pure_depth = 1;
+            for (index, value) in this.contexts[c].results.clone().into_iter().enumerate() {
+                let typ = this.values[value].typ.owned();
+                if matches!(base_type(&typ), Type::String { name, .. } if name != "string")
+                    || !this.r.owns_result_storage(&typ, &mut HashSet::new())
+                    || this.type_property(&typ, queries::Property::Unresolved) { continue; }
+                let copy = this.copied(value);
+                if let Some(origin) = this.refs(copy).iter().find(|origin| origin.seed.is_none() || origin.aspect == Aspect::NonOwner) {
+                    let site = this.r.fields(sig, "results").get(index)
+                        .and_then(|(_, annotation)| *annotation).unwrap_or(sig);
+                    let seed = origin.seed.or_else(|| params.get(origin.path.index).map(|p| p.0)).unwrap_or(proc);
+                    this.facts.borrowed_results.entry(site).and_modify(|prior| *prior = (*prior).min(seed)).or_insert(seed);
+                }
+            }
+            this.pure_depth = 0;
             for (origin, effect) in this.contexts[c].effects.clone() {
                 if origin.seed.is_some() || !effect.changes_storage {
                     continue;
@@ -824,7 +874,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
     }
     fn fresh(&mut self, typ: Type, path: Option<Path>) -> V {
         let data = self.has_slice_data(&typ)
-            || self.pure_depth > 0 && matches!(base_type(&typ), Type::Union(..));
+            || self.pure_depth > 0 && matches!(base_type(&typ), Type::Union(..))
+                && self.r.owns_result_storage(&typ, &mut HashSet::new());
         let id = self.value(typ);
         self.values[id].path = path.clone();
         if let Some(mut path) = path {
@@ -843,7 +894,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.values[id].locations.insert(path.clone());
             if path.qualified
                 && (data || self.pure_depth > 0
-                    && matches!(base_type(&self.values[id].typ), Type::String { .. }))
+                    && matches!(base_type(&self.values[id].typ), Type::String { .. } | Type::BigInteger | Type::BigRational))
             {
                 self.values[id].data.insert(Origin {
                     path,
@@ -1093,6 +1144,26 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.values[result].base = old.base.map(|child| self.snapshot(child, seen));
         result
     }
+    fn checked_copy(&mut self, value: V) -> V {
+        let copy = self.copied(value);
+        let mut graph = HashMap::new();
+        let root = self.snapshot(copy, &mut graph);
+        for id in graph.into_values() {
+            let path = self.values[id].path.take();
+            if let Some(path) = path.filter(|path| path.qualified) {
+                if self.type_property(&self.values[id].typ.owned(), queries::Property::Slice) {
+                    self.values[id].data.insert(Origin { path, aspect: Aspect::CopiedReferences, seed: None });
+                }
+            }
+            let v = &mut self.values[id];
+            v.locations = Default::default();
+            v.base = None;
+            for set in [&mut v.data, &mut v.storage] {
+                *set = set.iter().cloned().map(Origin::for_checked_copy).collect();
+            }
+        }
+        root
+    }
     fn copy_seen(&mut self, v: V, seen: &mut HashMap<V, V>) -> V {
         let _phase = seen.is_empty().then(||crate::profile::span("permissions.copy"));
         crate::profile::count("permissions.copy_visits", 1);
@@ -1103,7 +1174,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let id = self.value(old.typ.clone());
         seen.insert(v, id);
         if reference_data(&old.typ)
-            || self.pure_depth > 0 && matches!(base_type(&old.typ), Type::String { .. })
+            || self.pure_depth > 0 && matches!(base_type(&old.typ), Type::String { .. } | Type::BigInteger | Type::BigRational)
         {
             self.values[id].data = old.data;
             if self.vet_seeds.is_some() && matches!(base_type(&old.typ),Type::Union(..)) {
@@ -1383,6 +1454,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .and_then(|control| self.role(control, "cond"))
         });
         for origin in origins {
+            if origin.aspect == Aspect::NonOwner || origin.copy_provenance() { continue; }
             if let Some(seed) = origin.seed {
                 if origin.aspect == Aspect::Inline {
                     continue;
@@ -1449,7 +1521,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let Some(v) = args.get(origin.path.index) else {
             return Origins::new();
         };
-        if origin.aspect == Aspect::All {
+        if matches!(origin.aspect, Aspect::All | Aspect::CopiedAll) {
             return self.refs(*v);
         }
         // Native SOA columns are multipointers, while a freshly zipped
@@ -1497,12 +1569,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn resolve_once(&mut self, origin: &Origin, args: &[V],
         origins: &mut HashMap<Origin, Origins>, paths: &mut HashMap<Path, V>) -> Origins {
         if let Some(value) = origins.get(origin) { return value.clone(); }
-        let result = if origin.seed.is_some() || origin.aspect == Aspect::All {
+        let result = if origin.seed.is_some() || matches!(origin.aspect, Aspect::All | Aspect::CopiedAll) {
             self.resolve(origin, args)
         } else if let Some(value) = self.resolve_path(&origin.path, args, paths) {
             match origin.aspect {
-                Aspect::References => self.refs(value),
-                Aspect::Data => self.values[value].data.clone(),
+                Aspect::References | Aspect::CopiedReferences => self.refs(value),
+                Aspect::Data | Aspect::CopiedData => self.values[value].data.clone(),
                 _ => {
                     let mut storage = self.values[value].storage.clone();
                     if let Some((Step::Field(_), prefix)) = origin.path.steps.split_last() {
@@ -1515,6 +1587,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
             }
         } else { Origins::new() };
+        let result = if origin.copy_provenance() {
+            result.into_iter().map(Origin::for_checked_copy).collect()
+        } else { result };
         origins.insert(origin.clone(), result.clone());
         result
     }
@@ -1926,8 +2001,36 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             let Some(node) = self.s(parent).node(parent.node).parent else { break; };
                             parent.node = node;
                         }
+                        if self.kind(parent) == "Assignment" {
+                            let index = self.group(parent, "rhs").iter().position(|value| *value == child);
+                            if let Some(lhs) = index.and_then(|i| self.group(parent, "lhs").get(i).copied()) {
+                                return self.typ(lhs, c);
+                            }
+                        }
+                        let source = self.s(r);
+                        let switch = source.ancestors(child.node).take_while(|ancestor| source.node(*ancestor).kind != "Procedure").find(|ancestor| {
+                            matches!(source.node(*ancestor).kind.as_str(), "SwitchExpr" | "CompileSwitchExpr")
+                        });
+                        let arm_slot = switch.and_then(|switch| {
+                            let cases = source.node(switch).data["cases"].as_array()?;
+                            cases.iter().find_map(|case| {
+                                let span = crate::ast::Span::from_wire(&case["result"])?;
+                                let arm = source.at(span, switch)?;
+                                if arm == child.node { Some(0) } else {
+                                    source.group(arm, "args").iter().position(|arg| *arg == child.node)
+                                }
+                            }).map(|slot| (switch, slot))
+                        });
+                        let mut slot = 0;
+                        if let Some((switch, index)) = arm_slot {
+                            if let Some(container) = source.node(switch).parent {
+                                child.node = switch;
+                                parent.node = container;
+                                slot = index;
+                            }
+                        }
                         if self.kind(parent) == "Return" {
-                            let index = self.group(parent, "values").iter().position(|value| *value == child);
+                            let index = self.group(parent, "values").iter().position(|value| *value == child).map(|i| i+slot);
                             if let (Some(index), Some(procedure)) = (index, self.contexts[c].proc) {
                                 let signature = self.role(procedure, "type").unwrap_or(procedure);
                                 if let Some((_, Some(annotation))) = self.r.fields(signature, "results").get(index) {
@@ -2007,6 +2110,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.value(Type::Unknown)
         }
     }
+    fn global_read(&mut self, value: V, site: Ref) -> V {
+        if self.pure_depth == 0 { return value; }
+        let typ = self.values[value].typ.owned();
+        if !self.r.owns_result_storage(&typ, &mut HashSet::new()) {
+            return value;
+        }
+        let copy = self.copied(value);
+        let copy = self.snapshot(copy, &mut HashMap::new());
+        let mut pending = vec![copy];
+        let mut seen = HashSet::new();
+        while let Some(id) = pending.pop() {
+            if !seen.insert(id) { continue; }
+            let typ = self.values[id].typ.owned();
+            if self.has_slice_data(&typ) || typ.is_string() || typ.big_name().is_some() || matches!(base_type(&typ), Type::Dynamic(_)) {
+                self.values[id].data.insert(Origin::non_owner(site));
+            }
+            pending.extend(self.values[id].fields.values().copied());
+            pending.extend(self.values[id].element);
+        }
+        copy
+    }
     fn eval(&mut self, r: Ref, c: C) -> V {
         if self.vet_exhausted {return self.value(Type::Unknown);}
         if self.reuse.is_some() { self.observe_cache_input(r, c); }
@@ -2021,13 +2145,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         if kind == "Ident" || (kind == "Selector" && self.r.symbol(r).is_some()) {
             if let Some(symbol) = self.r.symbol(r) {
-                if let Some(v) = self.contexts[c]
-                    .env
-                    .get(&symbol)
-                    .or(self.globals.get(&symbol))
-                {
-                    return *v;
-                }
+                if let Some(v) = self.contexts[c].env.get(&symbol) { return *v; }
+                if let Some(&v) = self.globals.get(&symbol) { return self.global_read(v, r); }
                 let declaration = self.r.symbols[symbol].reference;
                 if self.kind(declaration) == "Declaration" && self.global_active.insert(symbol) {
                     let global = self.contexts.len();
@@ -2035,15 +2154,22 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.statement(declaration, global);
                     self.globals.extend(self.contexts[global].env.clone());
                     self.global_active.remove(&symbol);
-                    if let Some(v) = self.globals.get(&symbol) {
-                        return *v;
+                    if let Some(&v) = self.globals.get(&symbol) {
+                        return self.global_read(v, r);
                     }
                 }
             }
             return self.value(typ);
         }
         match kind.as_str() {
-            "Paren" | "Runtime" | "OrReturn" | "OrBranch" | "OrPanic" | "AutoCast" => {
+            "Literal" | "Directive" if self.pure_depth > 0 && (typ.is_string() || self.text(r) == "#procedure") => {
+                let value = self.value(typ);
+                if !matches!(self.text(r).as_str(), "\"\"" | "``") {
+                    self.values[value].data.insert(Origin::non_owner(r));
+                }
+                value
+            }
+            "Paren" | "Run" | "Runtime" | "OrReturn" | "OrBranch" | "OrPanic" | "AutoCast" => {
                 let Some(inner) = self.role(r, "expr") else {
                     return self.value(typ);
                 };
@@ -2103,9 +2229,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 for role in ["low", "high"] {
                     self.eval_role(r, role, c);
                 }
+                let non_owner = Origin::non_owner(r);
                 if matches!(base_type(&self.values[v].typ), Type::Soa(_)) {
                     let result = self.copied(v);
                     self.values[result].storage.clear();
+                    if self.pure_depth > 0 { self.values[result].data.insert(non_owner); }
                     return result;
                 }
                 let elem = self.item(v);
@@ -2128,6 +2256,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     })
                     .collect::<Vec<_>>();
                 self.values[result].data.extend(storage);
+                if self.pure_depth > 0 { self.values[result].data.insert(non_owner); }
                 result
             }
             "Unary" => {
@@ -2189,6 +2318,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
             "Procedure" | "ProcedureType" => self.value(typ),
             "Compound" => {
                 let id = self.value(typ.clone());
+                if self.pure_depth > 0 && matches!(base_type(&typ), Type::Slice(_) | Type::Soa(_))
+                    && !self.group(r, "elems").is_empty() {
+                    self.values[id].data.insert(Origin::non_owner(r));
+                }
                 let fields = self.record_fields(&typ);
                 for (index, element) in self.group(r, "elems").into_iter().enumerate() {
                     if matches!(base_type(&typ), Type::Map { .. })
@@ -2290,6 +2423,34 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.merge(result, y);
                 result
             }
+            "SwitchExpr" | "CompileSwitchExpr" => {
+                self.eval_role(r, "selector", c);
+                let selected = if kind == "CompileSwitchExpr" {
+                    self.r.selected_compile_switch_value(r, &self.contexts[c].bindings)
+                } else { None };
+                if kind == "SwitchExpr" {
+                    let source = self.s(r);
+                    let matches: Vec<_> = source.node(r.node).data["cases"].as_array().into_iter().flatten()
+                        .flat_map(|case| case["matches"].as_array().into_iter().flatten())
+                        .filter_map(crate::ast::Span::from_wire)
+                        .filter_map(|span| source.at(span, r.node)).collect();
+                    for node in matches { self.eval(Ref { node, ..r }, c); }
+                }
+                let arms: Vec<Ref> = selected.map(|arm| vec![arm]).unwrap_or_else(|| {
+                    let source = self.s(r);
+                    source.node(r.node).data["cases"].as_array().into_iter().flatten()
+                        .filter_map(|case| crate::ast::Span::from_wire(&case["result"]))
+                        .filter_map(|span| source.at(span, r.node)).map(|node| Ref { node, ..r }).collect()
+                });
+                let mut results = Vec::new();
+                for arm in arms {
+                    for (index, value) in self.expression_results(arm, c, 0).into_iter().enumerate() {
+                        if let Some(prior) = results.get(index) { self.merge(*prior, value); }
+                        else { results.push(self.copied(value)); }
+                    }
+                }
+                self.record(r, c, results, false)
+            }
             "SwitchResults" | "FallbackList" => {
                 let values = self
                     .group(r, "args")
@@ -2345,6 +2506,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 let result = self.value(typ);
                 if let Some(origins) = references { self.values[result].data = origins; }
+                if kind == "Interpolation" && self.pure_depth > 0
+                    && crate::lower::temporary_fstring_argument(self.r, r).is_some() {
+                    self.values[result].data.insert(Origin::non_owner(r));
+                }
                 result
             }
         }
@@ -2480,7 +2645,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .get(index)
                         .copied()
                         .unwrap_or_else(|| self.value(Type::Unknown));
-                    let v = self.copied(v);
+                    // Compound numeric assignment computes an independent value.
+                    // Its RHS supplies digits, never a result storage header.
+                    let v = if self.op(r) != "=" && self.values[target].typ.big_name().is_some() {
+                        self.value(self.values[target].typ.clone())
+                    } else { self.copied(v) };
                     if self.kind(site) == "Index" {
                         if let Some(container) = self.role(site, "expr") {
                             if matches!(base_type(&self.typ(container, c)), Type::Map { .. }) {
@@ -2879,6 +3048,23 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
         if builtin && READERS.contains(&name.as_str()) {
+            if matches!(name.as_str(), "min" | "max" | "clamp") && typ.is_string() {
+                let result = self.value(typ);
+                if let Some(plan) = crate::extremaplan::plan(self.r, r) {
+                    for (kind, node) in plan.parts {
+                        let arg = self.eval(Ref { file: r.file, node }, c);
+                        let value = if kind == crate::extremaplan::Part::Scalar { arg } else { self.item(arg) };
+                        self.merge(result, value);
+                    }
+                    if plan.optional {
+                        let status = self.value(Type::scalar("bool"));
+                        return self.record(r, c, vec![result, status], true);
+                    }
+                } else {
+                    for arg in values { self.merge(result, arg); }
+                }
+                return result;
+            }
             let first = self.value(typ);
             let status = match name.as_str() {
                 "make" | "new" => Some(Type::scalar("Allocator_Error")),
@@ -2897,6 +3083,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if path == "core:fmt" && FMT_READERS.contains(&name.as_str()) && reviewed
             {
                 return self.value(typ);
+            }
+            if reviewed && path == "thor:pure" && name == "clone" { return self.value(typ); }
+            if reviewed && path == "core:strings" && name == "clone" {
+                let value = self.value(typ);
+                let status = self.value(Type::scalar("Allocator_Error"));
+                return self.record(r, c, vec![value, status], true);
             }
             let reviewed_basic = path == "thor:basic" && reviewed;
             let graph_clone = name == "deepclone" && (reviewed_basic
@@ -2996,6 +3188,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     }
                     let result = self.value(Type::Soa(Box::new(Type::Anonymous(fields))));
                     self.values[result].fields = columns.into();
+                    if self.pure_depth > 0 { self.values[result].data.insert(Origin::non_owner(r)); }
                     return result;
                 }
                 "soa_unzip" if !values.is_empty() => {
@@ -3012,7 +3205,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .into_iter()
                         .map(|name| {
                             let column = self.member(values[0], &name);
-                            self.copied(column)
+                            let column = self.copied(column);
+                            if self.pure_depth == 0 { return column; }
+                            let element = self.item(column);
+                            let result = self.value(Type::Slice(Box::new(self.values[element].typ.owned())));
+                            self.values[result].element = Some(element);
+                            self.values[result].data = self.values[column].data.clone();
+                            self.values[result].data.insert(Origin::non_owner(r));
+                            result
                         })
                         .collect();
                     return self.record(r, c, values, false);
@@ -3179,6 +3379,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             // Conversions keep slice provenance. Opaque calls must promise
             // nothing about write access or returned storage.
             if self.denotes_type(callee) {
+                if typ.big_name().is_some() && self.r.logical_constructor(r).is_some() { return self.value(typ); }
                 let v = values
                     .first()
                     .copied()
@@ -3408,6 +3609,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 annotation.is_none_or(|r| {
                     let typ = self.specialized_type(r, &substitutions);
                     self.type_property(&typ, queries::Property::Slice)
+                        || self.pure_depth > 0 && self.r.owns_result_storage(&typ, &mut HashSet::new())
                 })
             });
             // As in the reference analyzer, body inspection is needed only
@@ -3504,11 +3706,17 @@ impl<'a, 'r> Privileges<'a, 'r> {
 
             for (index, output) in outputs.into_iter().enumerate() {
                 let output = if self.s(candidate).node(candidate.node).data["pure"] == true
-                    || old_depth > 0
                 {
                     self.value(self.values[output].typ.clone())
                 } else {
-                    self.instantiate(output, &bound, &mut instances, 0)
+                    let instance = self.instantiate(output, &bound, &mut instances, 0);
+                    if old_depth > 0 && self.r.owns_result_storage(&self.values[instance].typ.owned(), &mut HashSet::new()) {
+                        if matches!(self.s(sig).node(sig.node).data["calling_convention"].as_str(), Some(cc) if cc != "" && cc != "odin") {
+                            // Allocation-bearing results will receive the more specific
+                            // contextless-result diagnostic during signature validation.
+                            self.value(self.values[instance].typ.clone())
+                        } else { self.checked_copy(instance) }
+                    } else { instance }
                 };
                 if let Some(old) = results.get(index).copied() {
                     self.merge(old, output);
@@ -3976,6 +4184,7 @@ pub(crate) fn reviewed_library_contract(
             || ["bprint", "bprintln", "bprintf", "bprintfln"].contains(&name),
         "thor:basic" => ["print", "hash", "try_hash", "_string", "deepclone"].contains(&name),
         "thor:graph" => name == "deepclone",
+        "core:strings" | "thor:pure" => name == "clone",
         "core:slice" => ["clone", "clone_to_dynamic"].contains(&name),
         _ => false,
     };

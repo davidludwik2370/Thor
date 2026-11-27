@@ -28,7 +28,8 @@ work::fn(value:$T)->T{return helper(value)}
 copied[0]=9
 n:=3;if values[0]!=3||copied[0]!=9||work(n)!=3{panic("conditional ownership")}
 ''', '''
-identity::proc(value:$T)->T{return value}
+import "thor:pure"
+identity::proc(value:$T)->T{return pure.clone(value)}
 work::fn(value:$T)->T{when T==[]int{return identity(value)}else{return value}}
 '''))
 

@@ -256,7 +256,7 @@ fn expression_at(
             if nil && !zero {
                 return Err(error("A nil sequence cannot have nonzero-sized elements."));
             }
-            let element = format!("{meta}.type_elem_type({typ})");
+            let element = if value["soa"] == true {format!("type_of((cast(^{typ})nil)^[0])")} else {format!("{meta}.type_elem_type({typ})")};
             let texts = items
                 .iter()
                 .map(|v| child(v, &element))
@@ -431,13 +431,16 @@ impl Materializer<'_, '_> {
             )),
             "sequence" => {
                 let storage = value["storage"].as_str().unwrap_or("array");
-                let element = format!("{}.type_elem_type({typ})", self.meta);
+                let soa = value["soa"] == true;
+                let element = if soa {format!("type_of((cast(^{typ})nil)^[0])")} else {format!("{}.type_elem_type({typ})", self.meta)};
                 if storage == "dynamic" || storage == "slice" || value["nil"] == true {
                     self.serial += 1;
                     let name = format!("{}{}", self.prefix, self.serial);
                     let length = value["values"].as_array().unwrap().len();
                     let non_nil = value["nil"] != true;
-                    let allocate = if storage == "dynamic" {
+                    let allocate = if soa && storage == "dynamic" {
+                        format!("make({typ},{length},{})",value["capacity"])
+                    } else if soa {format!("make({typ},{length})")} else if storage == "dynamic" {
                         format!(
                             "{module}.allocate_dynamic({typ},{length},{},{non_nil})",
                             value["capacity"]

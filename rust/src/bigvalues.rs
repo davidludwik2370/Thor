@@ -86,18 +86,58 @@ pub fn packet(kind: &str, number: &Fraction) -> Result<Value> {
         Err("Invalid big-number contents kind.".into())
     }
 }
-pub fn literal(text: &str) -> Result<Fraction> {
+const DEFAULT_LITERAL_DIGITS: u64 = 16_000_000;
+const LIMIT_VARIABLE: &str = "THOR_MAX_LITERAL_DIGITS";
+
+pub fn literal_limit() -> Result<u64> {
+    static LIMIT: std::sync::OnceLock<Result<u64>> = std::sync::OnceLock::new();
+    LIMIT
+        .get_or_init(|| match std::env::var(LIMIT_VARIABLE) {
+            Err(std::env::VarError::NotPresent) => Ok(DEFAULT_LITERAL_DIGITS),
+            value => value
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .filter(|n| *n > 0)
+                .ok_or_else(|| format!("{LIMIT_VARIABLE} must be a positive whole number.")),
+        })
+        .clone()
+}
+
+// Describe the value using only space proportional to the source. Runtime
+// literal checks also use this representation, without expanding a BigInt.
+pub(crate) struct ExactLiteral {
+    negative: bool,
+    digits: String,
+    radix: u32,
+    scale: i128,
+}
+impl ExactLiteral {
+    pub(crate) fn is_whole(&self) -> bool {
+        self.scale <= 0
+    }
+    pub(crate) fn is_zero(&self) -> bool {
+        self.digits.is_empty()
+    }
+
+    pub(crate) fn check_size(&self) -> Result<()> {
+        let limit = literal_limit()?;
+        let numerator = self.digits.len() as i128 + (-self.scale).max(0);
+        let denominator = 1 + self.scale.max(0);
+        let required = numerator.max(denominator);
+        if required > i128::from(limit) {
+            return Err(format!("Exact numeric literal requires {required} digits in base {} before reduction; the limit is {limit}. Raise {LIMIT_VARIABLE} to allow it.", self.radix));
+        }
+        Ok(())
+    }
+}
+pub(crate) fn parse_literal(text: &str) -> Result<ExactLiteral> {
     let text = text.replace('_', "");
-    let (negative, digits) = text
-        .strip_prefix('-')
-        .map_or((false, text.as_str()), |value| (true, value));
-    let digits = if !negative {
-        digits.strip_prefix('+').unwrap_or(digits)
-    } else {
-        digits
-    };
+    let (negative, digits) = text.strip_prefix('-').map_or_else(
+        || (false, text.strip_prefix('+').unwrap_or(&text)),
+        |value| (true, value),
+    );
     if let Some(prefix) = digits.get(..2).map(str::to_ascii_lowercase) {
-        let base = match prefix.as_str() {
+        let radix = match prefix.as_str() {
             "0b" => Some(2),
             "0o" => Some(8),
             "0d" => Some(10),
@@ -105,10 +145,17 @@ pub fn literal(text: &str) -> Result<Fraction> {
             "0x" => Some(16),
             _ => None,
         };
-        if let Some(base) = base {
-            let value = BigInt::parse_bytes(&digits.as_bytes()[2..], base)
-                .ok_or("Invalid numeric literal.")?;
-            return Ok(Fraction::integer(if negative { -value } else { value }));
+        if let Some(radix) = radix {
+            let value = &digits[2..];
+            if value.is_empty() || !value.chars().all(|c| c.is_digit(radix)) {
+                return Err("Invalid numeric literal.".into());
+            }
+            return Ok(ExactLiteral {
+                negative,
+                digits: value.trim_start_matches('0').into(),
+                radix,
+                scale: 0,
+            });
         }
     }
     let mut parts = digits.split(['e', 'E']);
@@ -134,27 +181,34 @@ pub fn literal(text: &str) -> Result<Fraction> {
     {
         return Err("Invalid numeric literal.".into());
     }
-    let mut coefficient = format!("{whole}{fractional}");
-    if coefficient.bytes().all(|ch| ch == b'0') {
+    let coefficient = format!("{whole}{fractional}");
+    let significant = coefficient.trim_start_matches('0');
+    let digits = significant.trim_end_matches('0');
+    let scale = if digits.is_empty() {
+        0
+    } else {
+        fractional.len() as i128 - i128::from(exponent) - (significant.len() - digits.len()) as i128
+    };
+    Ok(ExactLiteral {
+        negative,
+        digits: digits.into(),
+        radix: 10,
+        scale,
+    })
+}
+
+pub fn literal(text: &str) -> Result<Fraction> {
+    let value = parse_literal(text)?;
+    value.check_size()?;
+    if value.is_zero() {
         return Ok(Fraction::integer(BigInt::zero()));
     }
-    let mut scale = i64::try_from(fractional.len())
-        .map_err(|_| "Invalid numeric literal.")?
-        .checked_sub(exponent)
+    let mut numerator = BigInt::parse_bytes(value.digits.as_bytes(), value.radix)
         .ok_or("Invalid numeric literal.")?;
-    while coefficient.ends_with('0') {
-        coefficient.pop();
-        scale = scale.checked_sub(1).ok_or("Invalid numeric literal.")?;
-    }
-    let mut numerator =
-        BigInt::parse_bytes(coefficient.as_bytes(), 10).ok_or("Invalid numeric literal.")?;
-    if negative {
+    if value.negative {
         numerator = -numerator;
     }
-    // Keep literal parsing exact. The protocol decoder bounds serialized
-    // packets separately; imposing that bound here would reject source
-    // constants accepted by the reference before they enter a value packet.
-    let mut exponent = scale.unsigned_abs();
+    let mut exponent = value.scale.unsigned_abs();
     let mut power = BigInt::one();
     let mut factor = BigInt::from(10u8);
     while exponent != 0 {
@@ -166,7 +220,7 @@ pub fn literal(text: &str) -> Result<Fraction> {
             factor = &factor * &factor;
         }
     }
-    if scale >= 0 {
+    if value.scale > 0 {
         Fraction::new(numerator, power)
     } else {
         Ok(Fraction::integer(numerator * power))

@@ -97,7 +97,8 @@ main::proc(){n:=4;cb:=factory();fmt.println(cb(n),work(n))}
         text='''package main
 import "core:fmt"
 import pure "thor:pure"
-copy_values::fn(values:[]int)->[]int {values}
+import "core:slice"
+copy_values::fn(values:[]int)->[]int {slice.clone(values)}
 make_values::fn(n:int)->[]int{values:=make([]int,2);values[0]=n;values[1]=n+1;defer values[1]+=1;values}
 text::fn(x:int)->string{f"value {x}"}
 main::proc(){
@@ -117,7 +118,7 @@ main::proc(){
         self.compare('''package main
 import "core:fmt"
 import pure "thor:pure"
-values::fn(x:int)->[]int{[]int{x,x+1}}
+values::fn(x:int)->[]int{pure.clone([]int{x,x+1})}
 main::proc(){a:=#run values(4);defer pure.destroy(a);b:=#run values(4);defer pure.destroy(b);a[0]=9;fmt.println(a,b)}
 ''',expected='[9, 5] [4, 5]')
 
@@ -183,7 +184,7 @@ main::proc(){n:=3;fmt.println(compiled(),partial(.Second),complete(.First),liter
         text='''package main
 import "core:fmt"
 import pure "thor:pure"
-choose::fn(values:[]int,copy:bool)->[]int{switch{case copy:values;case:[]int{7,8}}}
+choose::fn(values:[]int,copy:bool)->[]int{switch{case copy:pure.clone(values);case:pure.clone([]int{7,8})}}
 main::proc(){source:=[2,3];a:=choose(source[:],true);defer pure.destroy(a);b:=#run choose([]int{4,5},true);defer pure.destroy(b);a[0]=9;b[0]=6;if source[0]!=2{panic("aliased switch result")};fmt.println(a,b,source)}
 '''
         for flags in [['-debug'],base.UNCHECKED]:
@@ -193,10 +194,10 @@ main::proc(){source:=[2,3];a:=choose(source[:],true);defer pure.destroy(a);b:=#r
         template='''package main
 import "core:fmt"
 import pure "thor:pure"
-choose::fn(values:[]int,n:int)->[]int{RETURN switch n{case < 0:switch n{case -1:values;case:[]int{7,8}};case:[]int{9,10}}}
-pair::fn(values:[]int,n:int)->(data:[]int,count:int){RETURN switch n{case < 0:values,n;case:[]int{6,7},n+1}}
-compiled::fn()->([]int,int){RETURN #switch{case true:[]int{4,5},2;case:undefined,undefined}}
-saved::fn(n:int)->[]int{data:=make([]int,1);data[0]=n;defer data[0]+=1;RETURN switch n{case < 0:[]int{0};case:data}}
+choose::fn(values:[]int,n:int)->[]int{RETURN switch n{case < 0:switch n{case -1:pure.clone(values);case:pure.clone([]int{7,8})};case:pure.clone([]int{9,10})}}
+pair::fn(values:[]int,n:int)->(data:[]int,count:int){RETURN switch n{case < 0:pure.clone(values),n;case:pure.clone([]int{6,7}),n+1}}
+compiled::fn()->([]int,int){RETURN #switch{case true:pure.clone([]int{4,5}),2;case:undefined,undefined}}
+saved::fn(n:int)->[]int{data:=make([]int,1);data[0]=n;defer data[0]+=1;RETURN switch n{case < 0:pure.clone([]int{0});case:data}}
 main::proc(){
  source:=[2,3];n:=-1
  a:=choose(source[:],n);defer pure.destroy(a)
@@ -218,11 +219,12 @@ main::proc(){
     def test_owned_switch_diverging_arms_and_callback_results(self):
         self.compare('''package main
 import "core:fmt"
+import pure "thor:pure"
 Callback::fn(int)->int
 twice::fn(x:int)->int{x*2}
 factory::fn(x:int)->Callback{switch x{case 0:fn(v:int)->int{v+1};case:twice}}
 apply::fn(x:int)->int{callback:=factory(0);callback(x)}
-guarded::fn(n:int)->[]int{switch n{case < 0:panic("negative");case:[]int{n}}}
+guarded::fn(n:int)->[]int{switch n{case < 0:panic("negative");case:pure.clone([]int{n})}}
 never::fn(n:int)->[]int{switch n{case < 0:panic("negative");case:panic("positive")}}
 A::#run apply(4)
 main::proc(){n:=3;callback:=factory(n);values:=guarded(n);defer delete(values);fmt.println(A,callback(n),values)}
@@ -234,7 +236,7 @@ import "core:fmt"
 import "thor:big"
 import pure "thor:pure"
 Report::struct{values:[]int,count:int}
-record::fn(n:int)->Report{switch n{case 0:{[]int{n},n};case:{[]int{n+1},n+1}}}
+record::fn(n:int)->Report{switch n{case 0:{pure.clone([]int{n}),n};case:{pure.clone([]int{n+1}),n+1}}}
 integer::fn(n:int)->Integer{switch n{case < 0:Integer(-n);case:Integer(n+1)}}
 rational::fn(n:int)->Rational{switch n{case 0:Rational(1,3);case:Rational(n,2)}}
 main::proc(){
@@ -312,10 +314,11 @@ main::proc(){n:=4;fmt.println(forced(),runtime(n),converted(7),shadowed(n),inlin
     def test_diverging_calls_and_void_functions_keep_existing_semantics(self):
         self.compare('''package main
 import "core:fmt"
+import pure "thor:pure"
 stop::proc()->!{panic("stop")}
 panic_alias::panic
 value::fn(x:int)->int{if x>0{return x};panic_alias("negative")}
-owned::fn(x:int)->[]int{if x>0{return []int{x}};stop()}
+owned::fn(x:int)->[]int{if x>0{return pure.clone([]int{x})};stop()}
 verify::fn(x:int){assert(x>0)}
 main::proc(){n:=4;verify(n);a:=owned(n);defer delete(a);fmt.println(value(n),a)}
 ''',flags=['-debug'],expected='4 [4]')

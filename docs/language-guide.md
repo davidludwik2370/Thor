@@ -798,7 +798,7 @@ types without executing the queried expression. Invalid dependency cycles are
 reported separately from valid native recursion. Unresolved generic `#run` calls
 receive a source diagnostic rather than a fabricated result.
 
-Inputs may contain scalar values, enums, strings, slices, fixed arrays, records,
+Inputs may contain scalar values, enums, strings, slices, fixed arrays, fixed SOAs, SOA slices, records,
 bit sets and tagged unions. Borrowed contents are protected through aliases,
 fields, slices, shallow copies, loops, union matches/assertions and calls. Local fixed-array
 copies and fresh buffers can be mutated. Pointers, maps, dynamic-array inputs,
@@ -820,19 +820,36 @@ all outstanding internal allocations are released on every return. Ordinary
 `proc` results and named f-string owners retain explicit cleanup. Anonymous
 f-string arguments follow the expression lifetime rule described above.
 
-String/slice/dynamic-array results own independent backing storage, including input views and
-repeated aliases inside arrays, records and tagged unions. Promotion uses the
-saved caller allocator after user defers and before local/scratch storage expires.
-Nested calls allocate their returned copies in the receiving function's scratch.
-Temporary work is always released; visible runtime results are caller-managed:
+Every allocated part of a `fn` result needs an explicit owner. Returning an input slice,
+an alias of it, or a view into a local array is a compile error. Use `slice.clone` for
+a slice of inline values. For a slice of strings or a record containing slices,
+`pure.clone` also copies the referenced contents. A nonempty static string needs an
+explicit clone when returned as an owned string.
 
 ```odin
+import "core:slice"
 import pure "thor:pure"
-message :: fn(n:int)->string { return f"value {n}" }
-text := message(7)
-defer delete(text)
-// For nested allocated fields/elements, call pure.destroy(result) once instead.
+
+copy_tail :: fn(values: []int) -> []int { slice.clone(values[1:]) }
+tail :: fn(values: []int) -> []int { copy_tail(values) }
+copy_rows :: fn(rows: [][]int) -> [][]int { pure.clone(rows) }
+
+values := [3, 5, 7]
+result := tail(values[:])
+defer delete(result)
 ```
+
+The wrapper transfers the helper's allocation to its caller. The same rule applies
+to named and implicit returns, concretely instantiated generics and pure callbacks.
+Repeated references in an owned result get independent storage so each member can
+be freed once. Use `pure.destroy(result)` for nested allocated members.
+
+A pure function can read rows and columns of `#soa[]Row` and `#soa[N]Row` when
+the logical fields are supported pure values. Pass a dynamic SOA's slice view
+as input. To return rows, allocate a result with `make(#soa[]Row, n)` or clone
+the input with `pure.clone(rows)`. A scalar read such as `rows[i].x` needs no
+allocation. `#run` reconstructs owned SOA results with the same row values and
+dynamic capacity.
 
 Dynamic-array results retain their length and capacity and use the caller's
 allocator, so later `append` and ordinary `delete` work normally. For example:

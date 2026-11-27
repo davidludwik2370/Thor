@@ -144,7 +144,7 @@ assert(transmute(u64)ZERO==0x8000000000000000)
 Report::struct{value:int}
 pair::fn(n:int)->[2]int{return [n,n+1]}
 report::fn(n:int)->Report{return {n}}
-text::fn()->string{return "\\x00\\xff"}
+text::fn()->string{return f"\\x00\\xff"}
 zero::fn()->f64{return -f64(0)}
 PAIR::pair(7)
 REPORT::report(7)
@@ -308,7 +308,7 @@ testing.expect(t,raw_data(a.title)!=raw_data(b.title)&&raw_data(a.rows[0])!=raw_
 pure.destroy(a);pure.destroy(b);pure.destroy(runtime)
 ''','''
 Result::struct{title:string,rows:[]string}
-work::fn(input:string)->Result{data:=make([]string,1);data[0]=input;return {input,data}}
+work::fn(input:string)->Result{data:=make([]string,1);data[0]=pure.clone(input);return {pure.clone(input),data}}
 ''')
 
     def test_repeated_use_inside_runtime_loop_materializes_each_result(self):
@@ -317,11 +317,11 @@ for i in 0..<3{
  a:=folded();b:=#run work();a[0]=i
  testing.expect(t,b[0]==7);pure.destroy(a);pure.destroy(b)
 }
-''','work::fn()->[]int{data:=[7,8];return data[:]}\nfolded::proc()->[]int{return work()}\n')
+''','work::fn()->[]int{return pure.clone([]int{7,8})}\nfolded::proc()->[]int{return work()}\n')
 
     def test_specialized_owned_and_fixed_array_results(self):
         self.memory('a:=1;work(2,a);work(3,a)', '''
-repeat::fn($N:int)->[N]string{result:[N]string;for i in 0..<N{result[i]="text"};return result}
+repeat::fn($N:int)->[N]string{result:[N]string;for i in 0..<N{result[i]=f"text"};return result}
 work::proc($N:int,value:$T){result:=repeat(N);assert(len(result)==N);pure.destroy(result)}
 ''')
 

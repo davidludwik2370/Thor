@@ -97,7 +97,13 @@ impl Lower<'_, '_> {
     }
     fn pure_result_type(&mut self, result: &PureResult) -> Result<Code> {
         if let Some(annotation) = result.annotation {
-            return self.render(annotation, None, true);
+            let code = self.render(annotation, None, true)?;
+            // The frontend assigns the leading #soa to the surrounding source
+            // span. Standalone generated annotations must retain that modifier.
+            if self.source.node(annotation).op == "soa" && !self.source.text(annotation).trim_start().starts_with("#soa") {
+                return Ok(Code::concat([self.g("#soa", annotation), code]));
+            }
+            return Ok(code);
         }
         let default = result.default.ok_or_else(|| self.unsupported(result.field, "inferred pure result types"))?;
         let typ = self.typ(default).defaulted();
@@ -214,7 +220,7 @@ impl Lower<'_, '_> {
                 .filter_map(|result| result.annotation.or(result.default))
                 .any(|node| {
                     let typ = self.resolver.specialized_type(self.reference(node), &crate::semantics::Substitutions::new());
-                    self.pure_owns(&typ, &mut HashSet::new())
+                    self.resolver.owns_result_storage(&typ, &mut HashSet::new())
                 });
         let Some(body) = self.source.role(root.node, "body") else {
             return Ok(());
@@ -358,7 +364,7 @@ impl Lower<'_, '_> {
         let promotion = slots
             .iter()
             .zip(&names)
-            .map(|(slot, name)| format!("{slot}^={module}.clone({name},{allocator})"))
+            .map(|(slot, name)| format!("{slot}^={module}.promote({name},{allocator})"))
             .collect::<Vec<_>>()
             .join(";");
         self.body_prologues.insert(
@@ -566,33 +572,5 @@ impl Lower<'_, '_> {
         Ok(Some(Code::concat(code)))
     }
 
-    pub(super) fn pure_owns(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
-        if !seen.insert(typ.clone()) {
-            return false;
-        }
-        match typ {
-            Type::Nominal(_, base)
-            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
-            | Type::Vector { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => self.pure_owns(base, seen),
-            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
-                .resolver
-                .record_fields(typ)
-                .iter()
-                .any(|(name, typ)| name != "_" && self.pure_owns(typ, seen)),
-            Type::Union(..) => self
-                .resolver
-                .union_variants(typ)
-                .iter()
-                .any(|typ| self.pure_owns(typ, seen)),
-            Type::BigInteger
-            | Type::BigRational
-            | Type::Slice(_)
-            | Type::Dynamic(_)
-            | Type::String { .. }
-            | Type::Unknown
-            | Type::Generic => true,
-            _ => false,
-        }
-    }
+
 }

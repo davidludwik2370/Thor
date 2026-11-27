@@ -316,6 +316,7 @@ pub struct Resolver<'a> {
     logical_activation: std::cell::OnceCell<bool>,
     runtime_root: std::cell::OnceCell<std::path::PathBuf>,
     pub(crate) set_activation: std::cell::OnceCell<bool>,
+    pub(crate) callback_instances: HashSet<(Ref, Substitutions)>,
     pub(crate) pure_callback_activation: std::cell::OnceCell<bool>,
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
@@ -376,6 +377,35 @@ pub fn scope(source: &Source, id: NodeId) -> NodeId {
         .unwrap_or(NodeId(0))
 }
 impl<'a> Resolver<'a> {
+    pub(crate) fn owns_result_storage(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
+        if !seen.insert(typ.clone()) {
+            return false;
+        }
+        match typ {
+            Type::Nominal(_, base) | Type::SoaStorage(base)
+            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
+            | Type::Fixed { elem: base, .. } => self.owns_result_storage(base, seen),
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
+                .record_fields(typ)
+                .iter()
+                .any(|(name, typ)| name != "_" && self.owns_result_storage(typ, seen)),
+            Type::Union(..) => self
+                .union_variants(typ)
+                .iter()
+                .any(|typ| self.owns_result_storage(typ, seen)),
+            Type::BigInteger
+            | Type::BigRational
+            | Type::Soa(_)
+            | Type::Slice(_)
+            | Type::Dynamic(_)
+            | Type::String { .. }
+            | Type::Unknown
+            | Type::Generic => true,
+            _ => false,
+        }
+    }
+
     pub fn set_lexical_bindings(
         &mut self,
         types: BTreeMap<(Ref, String), Type>,
@@ -482,6 +512,7 @@ impl<'a> Resolver<'a> {
             logical_activation: std::cell::OnceCell::new(),
             runtime_root: std::cell::OnceCell::new(),
             set_activation: std::cell::OnceCell::new(),
+            callback_instances: HashSet::new(),
             pure_callback_activation: std::cell::OnceCell::new(),
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),

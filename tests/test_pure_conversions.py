@@ -184,12 +184,13 @@ input :> []int{n};output:=convert_values([]int,input);defer delete(output)
 output[0]=9
 if text!="number 3"||input[0]!=3||output[0]!=9{panic("captured owned conversions")}
 ''', '''
+import "core:slice"
 convert_text::proc($T:typeid,n:int)->string{
     inner::fn(value:int)->string{return T(f"number {value}")}
     return inner(n)
 }
 convert_values::proc($T:typeid,values:[]int)->[]int{
-    inner::fn(input:[]int)->[]int{return T(input)}
+    inner::fn(input:[]int)->[]int{return T(slice.clone(input))}
     return inner(values)
 }
 '''))

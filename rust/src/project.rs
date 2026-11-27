@@ -643,15 +643,16 @@ impl Project {
             crate::scoped::validate(&mut resolver)?;
             self.retain_resolver(resolver);
         }
-        let callbacks_deferred = if crate::purecallbacks::present(&self.sources) {
+        let (callbacks_deferred, callback_instances) = if crate::purecallbacks::present(&self.sources) {
             let mut resolver = self.resolver();
             resolver.prepare_contexts();
             resolver.set_evaluations(self.evaluated.clone());
             if let Some(plan)=&self.evaluation {crate::specialization::Specializations::apply_bindings(&plan.bindings,&mut resolver);}
             let deferred=crate::purecallbacks::validate(&mut resolver,false)?;
+            let instances = std::mem::take(&mut resolver.callback_instances);
             self.retain_resolver(resolver);
-            deferred
-        } else {false};
+            (deferred, instances)
+        } else {(false, Default::default())};
         self.schedule_evaluations()?;
         self.check_no_alloc()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root,self.options.native_policy_probe
@@ -667,6 +668,7 @@ impl Project {
         if self.evaluation.is_none() && crate::unused_attributes::present(&self.sources) {
             crate::unused_attributes::validate(&mut resolver, true)?;
         }
+        resolver.callback_instances = callback_instances;
         if callbacks_deferred || !self.evaluated.is_empty() {crate::purecallbacks::validate(&mut resolver,true)?;}
         crate::lower::prime_logical_constants(&mut resolver);
         resolver.begin_symbol_queries();
@@ -789,6 +791,16 @@ impl Project {
                 }).collect::<Vec<_>>());
                 return Err(error);
             }
+        }
+        if let Some((&site, &seed)) = privileges.borrowed_results.iter().next() {
+            let source = &self.sources[site.file];
+            let origin = &self.sources[seed.file];
+            let span = origin.node(seed.node).span;
+            let (line, column) = origin.position(span.start);
+            let mut error = Error::at(source, source.node(site.node).span,
+                "This fn cannot return borrowed storage. Explicitly clone the view or return an independently allocated result.");
+            error.diagnostics[0]["related"] = json!([{"pos":{"file":origin.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},"msgs":["The returned value refers to this storage."]}]);
+            return Err(error);
         }
         if let Some((site, _)) = privileges.unresolved.iter().next() {
             let source = &self.sources[site.file];

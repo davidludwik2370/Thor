@@ -600,7 +600,7 @@ impl Evaluator<'_, '_, '_> {
             let value = self.flow(base_node, env);
             let typ = self.resolver.type_of(base_node);
             return match base(&typ) {
-                Type::Slice(_) | Type::Dynamic(_) | Type::String { .. } | Type::Map { .. } => {
+                Type::Slice(_) | Type::Soa(_) | Type::Dynamic(_) | Type::String { .. } | Type::Map { .. } => {
                     self.arena.values[value].borrowed.clone()
                 }
                 Type::Pointer(_) => {

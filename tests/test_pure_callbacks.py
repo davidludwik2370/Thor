@@ -71,7 +71,8 @@ ordinary::proc(x:int)->int{return x}
         text='''package main
 import "core:fmt"
 Copy::fn([]int)->[]int
-copy_values::fn(values:[]int)->[]int{return values}
+import "core:slice"
+copy_values::fn(values:[]int)->[]int{return slice.clone(values)}
 apply::fn(values:[]int,cb:Copy)->[]int{return cb(values)}
 main::proc(){values:=[2,3];cb:Copy=copy_values;result:=apply(values[:],cb);defer delete(result);result[0]=7;if values[0]!=2{panic("aliased")};fmt.println(result)}
 '''
@@ -289,7 +290,7 @@ import "thor:pure"
 F::fn(int)->int
 Box::struct{callback:F,values:[]int}
 square::fn(x:int)->int{return x*x}
-create::fn(n:int)->Box{return {square,[]int{n,n+1}}}
+create::fn(n:int)->Box{return {square,pure.clone([]int{n,n+1})}}
 main::proc(){n:=3;box:=create(n);defer pure.destroy(box);box.values[0]=7;fmt.println(box.callback(8),box.values)}
 '''
         for flags in [['-debug'],[*UNCHECKED,'--track-allocations=basic']]:

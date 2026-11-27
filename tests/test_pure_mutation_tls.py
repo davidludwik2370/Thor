@@ -10,6 +10,23 @@ class PureMutationTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_borrowed_soa_return_recovers_after_explicit_clone(self):
+        source = '''package main
+import "thor:pure"
+Row :: struct { x, y: int }
+Rows :: #soa[]Row
+copy_rows :: fn(rows: Rows) -> Rows { rows }
+main :: proc() {}
+'''
+        client, main = self.open(source)
+        errors = client.diagnostic(main.as_uri(), contains='cannot return borrowed storage')
+        self.assertEqual(errors[0]['range']['start'], self.position(source, 'Rows { rows }', 0))
+        fixed = source.replace('{ rows }', '{ pure.clone(rows) }')
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2},
+                                               'contentChanges': [{'text': fixed}]})
+        client.diagnostic(main.as_uri(), empty=True)
+
     def test_sdk_reverse_recovers_between_local_and_borrowed_storage(self):
         text='''// 😀 native generic branch and source coordinates
 package main

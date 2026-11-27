@@ -51,7 +51,7 @@ class RustCheckedCallTests(unittest.TestCase):
 for flag in [false,true]{text:=work(flag);if text!=(flag ? "yes" : "no"){panic("checked do return")};delete(text)}
 text:=leaf(true);defer delete(text);if text!="yes"{panic("ordinary do return")}
 ''','''
-leaf::proc(flag:bool)->string{if flag do return f"yes";return "no"}
+leaf::proc(flag:bool)->string{if flag do return f"yes";return f"no"}
 work::fn(flag:bool)->string{return leaf(flag)}
 '''))
 
@@ -182,7 +182,7 @@ work::fn(n:int)->int{
         self.tracked(self.program('''n:=3
 text:=work(n);defer delete(text)
 if scalar(n)!=3||text!="ignored"{panic("ignored parameters")}
-''','''helper::proc(_:int)->string{return "ignored"}
+''','''helper::proc(_:int)->string{return f"ignored"}
 scalar::fn(_:int)->int{return 3}
 work::fn(_:int)->string{return helper(3)}
 '''))
@@ -198,7 +198,7 @@ work::fn(n:int)->[]int{values:[]int;fill(&values,n);return values}
         self.tracked(self.program('''n:=3;text:=work(n);defer delete(text)
 if text!="helper"{panic("procedure names")}
 ''','''name_length::proc()->int{return len(#procedure)}
-work::fn(n:int)->string{helper::proc()->string{return #procedure};_=n;if name_length()!=11{panic("scalar name")};return helper()}
+work::fn(n:int)->string{helper::proc()->string{original:=#procedure;return f"{original}"};_=n;if name_length()!=11{panic("scalar name")};return helper()}
 '''))
 
     def test_contextless_scalar_calls_remain_eligible(self):

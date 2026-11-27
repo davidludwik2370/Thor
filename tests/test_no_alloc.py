@@ -147,10 +147,10 @@ choose::proc{number,text}
 
     def test_fn_scalar_results_and_owned_results(self):
         self.check('_=twice(7)',declarations='twice::fn(x:int)->int{return x*2}')
-        self.check('values:=[1,2];_=view(values[:])',declarations='view::fn(values:[]int)->[]int{return values}',fail='ownership promotion may allocate')
-        self.check('_=#runtime text()',declarations='text::fn()->string{return "hello"}',fail='ownership promotion may allocate')
+        self.check('values:=[1,2];_=view(values[:])',declarations='view::fn(values:[]int)->[]int{return make([]int,len(values))}',fail='ownership promotion may allocate')
+        self.check('_=#runtime text()',declarations='text::fn()->string{return f"hello"}',fail='ownership promotion may allocate')
         self.check('a:=[1];b:=[2];values:=soa_zip(a=a[:],b=b[:]);_=#runtime identity(values)',
-                   declarations='identity::fn(value:$T)->T{return value}',fail='ownership promotion may allocate')
+                   declarations='import "thor:pure"\nidentity::fn(value:$T)->T{return pure.clone(value)}',fail='ownership promotion may allocate')
 
     def test_scalar_run_and_type_queries_do_not_reject_compiler_work(self):
         self.check('value:=#run work();_=value;_=size_of(make([]int,1))',declarations='''
@@ -159,9 +159,9 @@ work::fn()->int{values:=make([]int,2);values[0]=7;return values[0]}
         self.check('value:=#runtime work();_=value',declarations='work::fn()->int{values:=make([]int,2);return len(values)}',fail="builtin 'make'")
 
     def test_run_owned_result_materialization(self):
-        self.check('values:=#run work();_=values',declarations='work::fn()->[]int{return []int{1,2}}',fail='materializing this compile-time result may allocate')
-        self.check('value:=#run work();_=value',declarations='work::fn()->string{return "hello"}',fail='materializing this compile-time result may allocate')
-        self.check('TEXT::#run work();_=TEXT',declarations='work::fn()->string{return "hello"}')
+        self.check('values:=#run work();_=values',declarations='work::fn()->[]int{return make([]int,2)}',fail='materializing this compile-time result may allocate')
+        self.check('value:=#run work();_=value',declarations='work::fn()->string{return f"hello"}',fail='materializing this compile-time result may allocate')
+        self.check('TEXT::#run work();_=TEXT',declarations='work::fn()->string{return f"hello"}')
 
     def test_file_policy_procedures_initializers_and_other_files(self):
         self.compare('''#+vet no_alloc
@@ -274,8 +274,9 @@ write::proc(values:'''+typ+'){'+body+'}',fail='map writes may grow storage')
 
     def test_fn_aggregate_ownership_and_big_number_storage(self):
         self.check('value:Holder;_=wrap(value)',declarations='''
+import "thor:pure"
 Holder::struct{values:[]int}
-wrap::fn(value:Holder)->Holder{return value}
+wrap::fn(value:Holder)->Holder{return pure.clone(value)}
 ''',fail='ownership promotion may allocate')
         self.check('value:Integer;value+=1;_=value',declarations='import * "thor:basic"',fail='Integer/Rational')
 

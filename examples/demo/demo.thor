@@ -1246,8 +1246,8 @@ Travel_Log :: struct {
 
 build_log :: fn(label: string, start: int) -> Travel_Log {
     labels := make([]string, 2)
-    labels[0] = label
-    labels[1] = label
+    labels[0] = pure.clone(label)
+    labels[1] = pure.clone(label)
 
     lengths := make([]int, 3)
     for i in 0..<len(lengths) {
@@ -1262,9 +1262,9 @@ build_log :: fn(label: string, start: int) -> Travel_Log {
 }
 
 finish_after_defers :: fn() -> []int {
-    values := [10, 20, 30]
+    values := pure.clone([]int{10, 20, 30})
     defer values[1] = 99
-    return values[:]
+    return values
 }
 
 Empty :: struct {}

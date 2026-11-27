@@ -122,7 +122,7 @@ main::proc(){values:=[]int{7};view:=#runtime identity(values);view[0]=9}
     def test_metadata_inside_run_uses_each_original_expression(self):
         self.checked_and_unchecked('''package main
 import "core:fmt"
-capture::fn(value:int,expression:>#caller_expression(value))->string{return expression}
+capture::fn(value:int,expression:>#caller_expression(value))->string{return f"{expression}"}
 X::7
 Y::7
 A::#run capture(X)

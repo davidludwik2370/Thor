@@ -361,7 +361,12 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         self.pure_local_busy.insert(id);
-        let typ = self.render(id, expected, constant);
+        // #soa belongs to the enclosing source span. Validate its logical
+        // element in place so the directive still precedes an array type.
+        let checked = if self.source.node(id).op == "soa" {
+            self.source.role(id, "elem").unwrap_or(id)
+        } else { id };
+        let typ = self.render(checked, expected, constant);
         self.pure_local_busy.remove(&id);
         let typ = typ?;
         let name = format!("{}pure_local_type", self.prefix);
@@ -378,11 +383,15 @@ impl Lower<'_, '_> {
             .unwrap_or(id);
         let token = self.pure_type_site(id, proc, "local storage type");
         let type_of = self.native("type_of");
-        Ok(Some(Code::concat([
+        let wrapped = Code::concat([
             self.g(format!("{type_of}({name}("), id),
             typ,
             self.g(format!(",{token}))"), id),
-        ])))
+        ]);
+        if checked != id {
+            return self.splice(id, vec![(self.source.node(checked).span, wrapped)], vec![]).map(Some);
+        }
+        Ok(Some(wrapped))
     }
     pub(super) fn pure_conversion(
         &mut self,

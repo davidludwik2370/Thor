@@ -1,6 +1,8 @@
 """Static logical constants keep read-only backing and independent runtime copies."""
+import os
 import unittest
 from tests import test_rust_big_lowering as runtime
+from tests.test_rust_compiler import UNCHECKED
 
 
 class RustBigSourceConstantTests(unittest.TestCase):
@@ -63,6 +65,58 @@ delete(copy);delete(text)
             body+=f'if UNARY_{index}!=({expression}){{panic("constant unary")}}\n'
         body+='delete(a);delete(b)\n'
         self.tracked(self.numeric(body,prefix))
+
+    def test_literal_budget_applies_before_expansion_and_across_cache_hits(self):
+        # Reuse the same cache while changing only the configured limit.
+        source = self.numeric('expect(VALUE, "1/1000")',
+                              'VALUE :: Rational(10.000e-4)\n')
+        self.source.write_text(source)
+        for limit, accepted in [('4', True), ('3', False), ('6', True)]:
+            with self.subTest(limit=limit):
+                result = self.invoke('rust', env={**os.environ, 'THOR_MAX_LITERAL_DIGITS': limit})
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                if not accepted:
+                    self.assertIn('requires 4 digits', result.stderr)
+
+        self.source.write_text(self.numeric(
+            'x := #run make_value(); defer delete(x); expect(x, "1234")',
+            'make_value :: fn() -> Integer { Integer(1234) }\n'))
+        for limit, accepted in [('4', True), ('3', False), ('4', True)]:
+            with self.subTest(comptime_limit=limit):
+                result = self.invoke('rust', env={**os.environ, 'THOR_MAX_LITERAL_DIGITS': limit})
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                if not accepted:
+                    self.assertIn('requires 4 digits', result.stderr)
+
+        self.source.write_text(self.program('_=TINY', 'TINY :: Rational(1e-100000000)\n'))
+        result = self.invoke('rust', 'check', env={k:v for k,v in os.environ.items() if k != 'THOR_MAX_LITERAL_DIGITS'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('requires 100000001 digits', result.stderr)
+        self.assertIn('limit is 16000000', result.stderr)
+
+    def test_literal_budget_runtime_generic_and_radix_boundaries(self):
+        env = {**os.environ, 'THOR_MAX_LITERAL_DIGITS': '3'}
+        for expr, prefix in [
+                ('Integer(0x01_234)', ''), ('Rational(1e-3)', ''),
+                ('Rational(1, 1000)', ''), ('Integer(1e3, allocator=context.allocator)', ''),
+                ('number(Integer)', 'number :: proc($T: typeid) -> T { return 1234 }\n')]:
+            with self.subTest(expr=expr):
+                self.source.write_text(self.program('x := '+expr+'; delete(x)', prefix))
+                result = self.invoke('rust', 'check', env=env)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('requires 4 digits', result.stderr)
+
+        self.source.write_text(self.program('if number(int) != 1234 || ZERO != 0 || VALUE != 255 {panic("value")}',
+            'number :: proc($T: typeid) -> T { return 1234 }\n'
+            'ZERO :: Rational(0e-100000000)\nVALUE :: Integer(0x000_ff)\n'))
+        for flags in ([], ['-disable-assert'], UNCHECKED):
+            with self.subTest(flags=flags):
+                result = self.invoke('rust', flags=flags, env=env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+        self.source.write_text(self.program('_=I', 'I :: Integer(1)\n'))
+        result = self.invoke('rust', 'check', env={**env, 'THOR_MAX_LITERAL_DIGITS':'0'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('THOR_MAX_LITERAL_DIGITS must be a positive whole number', result.stderr)
 
     def test_power_budget_checks_both_rational_components(self):
         for expression in ('Rational(1,256)**16777216', 'Rational(-256,3)**-16777216',
@@ -144,6 +198,6 @@ delete(copy);delete(ratio)
     def test_selected_constant_types_are_ready_before_native_execution_scheduling(self):
         files={'library/main.thor':'package library\nCHOICE::#switch{case false:0;case:Integer(123)}\n'}
         self.tracked(self.numeric('''copy:=#run identity(library.CHOICE);copy+=1;expect(copy,"124");delete(copy)
-''','import "library"\nidentity::fn(value:Integer)->Integer{return value}\n'),files=files)
+''','import "library"\nidentity::fn(value:Integer)->Integer{return Integer(value)}\n'),files=files)
 
 if __name__=='__main__':unittest.main()

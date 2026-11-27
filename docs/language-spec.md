@@ -780,14 +780,16 @@ Allocation and results:
   function exit after any returned contents have been preserved.
 - Intended result support includes scalar values, strings, slices, dynamic arrays, and supported
   aggregates. No raw pointers, resources, cyclic graphs, or arbitrary alias graphs.
-- String/slice/dynamic-array results have value semantics and independent backing storage;
-  returning an input view produces an independent result, not an escaping alias.
-- Runtime allocation-bearing results are copied out into caller-owned storage
-  using the saved caller allocator before scratch storage is released. For nested
-  fn calls, the receiving function's scratch allocator may be that caller allocator.
-- Apply copying recursively to supported allocation-bearing aggregate members.
-  The support library must document cleanup of such results; shallow delete of
-  an outer container alone must not be presented as recursive destruction.
+- Allocated fn results require explicit allocation or cloning, including each
+  nested reference. Reject borrowed input storage, nonempty static literals and
+  views into local storage. Permit forwarding a proven owned helper result.
+- Transfer whole owned buffers to the caller after user defers. Copies needed
+  to separate repeated owned aliases preserve independent tree ownership.
+  Shallow deletion of an outer container cannot release nested owned contents.
+- Permit fixed SOA and SOA slice inputs with supported logical row fields.
+  Protect borrowed columns and row projections. Dynamic SOAs can be passed
+  as slice views. Support fixed, slice and dynamic SOA results at runtime and
+  in native compile-time evaluation.
 - Preserve dynamic-array length, capacity, nil backing and supported elements.
   Rebind promoted headers to the caller allocator. Dynamic-array-containing
   compile-time results require runtime storage (:=), just like slice results.

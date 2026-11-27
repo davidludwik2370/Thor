@@ -178,7 +178,7 @@ strings :> []string{#run text(), text()}
 defer delete(strings[0])
 defer delete(strings[1])
 if strings[0]!="hello" || strings[1]!="hello" {panic("owned strings")}
-''', 'text :: fn()->string {return "hello"}\n'), static=0)
+''', 'text :: fn()->string {return f"hello"}\n'), static=0)
 
     def test_branches_loops_and_generic_runtime_inputs(self):
         self.run_both(self.program('''

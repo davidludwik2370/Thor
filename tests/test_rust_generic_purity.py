@@ -28,7 +28,7 @@ square::fn(value:$T)->T{return value*value}
         self.tracked(self.program('''values :> []int{3}
 copy:=same(values);defer delete(copy);copy[0]=9
 if values[0]!=3||copy[0]!=9{panic("generic slice ownership")}
-''','same::fn(value:$T)->T{return value}\n'))
+''','import "thor:pure"\nsame::fn(value:$T)->T{return pure.clone(value)}\n'))
 
     def test_generic_records_keep_private_local_type_identity_and_nested_ownership(self):
         self.tracked(self.program('''Row::struct{values:[]int,text:string}
@@ -37,7 +37,7 @@ copy:=same(original);defer pure.destroy(copy)
 copy.values[0]=9
 if original.values[0]!=3||copy.text!="hello"{panic("generic record ownership")}
 ''','''import "thor:pure"
-same::fn(value:$T)->T{return value}
+same::fn(value:$T)->T{return pure.clone(value)}
 '''))
 
     def test_generic_array_dimensions_keep_inline_copy_mutation(self):
@@ -50,7 +50,7 @@ twice::fn(value:[$N]int)->[N]int{copy:=value;for &item in copy{item*=2};return c
 copy[0][0]=9
 if values[0]!=3||copy[0][0]!=9{panic("generic builder ownership")}
 ''','''import "thor:pure"
-wrap::fn(value:$T)->[]T{out:=make([]T,1);out[0]=value;return out}
+wrap::fn(value:$T)->[]T{out:=make([]T,1);out[0]=pure.clone(value);return out}
 '''))
 
     def test_generic_public_values_still_reject_unsupported_instantiations(self):
@@ -71,7 +71,7 @@ wrap::fn(value:$T)->[]T{out:=make([]T,1);out[0]=value;return out}
         self.source.write_text(self.program('''values:=[3,4]
 callback:proc([]int)->[]int=work
 _=work(values);_=callback(values[:])
-''','work::fn(value:$T)->T{copy:=value;copy[0]+=1;return copy}\n'))
+''','import "thor:pure"\nwork::fn(value:$T)->T{copy:=value;copy[0]+=1;return pure.clone(copy)}\n'))
         if native.reference_enabled():
             reference=self.invoke('python',command='check')
         if native.reference_enabled():

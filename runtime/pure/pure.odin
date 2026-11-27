@@ -135,6 +135,14 @@ scratch_destroy :: #force_inline proc(s:^Scratch) {
     s^={}
 }
 
+// Only queried via type_of. The marker length distinguishes a normal
+// record from fixed, sliced and dynamic SOA; its element is the logical row.
+soa_shape :: proc{soa_fixed_shape,soa_slice_shape,soa_dynamic_shape,ordinary_shape}
+soa_fixed_shape :: proc "contextless"($T:typeid/#soa[$N]$E)->[1]E {return {}}
+soa_slice_shape :: proc "contextless"($T:typeid/#soa[]$E)->[2]E {return {}}
+soa_dynamic_shape :: proc "contextless"($T:typeid/#soa[dynamic]$E)->[3]E {return {}}
+ordinary_shape :: proc "contextless"($T:typeid)->[0]bool {return {}}
+
 validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Site:string) {
     when Depth>24 {#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}
     else when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {}
@@ -204,6 +212,30 @@ clone :: proc(value:$T,allocator:=context.allocator)->T {
     }
 }
 
+// Scratch allocates payloads through its backing allocator. Releasing the
+// tracking entry transfers an entire allocation without moving its bytes.
+take_result_storage :: proc(s:^Scratch, pointer:rawptr, bytes:int, allocator:runtime.Allocator)->bool {
+    if s==nil || s.backing!=allocator || pointer==nil {return false}
+    if s.gate!=nil {scratch_lock(s.gate)}
+    defer {if s.gate!=nil {scratch_unlock(s.gate)}}
+    entry,ok:=s.allocations[pointer]
+    if !ok || entry.size!=bytes {return false}
+    delete_key(&s.allocations,pointer)
+    return true
+}
+
+promote :: proc(value:$T, allocator:runtime.Allocator)->T {
+    when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {
+        return value
+    } else {
+        result:=value
+        ptr:=any(&result)
+        info:=runtime.type_info_base(type_info_of(ptr.id)).variant.(typeinfo.Type_Info_Pointer)
+        clone_at((cast(^rawptr)ptr.data)^,any(value).data,info.elem,allocator,0,scratch_parent(context.allocator))
+        return transmute(T)result
+    }
+}
+
 allocate_slice :: proc($T:typeid/[]$E,count:int,nonnull:bool=true)->T {
     assert(count>=0&&(size_of(E)==0||count<=max(int)/max(1,size_of(E))),"Pure result allocation size overflow")
     if !nonnull {
@@ -245,19 +277,39 @@ clone_fields :: proc(dst:any,src:any,allocator:runtime.Allocator,depth:int) {
 
 offset :: proc "contextless"(pointer:rawptr,amount:int)->rawptr {return rawptr(uintptr(pointer)+uintptr(amount))}
 
-clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int) {
+// Moving a scalar column or slice already in its final allocation is O(1).
+clone_elements :: proc(dst,src:rawptr,elem:^runtime.Type_Info,count:int,allocator:runtime.Allocator,depth:int,scratch:^Scratch) {
+    if count==0 || elem.size==0 {return}
+    #partial switch _ in runtime.type_info_base(elem).variant {
+    case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,typeinfo.Type_Info_Procedure:
+        if dst!=src {runtime.mem_copy_non_overlapping(dst,src,count*elem.size)}
+        return
+    }
+    for i in 0..<count {
+        clone_at(offset(dst,i*elem.size),offset(src,i*elem.size),elem,allocator,depth,scratch)
+    }
+}
+
+clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int,scratch:^Scratch=nil) {
     if depth>24 {panic("Pure result nesting limit exceeded")}
-    for item in compiler_logical_values {if item.id==info.id && item.clone!=nil {item.clone(dst,src,allocator);return}}
+    for item in compiler_logical_values {
+        if item.id==info.id && item.clone!=nil {
+            if scratch!=nil {item.promote(dst,src,allocator,scratch)} else {item.clone(dst,src,allocator)}
+            return
+        }
+    }
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
          typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,typeinfo.Type_Info_Procedure:
-        runtime.mem_copy_non_overlapping(dst,src,info.size)
+        if dst!=src {runtime.mem_copy_non_overlapping(dst,src,info.size)}
     case typeinfo.Type_Info_String:
         if item.is_cstring||item.encoding!=.UTF_8 {panic("Unsupported pure string result")}
         value:=(cast(^string)src)^
         result:string
-        if len(value)>0 {
+        if take_result_storage(scratch,raw_data(value),len(value),allocator) {result=value}
+        else if len(value)>0 {
             data,err:=runtime.mem_alloc_bytes(len(value),1,allocator)
             if err!=.None||len(data)<len(value)||raw_data(data)==nil {panic("Pure result allocation failed")}
             runtime.mem_copy_non_overlapping(raw_data(data),raw_data(value),len(value))
@@ -270,35 +322,85 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
         if value.data==nil&&value.len!=0&&item.elem_size!=0 {panic("Invalid pure slice result")}
         if value.data!=nil {
             if value.len<0||value.len>max(int)/max(1,item.elem_size) {panic("Pure result allocation size overflow")}
-            data,err:=runtime.mem_alloc_bytes(max(1,value.len*item.elem_size),item.elem.align,allocator)
-            if err!=.None||raw_data(data)==nil {panic("Pure result allocation failed")}
-            result={raw_data(data),value.len}
-            for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
+            if take_result_storage(scratch,value.data,value.len*item.elem_size,allocator) {result=value}
+            else {
+                data,err:=runtime.mem_alloc_bytes(max(1,value.len*item.elem_size),item.elem.align,allocator)
+                if err!=.None||raw_data(data)==nil {panic("Pure result allocation failed")}
+                result={raw_data(data),value.len}
+            }
+            clone_elements(result.data,value.data,item.elem,value.len,allocator,depth+1,scratch)
         }
         (cast(^runtime.Raw_Slice)dst)^=result
     case typeinfo.Type_Info_Dynamic_Array:
         value:=(cast(^runtime.Raw_Dynamic_Array)src)^
-        result:=allocate_dynamic_storage(value.len,value.cap,item.elem_size,item.elem.align,value.data!=nil,allocator)
+        result:=value
+        if value.allocator==context.allocator && take_result_storage(scratch,value.data,value.cap*item.elem_size,allocator) {
+            result.allocator=allocator
+        } else {result=allocate_dynamic_storage(value.len,value.cap,item.elem_size,item.elem.align,value.data!=nil,allocator)}
         if value.data!=nil {
-            for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
+            clone_elements(result.data,value.data,item.elem,value.len,allocator,depth+1,scratch)
         }
         (cast(^runtime.Raw_Dynamic_Array)dst)^=result
     case typeinfo.Type_Info_Array:
-        for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
+        clone_elements(dst,src,item.elem,item.count,allocator,depth+1,scratch)
     case typeinfo.Type_Info_Enumerated_Array:
-        for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
+        clone_elements(dst,src,item.elem,item.count,allocator,depth+1,scratch)
     case typeinfo.Type_Info_Struct:
+        if item.soa_kind==.Slice || item.soa_kind==.Dynamic {
+            clone_soa(dst,src,info,item,allocator,depth,scratch)
+            return
+        }
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {
             if item.names[i]=="_" {continue}
-            clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)
+            clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1,scratch)
         }
     case typeinfo.Type_Info_Union:
-        runtime.mem_copy_non_overlapping(dst,src,info.size)
+        if dst!=src {runtime.mem_copy_non_overlapping(dst,src,info.size)}
         variant:=union_variant(src,item)
-        if variant!=nil {clone_at(dst,src,variant,allocator,depth+1)}
+        if variant!=nil {clone_at(dst,src,variant,allocator,depth+1,scratch)}
     case:panic("Unsupported pure result type")
     }
+}
+
+// Allocate all columns as a single block, using the native SOA alignment
+// between columns. Dynamic headers retain capacity and the caller allocator.
+clone_soa :: proc(dst,src:rawptr,info:^runtime.Type_Info,s:typeinfo.Type_Info_Struct,
+                  allocator:runtime.Allocator,depth:int,scratch:^Scratch) {
+    columns:=typeinfo.soa_columns(s)
+    count:=typeinfo.soa_length(s,src)
+    capacity:=count
+    if s.soa_kind==.Dynamic {capacity=(cast(^int)offset(src,int(s.offsets[columns+1])))^}
+    if count<0 || capacity<count {panic("Invalid pure SOA result")}
+    align:=s.soa_base_type.align
+    total:=0
+    for col in 0..<columns {
+        _,elem:=typeinfo.soa_column(s,src,col)
+        if capacity>(max(int)-total-(align-1))/max(1,elem.size) {panic("Pure SOA result size overflow")}
+        total=runtime.align_forward_int(total+elem.size*capacity,align)
+    }
+    block:rawptr
+    if total>0 {
+        first,_:=typeinfo.soa_column(s,src,0)
+        if take_result_storage(scratch,first,total,allocator) {block=first}
+        else {
+            bytes,err:=runtime.mem_alloc_bytes(total,align,allocator)
+            if err!=.None || raw_data(bytes)==nil {panic("Pure SOA result allocation failed")}
+            block=raw_data(bytes)
+        }
+    }
+    if dst!=src {runtime.mem_copy_non_overlapping(dst,src,info.size)}
+    pos:=0
+    for col in 0..<columns {
+        source,elem:=typeinfo.soa_column(s,src,col)
+        target:=offset(block,pos)
+        (cast(^rawptr)offset(dst,int(s.offsets[col])))^=target
+        if elem.size>0 && s.names[col]!="_" {
+            clone_elements(target,source,elem,count,allocator,depth+1,scratch)
+        }
+        pos=runtime.align_forward_int(pos+elem.size*capacity,align)
+    }
+    if s.soa_kind==.Dynamic {(cast(^runtime.Allocator)offset(dst,int(s.offsets[columns+2])))^=allocator}
 }
 
 // Call once for an independently owned fn/#run result. Ordinary assignments
@@ -331,6 +433,19 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
     case typeinfo.Type_Info_Enumerated_Array:
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
     case typeinfo.Type_Info_Struct:
+        if item.soa_kind==.Slice || item.soa_kind==.Dynamic {
+            columns:=typeinfo.soa_columns(item)
+            count:=typeinfo.soa_length(item,src)
+            backing:=allocator
+            if item.soa_kind==.Dynamic {backing=(cast(^runtime.Allocator)offset(src,int(item.offsets[columns+2])))^}
+            for col in 0..<columns {
+                data,elem:=typeinfo.soa_column(item,src,col)
+                if item.names[col]=="_" || elem.size==0 {continue}
+                for i in 0..<count {destroy_at(offset(data,i*elem.size),elem,backing,depth+1)}
+            }
+            if columns>0 {pointer,_:=typeinfo.soa_column(item,src,0); if pointer!=nil {runtime.mem_free(pointer,backing)}}
+            return
+        }
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {
             if item.names[i]=="_" {continue}
@@ -368,6 +483,7 @@ Compiler_Logical_Value :: struct {
     id:typeid,
     clone:proc(dst,src:rawptr,allocator:runtime.Allocator),
     destroy:proc(src:rawptr),
+    promote:proc(dst,src:rawptr,allocator:runtime.Allocator,scratch:^Scratch),
 }
 @(private="package") compiler_logical_values:[2]Compiler_Logical_Value
 compiler_register_logical :: proc "contextless"(index:int,value:Compiler_Logical_Value) {

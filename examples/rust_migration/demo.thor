@@ -4,6 +4,7 @@ package main
 import "core:fmt" / println
 import "base:intrinsics"
 import "core:slice"
+import "thor:pure"
 import "core:time"
 
 SEPARATOR :: "-" * 16
@@ -17,7 +18,7 @@ snapshot :: fn(input: []int) -> Snapshot {
     return {values, f"stored {len(input)} values"}
 }
 
-independent :: fn(value: $T) -> T { return value }
+independent :: fn(value: $T) -> T { return pure.clone(value) }
 explicit :: fn($T: typeid, value: T) -> T { return value }
 captured :: proc($T: typeid, value: int) -> int {
     calculate :: fn(n: int) -> int {

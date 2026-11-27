@@ -344,7 +344,7 @@ main::proc(){values~:=make([]int,2);fmt.println(len(values))}
     def test_allocated_run_results_fstrings_and_optional_construction(self):
         self.checked('''package main
 import "core:mem"
-create::fn()->[]int{return []int{1,2,3}}
+create::fn()->[]int{a:=make([]int,3);a[0]=1;a[1]=2;a[2]=3;return a}
 main::proc(){
  backing:=context.allocator
  tracker:mem.Tracking_Allocator
@@ -442,7 +442,7 @@ main::proc(){p~:=new(int,loc=#location());p^=7;if p^!=7{panic("value")}}
         self.checked('''package main
 import "core:mem"
 import "core:strings"
-word::fn()->string{return "hello"}
+word::fn()->string{return f"hello"}
 pick::proc(a:mem.Allocator)->mem.Allocator{return a}
 construct::proc(allocator:mem.Allocator,expression:>#caller_expression(allocator))->string{
  if expression!="pick(allocator)" {panic("caller expression changed")}

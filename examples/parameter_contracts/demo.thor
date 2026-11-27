@@ -15,7 +15,7 @@ describe :: proc(value: int,
 // Explicit callback types preserve automatic metadata and its capture target.
 Capture :: #type proc(value: int, expression :> #caller_expression(value)) -> string
 capture :: fn(value: int, expression :> #caller_expression(value)) -> string {
-    return expression
+    return f"{expression}"
 }
 
 read_sum :: proc(#ro values: []int) -> int {
@@ -45,7 +45,8 @@ main :: proc() {
     alias(number+1)
 
     callback: Capture = capture
-    fmt.println(callback(number*2))
+    captured ~:= callback(number*2)
+    fmt.println(captured)
     fmt.println("Compile-time capture:", CAPTURED)
 
     // Thor leaves this execution to runtime. Odin can still optimize the code.

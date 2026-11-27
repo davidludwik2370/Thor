@@ -75,15 +75,16 @@ selected,ok:=union_value.([dynamic]string)
 if !ok||selected[0]!="hello"||cap(selected)!=13{panic("union contents")}
 ''','''
 import pure "thor:pure"
+import "core:slice"
 INPUT::[]int{1,2}
 Record::struct{rows:[dynamic][]int,text:[dynamic]string}
 nested::fn(input:[]int)->Record{
-    rows:[dynamic][]int;append(&rows,input,input)
-    text:[dynamic]string;append(&text,"hello")
+    rows:[dynamic][]int;owned:=slice.clone(input);append(&rows,owned,owned)
+    text:[dynamic]string;append(&text,f!"hello")
     return {rows,text}
 }
 Choice::union{int,[dynamic]string}
-union_result::fn()->Choice{v:=make([dynamic]string,1,13);v[0]="hello";return v}
+union_result::fn()->Choice{v:=make([dynamic]string,1,13);v[0]=f"hello";return v}
 '''),flags=['-debug'])
 
     def test_helpers_deferred_named_multi_returns_and_pure_consumer(self):
@@ -152,7 +153,7 @@ for i in 0..<3{
     def test_borrowed_elements_in_local_dynamic_helpers_stay_readonly(self):
         self.invoke(self.program('source:=[1,2];_=bad(source[:])','''
 change::proc(out:^[dynamic][]int){out^[0][0]=9}
-bad::fn(input:[]int)->[dynamic][]int{out:[dynamic][]int;append(&out,input);change(&out);return out}
+bad::fn(input:[]int)->[dynamic][]int{out:[dynamic][]int;append(&out,input);change(&out);return nil}
 '''),command='check',fail='borrowed from an input')
 
     def test_dynamic_big_number_elements_keep_recursive_ownership(self):

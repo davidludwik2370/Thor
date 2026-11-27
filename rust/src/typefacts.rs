@@ -873,7 +873,7 @@ impl Resolver<'_> {
             _ => Type::Unknown,
         }
     }
-    fn selected_compile_switch_value(&mut self, r: Ref, bindings: &Substitutions) -> Option<Ref> {
+    pub(crate) fn selected_compile_switch_value(&mut self, r: Ref, bindings: &Substitutions) -> Option<Ref> {
         let source = &self.sources[r.file];
         let cases = source.node(r.node).data["cases"].as_array()?;
         let reference = |span: &serde_json::Value| {

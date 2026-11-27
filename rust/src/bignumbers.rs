@@ -107,6 +107,7 @@ impl Lower<'_, '_> {
         id: NodeId,
         typ: &Type,
         constant: bool,
+        constructor_args: &[NodeId],
     ) -> Result<Option<Code>> {
         let Some(text) = self.big_literal(id) else {
             return Ok(None);
@@ -117,14 +118,13 @@ impl Lower<'_, '_> {
                 "This Integer/Rational literal is not a valid exact compile-time number.",
             )));
         }
-        if matches!(typ, Type::BigInteger)
-            && crate::bigvalues::literal(&text)
-                .is_ok_and(|number| number.denominator() != &num_bigint::BigInt::from(1))
-        {
-            return Ok(Some(self.error_token(
-                id,
-                "An Integer literal must represent a whole number exactly.",
-            )));
+        if let Ok(value) = crate::bigvalues::parse_literal(&text) {
+            if let Err(message) = value.check_size() {
+                return Ok(Some(self.error_token(id, &message)));
+            }
+            if matches!(typ, Type::BigInteger) && !value.is_whole() {
+                return Ok(Some(self.error_token(id, "An Integer literal must represent a whole number exactly.")));
+            }
         }
         let method = if matches!(typ, Type::BigInteger) {
             "literal_integer"
@@ -132,9 +132,14 @@ impl Lower<'_, '_> {
             "literal_rational"
         };
         let module = self.big_module();
-        Ok(Some(
-            self.g(format!("{module}.{method}({})", json!(text)), id),
-        ))
+        let mut code = vec![self.g(format!("{module}.{method}({}", json!(text)), id)];
+        for &arg in constructor_args {
+            if self.source.role(arg, "field").is_some_and(|field| matches!(self.source.text(field), "allocator" | "loc")) {
+                code.extend([self.g(",", id), self.render(arg, None, false)?]);
+            }
+        }
+        code.push(self.g(")", id));
+        Ok(Some(Code::concat(code)))
     }
     fn big_generic_literal(
         &mut self,
@@ -149,8 +154,13 @@ impl Lower<'_, '_> {
             return Ok(None);
         };
         let module = self.big_module();
+        let limit_error = crate::bigvalues::parse_literal(&text).ok()
+            .and_then(|value| value.check_size().err());
         let (name,mut args)=self.closed(id,"big_literal",Some(""),|this|{
             let target=format!("{}Result",this.prefix);
+            if let Some(message) = limit_error {
+                return Ok(this.g(format!("when {target}=={module}.Integer || {target}=={module}.Rational {{#panic({})}} else {{value:{target}={text};return value}}",json!(message)),id));
+            }
             Ok(this.g(format!("when {target}=={module}.Integer {{return {module}.literal_integer({})}} else when {target}=={module}.Rational {{return {module}.literal_rational({})}} else {{value:{target}={text};return value}}",json!(text),json!(text)),id))
         })?;
         args.push(hint.code);
@@ -216,29 +226,7 @@ impl Lower<'_, '_> {
             }
         }
         if values.len() == 1 && self.big_literal(values[0]).is_some() {
-            let literal = self.big_render_literal(values[0], &typ, false)?.unwrap();
-            if names
-                .iter()
-                .any(|name| matches!(*name, "allocator" | "loc"))
-            {
-                // Preserve the selected literal's diagnostics while adding the
-                // explicit native allocator/location arguments.
-                let mut text = literal.finish().text;
-                text.pop();
-                let mut code = vec![self.g(text, id)];
-                for arg in args
-                    .iter()
-                    .filter(|arg| self.source.node(**arg).kind == "FieldValue")
-                {
-                    let field = self.role(*arg, "field")?;
-                    if matches!(self.source.text(field), "allocator" | "loc") {
-                        code.extend([self.g(",", id), self.render(*arg, None, false)?]);
-                    }
-                }
-                code.push(self.g(")", id));
-                return Ok(Code::concat(code));
-            }
-            return Ok(literal);
+            return Ok(self.big_render_literal(values[0], &typ, false, &args)?.unwrap());
         }
         if values.len() == 1 && self.resolver.untyped_operand(self.reference(values[0])) {
             let module = self.big_module();
@@ -294,7 +282,7 @@ impl Lower<'_, '_> {
             for (index, arg) in args.iter().enumerate() {
                 let value = this.source.role(*arg, "value").unwrap_or(*arg);
                 let expression = if this.big_literal(value).is_some() {
-                    this.big_render_literal(value, &Type::BigInteger, false)?
+                    this.big_render_literal(value, &Type::BigInteger, false, &[])?
                         .unwrap()
                 } else {
                     this.render(value, None, false)?
@@ -1099,8 +1087,7 @@ impl Lower<'_, '_> {
             return true;
         }
         if let Some(text) = self.big_literal(id) {
-            return crate::bigvalues::literal(&text)
-                .is_ok_and(|n| n.numerator() == &num_bigint::BigInt::from(0));
+            return crate::bigvalues::parse_literal(&text).is_ok_and(|n| n.is_zero());
         }
         let node = self.source.node(id);
         if node.kind == "Literal" && node.op == "string" {
@@ -1216,7 +1203,7 @@ impl Lower<'_, '_> {
         }
         let expected = hint.as_ref().and_then(|hint| hint.semantic.as_ref());
         if let Some(typ) = expected.filter(|typ| typ.big_name().is_some()) {
-            if let Some(code) = self.big_render_literal(id, typ, constant)? {
+            if let Some(code) = self.big_render_literal(id, typ, constant, &[])? {
                 return Ok(Some(code));
             }
         }
