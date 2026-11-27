@@ -89,3 +89,48 @@ produce `Square root: 3` and `Has prefix: true` in checked and unchecked builds.
 The example test and all three README structure checks passed (four tests,
 no skips). Results are retained locally as
 `dist/readme-reorganization-2026-11-27/native-imports.json`.
+
+## Full example review, displayed output and scoped style
+
+Reviewed every Thor/Odin pair and its prerequisites. The Odin inferred-array
+example now uses native `[?]int` length inference, the integer-power helper
+rejects negative exponents, and the parallel-map counterpart creates and deletes
+an allocated result slice. The text distinguishes matching runtime behavior from
+Thor-only purity and vet guarantees, and clarifies container cycles versus
+address-only pointer hashing.
+
+The introduction-order review checked imports and immutable bindings before
+read-only parameters and caller metadata, arrays/membership before their later
+expression uses, switch values before implicit switch returns, and `fn` before
+callback types and compile-time execution. Key definitions now precede their
+examples, including the distinction between `:>` and native `::`, contextual
+struct literals, scoped operators and explicit `#run`.
+
+All 46 runnable Thor examples now contain an `// Output:` comment block after
+their printing call or final invocation. The existing structure test compares
+those comments with the manifest, whose results are verified by executing both
+languages. Deliberate rejection examples retain their error labels instead of
+claiming printed output. There remain 94 displayed source snippets and 49
+example groups.
+
+`values ~:=` and `values ~:>` are the documented conventional single-owner
+spellings throughout the current references and standalone examples. The
+`values~ :=` / `values~ :>` forms remain supported. The existing allocation-
+tracking spacing regression still exercises all four forms and lexical cleanup
+in checked and unchecked builds; no parser, compiler, TLS or runtime change was
+needed.
+
+Validation on macOS ARM64:
+
+- 53 tests passed: all 52 README tests plus the scoped-owner spacing regression.
+  No skips, failures or errors; elapsed time was 182.109 seconds.
+- All examples ran in checked and unchecked configurations; the selected
+  compile-time examples also retained all four mode checks.
+- Both updated standalone programs (`examples/scoped_owners` and
+  `examples/switch_comparisons`) passed checked and unchecked runs, four runs
+  total, with explicit Python output/error checks.
+- Assertion hygiene passed seven tests. `git diff --check` was clean.
+
+Results are retained locally as `review-and-outputs.json`,
+`scoped-style-examples.json` and `assertion-hygiene-review.log` under
+`dist/readme-reorganization-2026-11-27`. Isolated outputs and caches were removed.

@@ -19,7 +19,7 @@ case:       "other"
 
 main :: proc() {
     for n in [-5, 0, 10, 12, 20] {
-        label~ :> classify(n)
+        label ~:> classify(n)
         basic.print(n, label)
     }
     basic.print(LABEL)

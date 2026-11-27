@@ -150,7 +150,7 @@ For example, this is a definite lifetime problem even though only `out` returns:
 
 ```odin
 bad :: proc() -> [dynamic][]int {
-    values~ := make([]int, 2)
+    values ~:= make([]int, 2)
     out := make([dynamic][]int)
     append(&out, values)
     return out // out's element refers to storage freed by values~.
@@ -392,7 +392,7 @@ Use the existing declaration attribute, with an explanatory comment:
 work :: proc(callback: proc(values: []int)) {
     // Reviewed: callback completes synchronously, never retains or frees values.
     @(vet_ignore={.lifetime_unknown})
-    values~ := make([]int, 100)
+    values ~:= make([]int, 100)
     callback(values)
 }
 

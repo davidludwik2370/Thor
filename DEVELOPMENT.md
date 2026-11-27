@@ -38,9 +38,13 @@ README code fences marked `readme-example` are the actual inputs to
 `tests.test_readme_examples`; `tests/fixtures/readme-examples.json` supplies only
 wrapper context, expected output or expected rejection, and mode selection. Do
 not keep a second copy of the snippets in fixtures. Update the manifest when
-adding or changing examples, and run the maintained example suite in checked and
-unchecked builds. Its structure checks protect index order, local links, legacy
-incoming anchors and coverage of every displayed Thor/Odin code fence.
+adding or changing examples, show each runnable Thor example's printed results
+in an `// Output:` comment block, and run the maintained example suite in checked
+and unchecked builds. Its structure checks protect displayed output, index
+order, local links, legacy incoming anchors and coverage of every displayed
+Thor/Odin code fence. Introduce Thor syntax before using it in later examples;
+use `values ~:=` / `values ~:>` as the conventional scoped-owner spellings while
+retaining tests of all accepted spacing forms.
 
 ```sh
 THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py

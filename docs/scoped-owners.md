@@ -3,20 +3,20 @@
 A scoped local owns shallow cleanup at the end of its enclosing lexical scope:
 
 ```odin
-nums~ := make([]int, 5)
+nums ~:= make([]int, 5)
 // Equivalent lifetime to a local followed by deferred shallow cleanup.
 nums[0] = 7
 ```
 
-Use `nums~ :=` as the conventional spelling. `nums ~:=`, `nums~ :>`, and
-`nums ~:>` also work, including whitespace between the marker and colon. The
-marker belongs to the declaration; the variable is still named `nums` in uses,
-completion, references, and rename. `:=` permits mutation and `:>` retains the
+Use `nums ~:=` and immutable `nums ~:>` as the conventional spellings.
+`nums~ :=` and `nums~ :>` also work, including whitespace between the marker
+and colon. The marker belongs to the declaration; the variable is still named
+`nums` in uses, completion, references, and rename. `:=` permits mutation and `:>` retains the
 normal immutable-storage rules. The marker does not change the existing binary
 xor or unary complement operator.
 
 ```odin
-values~ :> [x*x for x in 0..<10]
+values ~:> [x*x for x in 0..<10]
 print(values)
 // values[0] = 7 // Error: immutable slice storage.
 ```
@@ -68,7 +68,7 @@ inside an arbitrary factory.
 
 ```odin
 {
-    growing~ := make([dynamic]int)
+    growing ~:= make([dynamic]int)
     for i in 0..<1000 { append(&growing, i) }
     // The final resized buffer is deleted at the closing brace.
 }
@@ -105,7 +105,7 @@ conditional results, and inspectable helper return values:
 
 ```odin
 bad :: proc() -> []int {
-    nums~ := make([]int, 5)
+    nums ~:= make([]int, 5)
     view := nums[1:]
     return view // Error: nums is cleaned before the caller can use this view.
 }
@@ -117,20 +117,20 @@ Independent copies and scalar loads can be returned:
 import "core:slice"
 
 good :: proc() -> []int {
-    nums~ := make([]int, 5)
+    nums ~:= make([]int, 5)
     return slice.clone(nums) // Caller owns the separate returned allocation.
 }
 
 count :: proc() -> int {
-    nums~ := make([]int, 5)
+    nums ~:= make([]int, 5)
     return len(nums)
 }
 ```
 
 Allocated `fmt.aprint*` and `fmt.caprint*` results are also independent copies.
 An allocated outer collection may be scoped while its elements borrow another
-owner: for example `source~ := strings.clone("a b")` followed by
-`parts~ := strings.fields(source)`. Cleanup of `parts` frees only the string
+owner: for example `source ~:= strings.clone("a b")` followed by
+`parts ~:= strings.fields(source)`. Cleanup of `parts` frees only the string
 header array. Its text still borrows `source`, so those elements cannot escape
 `source`'s scope. The same distinction applies to shallow clones of collections
 containing references.

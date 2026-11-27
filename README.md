@@ -30,7 +30,7 @@ The index and sections below use the same order. Odin comparisons demonstrate eq
 
 **Data and expressions**
 
-- [Inferred array literals](#inferred-array-literals) — Write a fixed array without repeating its length and element type.
+- [Inferred array literals](#inferred-array-literals) — Infer a fixed array’s length and element type.
 - [Membership and intervals](#membership-and-intervals) — Test collections and numeric or ordered intervals with `in` and `not_in`.
 - [Membership in generic constraints](#membership-in-generic-constraints) — Express allowed types and constant values as membership constraints.
 - [Multiline ternaries](#multiline-ternaries) — Continue a ternary before its colon without a line-continuation escape.
@@ -90,7 +90,7 @@ Also: [compiler commands](#compiler-commands), [vetting](#thor-vetting), [VS Cod
 
 ## Reading the examples
 
-Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. The tests compile the exact displayed snippets, run both languages, compare their output and check rejection examples in checked and unchecked builds.
+Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. Comments labeled `Output` show the complete printed results; the Odin counterpart prints the same results. The tests compile the exact displayed snippets, run both languages, verify those comments and check rejection examples in checked and unchecked builds.
 
 ## Imports and bindings
 
@@ -109,6 +109,9 @@ import * "core:strings"
 print("Square root: ")
 println(sqrt(f64(9)))
 println("Has prefix:", has_prefix("Thor", "Th"))
+// Output:
+// Square root: 3
+// Has prefix: true
 ```
 
 **Odin**
@@ -130,7 +133,7 @@ fmt.println("Has prefix:", strings.has_prefix("Thor", "Th"))
 
 ### Immutable bindings and views
 
-Initialize once at runtime with `:>` and prevent writes through that binding.
+Use `:>` instead of `:=` to initialize once at runtime and prevent writes through that binding. This is separate from Odin’s `::` compile-time constants.
 
 **Thor**
 
@@ -140,6 +143,8 @@ number := 3
 value :> number+1
 values :> [2]int{10, 20}
 fmt.println(value, values[0])
+// Output:
+// 4 10
 ```
 
 **Odin**
@@ -178,6 +183,8 @@ destination := make([]int, 2)
 defer delete(destination)
 copy_values(source, destination)
 fmt.println(destination)
+// Output:
+// [1, 2]
 ```
 
 **Odin**
@@ -200,7 +207,7 @@ fmt.println(destination)
 
 ### Inferred array literals
 
-Write a fixed array without repeating its length and element type.
+Infer a fixed array’s length and element type.
 
 **Thor**
 
@@ -208,17 +215,19 @@ Write a fixed array without repeating its length and element type.
 ```odin
 values := [10, 20, 30]
 fmt.println(values)
+// Output:
+// [10, 20, 30]
 ```
 
 **Odin**
 
 <!-- readme-example: inferred-array-literals:odin -->
 ```odin
-values := [3]int{10, 20, 30}
+values := [?]int{10, 20, 30}
 fmt.println(values)
 ```
 
-Context supplies element types in arguments, returns, assignments and nested literals. Otherwise the first element establishes the type. Empty literals need context. A fixed array itself needs no heap cleanup.
+Odin’s `[?]T{...}` already infers the length; Thor also infers the element type. Context supplies element types in arguments, returns, assignments and nested literals. Otherwise the first element establishes the type. Empty literals need context. A fixed array itself needs no heap cleanup.
 
 [Array inference](docs/language-guide.md#expressions-arrays-and-ranges).
 
@@ -233,6 +242,8 @@ Test collections and numeric or ordered intervals with `in` and `not_in`.
 values := [2, 4, 6]
 needle := 4
 fmt.println(needle in values, needle not_in values, needle in 0..<5)
+// Output:
+// true false true
 ```
 
 **Odin**
@@ -260,6 +271,8 @@ Express allowed types and constant values as membership constraints.
 ```odin
 numeric :: proc(value: $T) -> T where T in [int, f64] { return value }
 fmt.println(numeric(3))
+// Output:
+// 3
 ```
 
 **Odin**
@@ -286,6 +299,8 @@ enabled := true
 value := enabled ? 10
                  : 20
 fmt.println(value)
+// Output:
+// 10
 ```
 
 **Odin**
@@ -311,6 +326,8 @@ Repeat a compile-time string with `*`.
 ```odin
 TEXT :: "ab" * 3
 fmt.println(TEXT)
+// Output:
+// ababab
 ```
 
 **Odin**
@@ -337,6 +354,8 @@ FIRST :: [1, 2]
 SECOND :: [3, 4]
 ALL :: FIRST ++ SECOND
 fmt.println(ALL)
+// Output:
+// [1, 2, 3, 4]
 ```
 
 **Odin**
@@ -363,6 +382,8 @@ Use infix `**` for integer and floating-point powers.
 <!-- readme-example: exponentiation:thor -->
 ```odin
 fmt.println(2 ** 10, 2.0 ** -3)
+// Output:
+// 1024 0.125
 ```
 
 **Odin**
@@ -371,6 +392,7 @@ fmt.println(2 ** 10, 2.0 ** -3)
 ```odin
 import "core:math"
 power :: proc(base, exponent: int) -> int {
+    if exponent < 0 { panic("negative integer exponent") }
     result := 1
     for _ in 0..<exponent { result *= base }
     return result
@@ -384,7 +406,7 @@ Power associates right: `2 ** 3 ** 2` is 512. It binds more tightly than unary s
 
 ### Struct operators
 
-Apply arithmetic, bitwise operations, shifts, power and complement field by field.
+Apply arithmetic, bitwise operations, shifts, power and complement field by field. An untyped literal such as `{5, 6}` takes its struct type from the other operand or assignment target.
 
 **Thor**
 
@@ -396,6 +418,8 @@ right := Pair{3, 4}
 result := left + right
 result += {5, 6}
 fmt.println(result.a, result.b)
+// Output:
+// 9 12
 ```
 
 **Odin**
@@ -428,6 +452,8 @@ for i: i16 in 0..<3 { total += int(i) }
 values := [10, 20]
 for value, (i: u8) in values { total += value + int(i) }
 fmt.println(total)
+// Output:
+// 34
 ```
 
 **Odin**
@@ -464,6 +490,8 @@ count := 3
 text := f"Hello {name}: {count}"
 defer delete(text)
 fmt.println(text)
+// Output:
+// Hello Ada: 3
 ```
 
 **Odin**
@@ -493,6 +521,8 @@ import f "thor:format"
 text := f.format(1234567, grouping=true)
 defer delete(text)
 fmt.println(text)
+// Output:
+// 1,234,567
 ```
 
 **Odin**
@@ -520,6 +550,8 @@ Build collections with an output expression, iteration and an optional filter.
 squares := [n*n for n in 0..<5 if n % 2 == 0]
 defer delete(squares)
 fmt.println(squares)
+// Output:
+// [0, 4, 16]
 ```
 
 **Odin**
@@ -551,6 +583,8 @@ values := set[int]{1, 2, 2}
 defer delete(values)
 values += 3
 fmt.println(len(values), 2 in values)
+// Output:
+// 3 true
 ```
 
 **Odin**
@@ -581,6 +615,8 @@ Count backward from the end of sequences.
 values := [10, 20, 30]
 values[-1] += 1
 fmt.println(values[-1], values[:-1])
+// Output:
+// 31 [10, 20]
 ```
 
 **Odin**
@@ -609,6 +645,8 @@ Use a switch as a value, including multiple results and contextual literals.
 number := 2
 label := switch number { case 1: "one"; case 2: "two"; case: "other" }
 fmt.println(label)
+// Output:
+// two
 ```
 
 **Odin**
@@ -637,6 +675,8 @@ number := 12
 result := 0
 switch number { case < 10: result = 1; case < 20: result = 2; case: result = 3 }
 fmt.println(result)
+// Output:
+// 2
 ```
 
 **Odin**
@@ -666,6 +706,8 @@ Unwrap a successful optional result or panic with the original source context.
 import "core:strconv"
 number := strconv.parse_int("42") or_panic
 fmt.println(number)
+// Output:
+// 42
 ```
 
 **Odin**
@@ -695,6 +737,8 @@ Provide a parenthesized fallback list with matching discarded positions.
 load :: proc() -> (int, string, bool) { return 0, "", false }
 _, text := load() or_else (_, "fallback")
 fmt.println(text)
+// Output:
+// fallback
 ```
 
 **Odin**
@@ -722,6 +766,8 @@ Reduce sequences with `min`/`max` and receive an optional presence flag.
 values := [7, 2, 9]
 smallest, ok := min(..values[:])
 fmt.println(smallest, ok, max(**values))
+// Output:
+// 2 true 9
 ```
 
 **Odin**
@@ -754,6 +800,8 @@ Person :: struct { age: int }
 person := Person{42}
 using person
 fmt.println(age)
+// Output:
+// 42
 ```
 
 **Odin**
@@ -785,6 +833,8 @@ choose :: proc(a, b: $T, less := proc(x, y: T) -> bool { return x < y }) -> T {
     return a if less(a, b) else b
 }
 fmt.println(choose(7, 3))
+// Output:
+// 3
 ```
 
 **Odin**
@@ -815,6 +865,8 @@ Declare deterministic functions with checked read-only inputs and effects.
 square :: fn(value: int) -> int { return value*value }
 number := 4
 fmt.println(square(number))
+// Output:
+// 16
 ```
 
 **Odin**
@@ -841,6 +893,8 @@ Return a value-returning `fn` body’s last expression automatically.
 quad :: fn(x: int) -> int { 4*x }
 choose :: fn(x: int) -> int { switch x { case 0: 4; case: 8 } }
 fmt.println(quad(3), choose(0))
+// Output:
+// 12 4
 ```
 
 **Odin**
@@ -871,6 +925,8 @@ apply :: fn(x: int, callback: fn(int) -> int) -> int { return callback(x) }
 callback: fn(int) -> int = twice
 number := 3
 fmt.println(apply(number, callback))
+// Output:
+// 6
 ```
 
 **Odin**
@@ -884,7 +940,7 @@ number := 3
 fmt.println(apply(number, callback))
 ```
 
-Runtime-selected callbacks use ordinary procedure pointers, without runtime purity tags or adapters. Aliases, generic forwarding and storage preserve the Thor contract. Plain `proc` values cannot be converted back into `fn` types. A pure callback’s identity and arguments must be known for compile-time execution.
+Odin’s `proc` type does not carry Thor’s purity guarantee. Runtime-selected callbacks use ordinary procedure pointers, without runtime purity tags or adapters. Aliases, generic forwarding and storage preserve the Thor contract. Plain `proc` values cannot be converted back into `fn` types. A pure callback’s identity and arguments must be known for compile-time execution.
 
 [Callback types, conversions and compile-time rules](docs/pure-callbacks.md).
 
@@ -901,6 +957,8 @@ show :: proc(value: int, expression :> #caller_expression(value)) {
 }
 number := 3
 show(number)
+// Output:
+// number 3
 ```
 
 **Odin**
@@ -931,6 +989,8 @@ calculate :: proc(x: int) -> (value: int, valid: bool) { return x, x > 0 }
 Result :: ti.result_type_of(calculate(3))
 result := Result{3, true}
 fmt.println(result.value, result.valid)
+// Output:
+// 3 true
 ```
 
 **Odin**
@@ -948,7 +1008,7 @@ The query does not execute the call or its arguments. One result yields its exac
 
 ### Compile-time execution
 
-Evaluate eligible known-argument `fn` calls automatically, or request execution with `#run`.
+Eligible `fn` calls with constant inputs can run during compilation. `#run` explicitly requests compile-time execution of an eligible call, including an ordinary `proc`; the same purity restrictions apply.
 
 **Thor**
 
@@ -960,6 +1020,8 @@ SIZE :: square(4)
 NEXT :: #run ordinary(SIZE)
 values: [SIZE]int
 fmt.println(len(values), NEXT)
+// Output:
+// 16 17
 ```
 
 There is no equivalent Odin language facility for executing these procedure calls as constants. Thor verifies dependencies and effects, executes native helpers, and caches contents-only results. Required work cannot silently fall back to runtime. Supported allocated results materialize independent runtime owners; constants use their documented borrowed-storage rules. Runtime bindings, including `:>`, are not automatically constant inputs. Debug builds leave optional calls at runtime; required constants and `#run` still evaluate. Evaluation currently uses the host target.
@@ -977,6 +1039,8 @@ Choose optional compile-time work and mark calls that should stay at runtime.
 square :: fn(x: int) -> int { return x*x }
 value := #runtime square(4)
 fmt.println(value)
+// Output:
+// 16
 ```
 
 **Odin**
@@ -1003,6 +1067,8 @@ Select statements or values using `#switch` and leave inactive arms unchecked.
 MODE :: 2
 VALUE :: #switch MODE { case 1: 10; case: 20 }
 fmt.println(VALUE)
+// Output:
+// 20
 ```
 
 **Odin**
@@ -1022,15 +1088,17 @@ Statement-form `#switch` corresponds to an Odin `when` / `else when` chain. Sele
 
 ### Scoped owners
 
-Attach shallow end-of-scope cleanup to a local declaration with `~`.
+Declare a local with `~:=` or immutable `~:>` to attach shallow end-of-scope cleanup.
 
 **Thor**
 
 <!-- readme-example: scoped-owners:thor -->
 ```odin
-values~ := make([]int, 3)
+values ~:= make([]int, 3)
 values[0] = 7
 fmt.println(values)
+// Output:
+// [7, 0, 0]
 ```
 
 **Odin**
@@ -1043,7 +1111,7 @@ values[0] = 7
 fmt.println(values)
 ```
 
-Both `values~ :=` / `values ~:=` and the `:>` variants work. Cleanup reads the final binding and retains the correct allocator. Supported owners include pointers, slices, strings, dynamic arrays, maps, sets and logical numbers. Cleanup is shallow; nested allocations and graph roots need their own cleanup. Tracked escaping owners/views are rejected, but this is not a complete memory-safety proof.
+Prefer `values ~:=` and immutable `values ~:>`. The `values~ :=` / `values~ :>` spellings remain supported. Cleanup reads the final binding and retains the correct allocator. Supported owners include pointers, slices, strings, dynamic arrays, maps, sets and logical numbers. Cleanup is shallow; nested allocations and graph roots need their own cleanup. Tracked escaping owners/views are rejected, but this is not a complete memory-safety proof.
 
 [Supported owners, escapes and allocator rules](docs/scoped-owners.md).
 
@@ -1065,6 +1133,8 @@ b := big.to_string(fraction)
 defer delete(a)
 defer delete(b)
 fmt.println(a, b)
+// Output:
+// 123456789012345678901234567890 5/4
 ```
 
 **Odin**
@@ -1104,6 +1174,8 @@ sum :: proc(values: []int) -> int {
 }
 values := [1, 2, 3]
 fmt.println(sum(values[:]))
+// Output:
+// 6
 ```
 
 **Odin**
@@ -1143,6 +1215,8 @@ Mark declarations intentionally unused and reject later references to them.
 @(unused)
 reserved :: 64
 fmt.println("ready")
+// Output:
+// ready
 ```
 
 **Odin**
@@ -1178,6 +1252,8 @@ Silence selected vet advice on one declaration using named enum options.
 @(vet_ignore={.immutable})
 value := 4
 fmt.println(value)
+// Output:
+// 4
 ```
 
 **Odin**
@@ -1188,7 +1264,7 @@ value := 4
 fmt.println(value)
 ```
 
-`@(vet_ignore={.immutable, .pure})` selects multiple checks. Dedicated `.lifetime_unknown` and `.leak_unknown` options acknowledge intentional unverified cases; definite memory findings retain their own rules. Suppressions do not bypass type checking, immutability, purity or `no_alloc` contracts. TLS completes the option names after `.`.
+Odin has no equivalent for Thor’s vet categories; its block shows the same executable code. `@(vet_ignore={.immutable, .pure})` selects multiple checks. Dedicated `.lifetime_unknown` and `.leak_unknown` options acknowledge intentional unverified cases; definite memory findings retain their own rules. Suppressions do not bypass type checking, immutability, purity or `no_alloc` contracts. TLS completes the option names after `.`.
 
 [Suppression options](docs/attributes-and-directives.md#attr-vet_ignore) and [vet policy](docs/compiler-guide.md#thor-vetting).
 
@@ -1208,6 +1284,8 @@ Use the package namespace, select individual names, or import all public helpers
 ```odin
 import * "thor:basic"
 print("Hello, Thor!")
+// Output:
+// Hello, Thor!
 ```
 
 **Odin**
@@ -1239,6 +1317,8 @@ kept := basic.filter(values, positive)
 defer delete(mapped)
 defer delete(kept)
 fmt.println(mapped, kept)
+// Output:
+// [-2, 0, 6] [3]
 ```
 
 **Odin**
@@ -1278,6 +1358,8 @@ main :: proc() {
     results := basic.pmap([]int{2, 3, 4}, square)
     defer delete(results)
     fmt.println(results)
+    // Output:
+    // [4, 9, 16]
 }
 ```
 
@@ -1301,7 +1383,8 @@ main :: proc() {
         thread.start(threads[i])
     }
     for t in threads { thread.join(t); thread.destroy(t) }
-    results: [3]int
+    results := make([]int, len(jobs))
+    defer delete(results)
     for job, i in jobs { results[i] = job.output }
     fmt.println(results)
 }
@@ -1324,6 +1407,8 @@ values := []int{3, 1, 2}
 ordered := basic.sorted(values)
 defer delete(ordered)
 fmt.println(ordered, values)
+// Output:
+// [1, 2, 3] [3, 1, 2]
 ```
 
 **Odin**
@@ -1356,6 +1441,8 @@ import "thor:basic"
     context.allocator = basic.scoped_arena()
     values := make([]int, 10)
     fmt.println(len(values))
+    // Output:
+    // 10
 }
 ```
 
@@ -1394,6 +1481,8 @@ if err != .None { panic("clone failed") }
 defer { release_err := basic.deepfree(cloned); if release_err != .None { panic("free failed") } }
 cloned^[0] = 9
 fmt.println(source[0], cloned^[0])
+// Output:
+// 1 9
 ```
 
 **Odin**
@@ -1425,6 +1514,8 @@ import "thor:basic"
 first := [1, 2]
 second := [1, 2]
 fmt.println(basic.hash(first) == basic.hash(second))
+// Output:
+// true
 ```
 
 **Odin**
@@ -1437,7 +1528,7 @@ second := [2]int{1, 2}
 fmt.println(hashing.hash(first) == hashing.hash(second))
 ```
 
-The native Odin package provides the same API. Struct padding, allocator metadata and spare capacity are ignored. Pointers hash addresses; unsupported/cyclic data is rejected. `try_hash` returns a recoverable error. Algorithms include XXH3_64, XXH64 and FNV64a.
+The native Odin package provides the same API. Struct padding, allocator metadata and spare capacity are ignored. Pointers hash addresses; unsupported values and container cycles are rejected. `try_hash` returns a recoverable error. Algorithms include XXH3_64, XXH64 and FNV64a.
 
 [Hashing contract](runtime/hash/README.md).
 
@@ -1454,6 +1545,9 @@ names := []string{"Ada", "Lin"}
 ages := []int{36, 28}
 people := basic.zip(name=names, age=ages)
 for person in people { fmt.println(person.name, person.age) }
+// Output:
+// Ada 36
+// Lin 28
 ```
 
 **Odin**
@@ -1483,6 +1577,8 @@ number := basic._int("42") or_panic
 values := basic.range(1, 4)
 defer delete(values)
 basic.print(number, basic.sum(values), basic.and(true, false))
+// Output:
+// 42 6 false
 ```
 
 **Odin**

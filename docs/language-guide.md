@@ -63,7 +63,7 @@ returns. Keep its allocations within that scope; explicit allocator choices and
 `context.temp_allocator` retain their usual behavior. See the
 [scoped arena contract](../runtime/basic/README.md#scoped-arena-allocations).
 
-Use `nums~ := make([]int, 5)` for a single local with automatic shallow
+Use `nums ~:= make([]int, 5)` for a single local with automatic shallow
 cleanup. Both `:=` and `:>` are supported. See [scoped owners](../docs/scoped-owners.md)
 and the [runnable example](../examples/scoped_owners/main.thor).
 

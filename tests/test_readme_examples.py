@@ -18,6 +18,21 @@ BLOCK=re.compile(r'<!-- readme-example: ([a-z0-9-]+):(thor|odin) -->\s*```odin\n
 CASES=json.loads(MANIFEST.read_text())['examples']
 
 
+def displayed_output(code):
+    lines=code.splitlines()
+    starts=[index for index,line in enumerate(lines) if line.strip()=='// Output:']
+    if len(starts)!=1:
+        raise ValueError('A runnable Thor example needs one Output comment block')
+    result=[]
+    for line in lines[starts[0]+1:]:
+        line=line.lstrip()
+        if line=='//':result.append('')
+        elif line.startswith('// '):result.append(line[3:])
+        else:break
+    if not result:raise ValueError('An Output comment block must show the printed results')
+    return '\n'.join(result)
+
+
 def without_fences(text):
     return re.sub(r'^```[^\n]*\n.*?^```\s*$', '', text, flags=re.M|re.S)
 
@@ -64,9 +79,12 @@ class ReadmeStructureTests(unittest.TestCase):
         linked=re.findall(r'^- \[[^\]]+\]\(#([^\)]+)\)',index,re.M)
         self.assertEqual(linked,[case['section'] for case in features])
         actual_anchors=anchors(text)
+        source={(identity,engine):code for identity,engine,code in blocks}
         for case in CASES:
             with self.subTest(example=case['id']):
                 self.assertIn(case['section'],actual_anchors)
+                if 'error' not in case:
+                    self.assertEqual(displayed_output(source[case['id'],'thor']),case['stdout'])
                 if case['engines']==['thor'] and 'error' not in case:
                     self.assertTrue(case.get('no_odin_reason'))
 
