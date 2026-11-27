@@ -691,6 +691,16 @@ expression. This does not introduce tuple-expression or comma-list syntax.
 An untyped brace literal can be parenthesized to distinguish it from a statement
 block. Void fn bodies and ordinary proc return requirements are unchanged.
 
+A final value-producing switch, #switch or #partial switch is an expression in
+this context, with the same result types, arity, exhaustiveness, ownership and
+compile-time rules as an explicit return switch. Expression-only arms supply
+the values; this also supports nested switches and comma-separated switch-arm
+result lists. A statement switch (including initializers, type switches,
+assignments, labels or explicit return statements) retains its existing rules.
+Missing values do not create an implicit zero/default result. Expression
+directives such as #partial on a compound literal remain part of the returned
+expression. The existing restriction against do bodies for fn is unchanged.
+
 Purity means deterministic results from the input values and permitted constants,
 with no externally visible mutation or I/O. Compiler-managed allocation is an
 allowed effect; allocation addresses, identity, and allocator callbacks are not

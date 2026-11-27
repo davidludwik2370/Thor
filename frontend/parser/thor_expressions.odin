@@ -195,6 +195,73 @@ thor_fn_literal_at_tail :: proc(p:^Parser)->bool {
     return token.kind==.Close_Brace
 }
 
+// A failed expression attempt can grow a recording buffer and free its old
+// backing allocation. Rewind its length while retaining the current allocation;
+// restoring a shallow Parser snapshot alone would resurrect dangling buffers.
+thor_fn_rewind_list :: proc(current:[dynamic]$T,count:int)->[dynamic]T {
+    list:=current
+    resize(&list,count)
+    return list
+}
+
+thor_fn_rewind :: proc(p:^Parser,previous:Parser,previous_file:ast.File) {
+    restored:=previous
+    restored.fn_statement_switches=p.fn_statement_switches
+    restored.optional_semicolons=thor_fn_rewind_list(p.optional_semicolons,len(previous.optional_semicolons))
+    restored.edits=thor_fn_rewind_list(p.edits,len(previous.edits))
+    restored.selections=thor_fn_rewind_list(p.selections,len(previous.selections))
+    restored.immutables=thor_fn_rewind_list(p.immutables,len(previous.immutables))
+    restored.scoped=thor_fn_rewind_list(p.scoped,len(previous.scoped))
+    restored.mut_parameters=thor_fn_rewind_list(p.mut_parameters,len(previous.mut_parameters))
+    restored.ro_parameters=thor_fn_rewind_list(p.ro_parameters,len(previous.ro_parameters))
+    restored.auto_parameters=thor_fn_rewind_list(p.auto_parameters,len(previous.auto_parameters))
+    restored.features=thor_fn_rewind_list(p.features,len(previous.features))
+    restored.declaration_separators=thor_fn_rewind_list(p.declaration_separators,len(previous.declaration_separators))
+    file:=previous_file
+    file.tags=thor_fn_rewind_list(p.file.tags,len(previous_file.tags))
+    file.decls=thor_fn_rewind_list(p.file.decls,len(previous_file.decls))
+    file.imports=thor_fn_rewind_list(p.file.imports,len(previous_file.imports))
+    file.comments=thor_fn_rewind_list(p.file.comments,len(previous_file.comments))
+    p^=restored
+    p.file^=file
+}
+
+// Try only the ambiguous expression starters, at the fn's own body level.
+// Successful tails keep the parsed tree and recorded features: no second parse
+// or new lowering path. Statement switches (including explicit returns, labels,
+// initializers and type switches) fall back to the ordinary statement parser.
+thor_fn_tail_expression :: proc(p:^Parser)->^ast.Expr {
+    if !thor_fn_has_results(p) {return nil}
+    if p.curr_tok.kind!=.Switch &&
+       !(p.curr_tok.kind==.Hash && peek_token(p).text=="partial") {return nil}
+    // An enclosing failed attempt can revisit nested callback bodies. Cache
+    // statement forms so this cannot multiply speculative work exponentially.
+    mode:=(1 if p.allow_range else 0)+(2 if p.allow_in_expr else 0)
+    key:=[2]int{p.curr_tok.pos.offset,mode}
+    if p.fn_statement_switches[key] {return nil}
+    previous,previous_file:=p^,p.file^
+    p.err,p.warn,p.tok.err=nil,nil,nil
+    expr:=parse_expr(p,false)
+    at_tail:=thor_fn_literal_at_tail(p)
+    lexical_ok:=p.tok.error_count==previous.tok.error_count
+    warnings_ok:=p.file.syntax_warning_count==previous_file.syntax_warning_count
+    errors:=p.error_count-previous.error_count
+    incomplete:=p.incomplete_selectors-previous.incomplete_selectors
+    if at_tail && lexical_ok && warnings_ok && errors==0 {
+        p.err,p.warn,p.tok.err=previous.err,previous.warn,previous.tok.err
+        return expr
+    }
+    thor_fn_rewind(p,previous,previous_file)
+    if at_tail && lexical_ok && warnings_ok && errors>0 && errors==incomplete {
+        // Keep contextual completion for an unfinished enum result, and report
+        // its original diagnostics exactly once using the normal handlers.
+        return parse_expr(p,false)
+    }
+    if p.fn_statement_switches==nil {p.fn_statement_switches=make(map[[2]int]bool)}
+    p.fn_statement_switches[key]=true
+    return nil
+}
+
 thor_fn_implicit_return :: proc(p:^Parser,expr:^ast.Expr) {
     literal,ok:=expr.derived.(^ast.Proc_Lit)
     if !ok || literal.body==nil || literal.type.results==nil || len(literal.type.results.list)==0 {return}

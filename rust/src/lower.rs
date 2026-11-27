@@ -1311,11 +1311,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
         }
-        if !native_type_operand && matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
-            if let Some(code) = self.switch_statement(id, constant)? {
-                return Ok(code);
-            }
-        }
         if kind == "Return" {
             if node.data["implicit_return"]==true {
                 if let [value]=self.source.group(id,"values") {
@@ -1329,6 +1324,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
             if let Some(code) = self.pure_return(id, constant)? {
+                return Ok(code);
+            }
+        }
+        if !native_type_operand && matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
+            if let Some(code) = self.switch_statement(id, constant)? {
                 return Ok(code);
             }
         }

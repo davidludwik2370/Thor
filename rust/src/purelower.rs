@@ -494,6 +494,10 @@ impl Lower<'_, '_> {
     }
 
     pub(super) fn pure_return(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
+        if self.pure_busy.is_empty() {return Ok(None);}
+        self.pure_return_values(id,self.source.group(id,"values").to_vec(),constant)
+    }
+    pub(super) fn pure_return_values(&mut self, id: NodeId, mut values: Vec<NodeId>, constant: bool) -> Result<Option<Code>> {
         if self.pure_busy.is_empty() {
             return Ok(None);
         }
@@ -505,6 +509,15 @@ impl Lower<'_, '_> {
         else {
             return Ok(None);
         };
+        if let [value]=values.as_slice() {
+            if !self.switch_replacements.contains_key(value) {
+                let value=self.unparen(*value);
+                if matches!(s.node(value).kind.as_str(),"SwitchExpr"|"CompileSwitchExpr") {
+                    return self.pure_return_switch(id,value,constant).map(Some);
+                }
+                if s.node(value).kind=="SwitchResults" {values=s.group(value,"args").to_vec();}
+            }
+        }
         let signature = self.role(proc, "type")?;
         let results = self.resolver.fields(self.reference(signature), "results");
         let prefix = format!("{}pure_{}", self.prefix, s.node(proc).span.start);
@@ -513,7 +526,6 @@ impl Lower<'_, '_> {
             .enumerate()
             .map(|(index, (name, _))| Self::pure_result_name(&prefix, name.clone(), index))
             .collect::<Vec<_>>();
-        let values = s.group(id, "values");
         if let Some(parent) = s.node(id).parent.filter(|parent| {
             s.node(*parent).kind == "Block" && s.raw.as_bytes()[s.node(*parent).span.start] != b'{'
         }) {

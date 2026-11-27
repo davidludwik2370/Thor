@@ -8,6 +8,40 @@ pub(super) struct Case {
     pub(super) result: NodeId,
 }
 impl Lower<'_, '_> {
+    // Owned fn results are promoted by the fn's deferred cleanup. Keep switch
+    // arms in that function's scope: returning a stack-backed literal through
+    // an intermediate switch helper would outlive the literal before promotion.
+    pub(super) fn pure_return_switch(&mut self, owner:NodeId,id:NodeId,constant:bool)->Result<Code> {
+        let hints=self.statement_hints(owner)?;
+        if let Some(problem)=self.switch_problem(id,hints.len())? {return Ok(problem);}
+        let cases=self.cases(id)?;
+        if cases.iter().any(|case|self.source.node(case.result).kind=="SwitchBreak") {
+            return Ok(self.error_token(id,"break in a switch expression requires an ordinary = assignment to existing destinations."));
+        }
+        let mut branches=HashMap::new();
+        for case in &cases {
+            let branch=if self.diverging(case.result) {
+                self.render(case.result,None,false)?
+            } else {
+                self.pure_return_values(owner,vec![case.result],constant)?
+                    .ok_or_else(||Error::new("missing owned return context"))?
+            };
+            branches.insert(case.result,branch);
+        }
+        if self.source.node(id).kind=="SwitchExpr" {
+            return self.native_switch(id,&hints,None,Some(&branches));
+        }
+        let validation=self.switch_validation(id)?;
+        let mut code=vec![self.g("when ",id),validation,self.g(" {\n",id)];
+        for (index,case) in cases.iter().filter(|case|!case.matches.is_empty())
+            .chain(cases.iter().filter(|case|case.matches.is_empty())).enumerate() {
+            code.extend([self.g(if index==0 {"when "} else {"else when "},id),
+                self.case_condition(id,case)?,self.g(" {\n",id),branches[&case.result].clone(),self.g("\n}\n",id)]);
+        }
+        code.push(self.g("} else {#panic(\"Invalid compile-time switch cases.\")}\n",id));
+        Ok(Code::concat(code))
+    }
+
     fn switch_hint_semantic(
         &mut self,
         id: NodeId,

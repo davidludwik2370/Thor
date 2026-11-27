@@ -90,5 +90,59 @@ main::proc(){n:=4;result:=helper.build(n);_=result.value}
         items=completion.get('items',[]) if isinstance(completion,dict) else completion or []
         self.assertIn('value',[item['label'] for item in items])
 
+    def test_switch_tails_keep_result_context_navigation_and_tokens(self):
+        text='''// 😀 original source positions
+package main
+Mode::enum{First,Second}
+Record::struct{value:int}
+choose::fn(x:int)->Record{switch x{case < 0:{x};case:{x+1}}}
+mode::fn(x:Mode)->Mode{#partial switch x{case .First:.First;case:.Second}}
+compiled::fn(x:$T)->T{#switch{case T==int:x+1;case:undefined}}
+main::proc(){n:=3;result:=choose(n);number:=compiled(n);_=result.value;_=number;_=mode(.First)}
+'''
+        for compiler in [False,True]:
+            with self.subTest(compiler=compiler):
+                client,main=self.open(text,compiler=compiler)
+                if compiler:client.diagnostic(main.as_uri(),empty=True)
+                self.assertIn('Record',json.dumps(self.hover(client,main,text,'result:=')))
+                self.assertIn('int',json.dumps(self.hover(client,main,text,'number:=')))
+                completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'.Second',1)})
+                items=completion.get('items',[]) if isinstance(completion,dict) else completion or []
+                self.assertTrue({'First','Second'}<={item['label'] for item in items},items)
+                definitions=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'{x+1}',1)})
+                if isinstance(definitions,dict):definitions=[definitions]
+                self.assertTrue(any(item['range']['start']==self.position(text,'x:int',0) for item in definitions or []),definitions)
+                self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
+    def test_switch_arm_diagnostics_and_unsaved_recovery(self):
+        text='''// 😀
+package main
+choose::fn(x:int)->int{switch x{case < 0:"wrong";case:x}}
+main::proc(){n:=3;_=choose(n)}
+'''
+        client,main=self.open(text,compiler=True)
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(item for item in errors if 'Cannot' in item['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'"wrong"',0))
+        self.assertNotIn('__thor_',error['message'])
+        fixed=text.replace('"wrong"','-x')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':self.position(fixed,'-x',1)})
+        self.assertIn('int',json.dumps(hover))
+
+    def test_incomplete_enum_switch_tail_retains_completion(self):
+        text='package main\nMode::enum{First,Second}\nchoose::fn(x:int)->Mode{switch x{case 0:.;case:.Second}}\nmain::proc(){}\n'
+        original=text.replace('0:.;case:.Second','0:return .First;case:return .Second')
+        client,main=self.open(original,compiler=False)
+        self.hover(client,main,original,'choose::')
+        # Reuse the document parser at the same switch offset. A cached failed
+        # statement attempt belongs to the old source snapshot, not this edit.
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':text}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'0:.;',3),'context':{'triggerKind':2,'triggerCharacter':'.'}})
+        items=completion.get('items',[]) if isinstance(completion,dict) else completion or []
+        self.assertTrue({'First','Second'}<={item['label'] for item in items},items)
+
 
 if __name__=='__main__':unittest.main()

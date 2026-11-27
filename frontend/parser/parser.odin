@@ -70,6 +70,8 @@ Parser :: struct {
 	comprehension_filter: bool,
 	comprehension_level: int,
 	fallback_paren: int, // Source offset of the next or_else RHS grouping.
+	incomplete_selectors: int, // Recoverable '.' placeholders while editing fn values.
+	fn_statement_switches: map[[2]int]bool, // Failed tail attempts, retained across rewinds.
 }
 
 Edit :: struct {start, end: int, text: string}
@@ -170,6 +172,8 @@ is_package_name_reserved :: proc(name: string) -> bool {
 
 parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	zero_parser: {
+		clear(&p.fn_statement_switches)
+		p.incomplete_selectors = 0
 		p.prev_tok         = {}
 		p.curr_tok         = {}
 		p.expr_level       = 0
@@ -761,7 +765,7 @@ parse_ident :: proc(p: ^Parser) -> ^ast.Ident {
 	return i
 }
 
-parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
+parse_stmt_list :: proc(p: ^Parser, fn_tail: bool = false) -> []^ast.Stmt {
 	list: [dynamic]^ast.Stmt
 	for p.curr_tok.kind != .Case &&
 	    p.curr_tok.kind != .Close_Brace &&
@@ -774,7 +778,7 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
                 if ch==' ' {error(p,p.curr_tok.pos,"With '-vet-tabs', tabs must be used for indentation");break}
             }
         }
-		stmt := parse_stmt(p)
+		stmt := parse_stmt(p,fn_tail)
 		if stmt != nil {
 			if _, ok := stmt.derived.(^ast.Empty_Stmt); !ok {
 				append(&list, stmt)
@@ -1481,7 +1485,16 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 	return range_stmt
 }
 
-parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
+parse_stmt :: proc(p: ^Parser, fn_tail: bool = false) -> ^ast.Stmt {
+    if fn_tail {
+        start:=p.curr_tok.pos
+        if expr:=thor_fn_tail_expression(p);expr!=nil {
+            stmt:=ast.new(ast.Expr_Stmt,start,expr.end)
+            stmt.expr=expr
+            expect_semicolon(p,stmt)
+            return stmt
+        }
+    }
     if thor_fn_expression_start(p) {
         stmt:=parse_simple_stmt(p,{Stmt_Allow_Flag.Label})
         expect_semicolon(p,stmt)
@@ -1618,7 +1631,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		switch name {
 		case "bounds_check", "no_bounds_check":
-			stmt := parse_stmt(p)
+			stmt := parse_stmt(p,fn_tail)
 			switch name {
 			case "bounds_check":
 				stmt.state_flags += {.Bounds_Check}
@@ -1627,7 +1640,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			}
 			return stmt
 		case "type_assert", "no_type_assert":
-			stmt := parse_stmt(p)
+			stmt := parse_stmt(p,fn_tail)
 			switch name {
 			case "type_assert":
 				stmt.state_flags += {.Type_Assert}
@@ -1789,13 +1802,13 @@ parse_type :: proc(p: ^Parser) -> ^ast.Expr {
 	return type
 }
 
-parse_body :: proc(p: ^Parser) -> ^ast.Block_Stmt {
+parse_body :: proc(p: ^Parser, fn_tail: bool = false) -> ^ast.Block_Stmt {
 	prev_expr_level := p.expr_level
 	defer p.expr_level = prev_expr_level
 
 	p.expr_level = 0
 	open := expect_token(p, .Open_Brace)
-	stmts := parse_stmt_list(p)
+	stmts := parse_stmt_list(p,fn_tail)
 	close := expect_token(p, .Close_Brace)
 
 	bs := ast.new(ast.Block_Stmt, open.pos, end_pos(close))
@@ -2800,6 +2813,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return type
 		}
 		body: ^ast.Stmt
+		fn_tail := p.thor && tok.text=="fn" && type.results!=nil && len(type.results.list)>0
 
 		skip_possible_newline_for_literal(p)
 
@@ -2811,7 +2825,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		} else if p.curr_tok.kind == .Open_Brace {
 			prev_proc := p.curr_proc
 			p.curr_proc = type
-			body = parse_body(p)
+			body = parse_body(p,fn_tail)
 			p.curr_proc = prev_proc
 		} else if allow_token(p, .Do) {
 			prev_proc := p.curr_proc
@@ -3828,6 +3842,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
             // Retain the enclosing body while the user is typing a tail enum
             // expression. Consuming its closing delimiter loses return context.
             error(p,p.curr_tok.pos,"expected an identifier after '.'")
+            p.incomplete_selectors+=1
             field=ast.new(ast.Ident,end_pos(op),end_pos(op))
         } else {field=parse_ident(p)}
 		ise := ast.new(ast.Implicit_Selector_Expr, op.pos, field)
