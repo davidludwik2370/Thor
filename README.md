@@ -62,6 +62,7 @@ The index and sections below use the same order. Odin comparisons demonstrate eq
 - [Pure callback types](#pure-callback-types) — Preserve a function’s purity contract through callback values and aliases.
 - [Automatic caller metadata](#automatic-caller-metadata) — Expose caller expressions and locations as documented, non-overridable parameters.
 - [Procedure result type queries](#procedure-result-type-queries) — Derive one result’s type or a named record of several result types.
+- [Dependent type-parameter defaults](#dependent-type-parameter-defaults) — Infer a compile-time type parameter from earlier inputs and callbacks.
 - [Compile-time execution](#compile-time-execution) — Evaluate eligible known-argument `fn` calls automatically, or request execution with `#run`.
 - [Runtime barriers and evaluation modes](#runtime-barriers-and-evaluation-modes) — Choose optional compile-time work and mark calls that should stay at runtime.
 - [Compile-time switches](#compile-time-switches) — Select statements or values using `#switch` and leave inactive arms unchecked.
@@ -977,6 +978,56 @@ The query does not execute the call or its arguments. One result yields its exac
 
 [Result-type query reference](runtime/intrinsics/README.md).
 
+### Dependent type-parameter defaults
+
+A compile-time type parameter can default to a type derived from earlier parameters. Here, `Result` is inferred from the callback’s results.
+
+**Thor**
+
+<!-- readme-example: dependent-type-parameter-defaults:thor -->
+```odin
+import ti "thor:intrinsics"
+
+Job :: struct { left, right: int }
+calculate :: proc(a, b: int) -> (sum, product: int) {
+    return a+b, a*b
+}
+
+first :: proc(jobs: []$J, callback: $F,
+    $Result: typeid = ti.result_type_of(callback(**J{})),
+) -> Result {
+    return compress_values(callback(**jobs[0]))
+}
+
+result := first([]Job{{2, 3}}, calculate)
+fmt.println(result.sum, result.product)
+// 5 6
+```
+
+`result_type_of` inspects the callback without executing it. Native Odin’s `**` expands the job’s fields, and `compress_values` packs the returned values into `Result`. This example expects a nonempty slice.
+
+**Odin**
+
+<!-- readme-example: dependent-type-parameter-defaults:odin -->
+```odin
+Job :: struct { left, right: int }
+Result :: struct { sum, product: int }
+calculate :: proc(a, b: int) -> (sum, product: int) {
+    return a+b, a*b
+}
+
+first :: proc(jobs: []$J, callback: $F, $Result: typeid) -> Result {
+    return compress_values(callback(**jobs[0]))
+}
+
+result := first([]Job{{2, 3}}, calculate, Result)
+fmt.println(result.sum, result.product)
+```
+
+The Odin version defines and passes `Result` explicitly. Thor supplies the omitted default at the call site, after resolving the earlier parameters. This is the mechanism used by [parallel mapping](#parallel-mapping) to infer its output element type.
+
+[Dependent result-type defaults](runtime/parallel/README.md#result-type-queries).
+
 ### Compile-time execution
 
 Eligible `fn` calls with constant inputs can run during compilation. `#run` explicitly requests compile-time execution of an eligible call, including an ordinary `proc`; the same purity restrictions apply.
@@ -1314,28 +1365,49 @@ Run a mapping callback with bounded workers and ordered results.
 <!-- readme-example: parallel-mapping:thor -->
 ```odin
 import "thor:basic"
-square :: proc(x: $T) -> T { return x*x }
+
+Job :: struct { left, right: int }
+calculate :: proc(a, b: $T) -> (sum, product: T) {
+    return a+b, a*b
+}
+
 main :: proc() {
-    results := basic.pmap([]int{2, 3, 4}, square)
+    jobs := []Job{{2, 3}, {4, 5}}
+    results := basic.pmap(jobs, calculate)
     defer delete(results)
-    fmt.println(results)
-    // [4, 9, 16]
+
+    for row in results {
+        fmt.println(row.sum, row.product)
+    }
+    // 5 6
+    // 9 20
 }
 ```
+
+Each job supplies two arguments. `results` is an allocated slice of structs with `sum` and `product` fields, inferred from the named results. The polymorphic callback needs no extra annotations.
 
 **Odin**
 
 <!-- readme-example: parallel-mapping:odin -->
 ```odin
 import "core:thread"
-Job :: struct { input, output: int }
-worker :: proc(t: ^thread.Thread) {
-    job := cast(^Job)t.data
-    job.output = job.input*job.input
+
+Result :: struct { sum, product: int }
+Work :: struct { left, right: int, output: Result }
+
+calculate :: proc(a, b: int) -> (sum, product: int) {
+    return a+b, a*b
 }
+
+worker :: proc(t: ^thread.Thread) {
+    work := cast(^Work)t.data
+    work.output.sum, work.output.product = calculate(work.left, work.right)
+}
+
 main :: proc() {
-    jobs := [3]Job{{input=2}, {input=3}, {input=4}}
-    threads: [3]^thread.Thread
+    jobs := [?]Work{{left=2, right=3}, {left=4, right=5}}
+    threads: [2]^thread.Thread
+
     for &job, i in jobs {
         threads[i] = thread.create(worker)
         if threads[i] == nil { panic("thread creation failed") }
@@ -1343,10 +1415,11 @@ main :: proc() {
         thread.start(threads[i])
     }
     for t in threads { thread.join(t); thread.destroy(t) }
-    results := make([]int, len(jobs))
+
+    results := make([]Result, len(jobs))
     defer delete(results)
     for job, i in jobs { results[i] = job.output }
-    fmt.println(results)
+    for row in results { fmt.println(row.sum, row.product) }
 }
 ```
 

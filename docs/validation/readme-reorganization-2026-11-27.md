@@ -134,3 +134,28 @@ Validation on macOS ARM64:
 Results are retained locally as `review-and-outputs.json`,
 `scoped-style-examples.json` and `assertion-hygiene-review.log` under
 `dist/readme-reorganization-2026-11-27`. Isolated outputs and caches were removed.
+
+## Dependent defaults and named parallel results
+
+Added the approved dependent type-parameter default example immediately after
+result-type queries, with an Odin counterpart that defines and passes the
+result struct explicitly. Its `first` helper infers named `sum` and `product`
+fields from the callback. The text explains native expansion/result packing,
+unevaluated queries, the nonempty-input requirement and the connection to pmap.
+
+The parallel mapping example now accepts two fields per job and a polymorphic
+callback returning named `sum` and `product` results. Its Odin counterpart uses
+explicit threads and an allocated slice of manually declared result structs.
+Both print `5 6` followed by `9 20`.
+
+Both pairs are permanent README-source tests through the example manifest.
+The full README suite passed 53 tests in 182.796 seconds, with no skips,
+failures or errors. All 96 displayed snippets are covered in checked and
+unchecked builds; the existing mode-selected examples also run under all four
+compile-time modes. Displayed-result, index-order and link checks passed.
+The README now has 47 indexed entries and 50 example groups.
+
+Raw results are retained locally in
+`dist/readme-reorganization-2026-11-27/dependent-pmap-final.json` and its sibling
+log. Temporary sources, executables and isolated caches were cleaned by the
+maintained runner. No compiler or runtime implementation changed.
