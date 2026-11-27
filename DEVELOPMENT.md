@@ -39,7 +39,7 @@ README code fences marked `readme-example` are the actual inputs to
 wrapper context, expected output or expected rejection, and mode selection. Do
 not keep a second copy of the snippets in fixtures. Update the manifest when
 adding or changing examples, show each runnable Thor example's printed results
-in an `// Output:` comment block, and run the maintained example suite in checked
+as plain `// result` comments after the final call, and run the maintained example suite in checked
 and unchecked builds. Its structure checks protect displayed output, index
 order, local links, legacy incoming anchors and coverage of every displayed
 Thor/Odin code fence. Introduce Thor syntax before using it in later examples;

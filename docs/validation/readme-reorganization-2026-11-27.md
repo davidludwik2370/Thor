@@ -106,7 +106,7 @@ callback types and compile-time execution. Key definitions now precede their
 examples, including the distinction between `:>` and native `::`, contextual
 struct literals, scoped operators and explicit `#run`.
 
-All 46 runnable Thor examples now contain an `// Output:` comment block after
+All 46 runnable Thor examples show their printed results as plain comments after
 their printing call or final invocation. The existing structure test compares
 those comments with the manifest, whose results are verified by executing both
 languages. Deliberate rejection examples retain their error labels instead of

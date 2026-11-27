@@ -20,17 +20,17 @@ CASES=json.loads(MANIFEST.read_text())['examples']
 
 def displayed_output(code):
     lines=code.splitlines()
-    starts=[index for index,line in enumerate(lines) if line.strip()=='// Output:']
-    if len(starts)!=1:
-        raise ValueError('A runnable Thor example needs one Output comment block')
+    # File examples may close main or a scoped block after the result comments.
+    while lines and lines[-1].strip() in ('','}'):
+        lines.pop()
     result=[]
-    for line in lines[starts[0]+1:]:
-        line=line.lstrip()
+    while lines:
+        line=lines.pop().lstrip()
         if line=='//':result.append('')
         elif line.startswith('// '):result.append(line[3:])
         else:break
-    if not result:raise ValueError('An Output comment block must show the printed results')
-    return '\n'.join(result)
+    if not result:raise ValueError('A runnable Thor example needs result comments after its final call')
+    return '\n'.join(reversed(result))
 
 
 def without_fences(text):

@@ -90,7 +90,7 @@ Also: [compiler commands](#compiler-commands), [vetting](#thor-vetting), [VS Cod
 
 ## Reading the examples
 
-Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. Comments labeled `Output` show the complete printed results; the Odin counterpart prints the same results. The tests compile the exact displayed snippets, run both languages, verify those comments and check rejection examples in checked and unchecked builds.
+Examples omit `package main`. Unless `main` is shown, put imports at file scope and the remaining code inside `main :: proc() { ... }`; examples using `fmt` also import `core:fmt`. Place `#+…` file tags before `package main`. Odin examples importing `thor:…` use ordinary Odin support libraries and need `-collection:thor=/path/to/Thor/runtime`. Comments after the final call show the complete printed results; the Odin counterpart prints the same results. The tests compile the exact displayed snippets, run both languages, verify those comments and check rejection examples in checked and unchecked builds.
 
 ## Imports and bindings
 
@@ -109,7 +109,6 @@ import * "core:strings"
 print("Square root: ")
 println(sqrt(f64(9)))
 println("Has prefix:", has_prefix("Thor", "Th"))
-// Output:
 // Square root: 3
 // Has prefix: true
 ```
@@ -143,7 +142,6 @@ number := 3
 value :> number+1
 values :> [2]int{10, 20}
 fmt.println(value, values[0])
-// Output:
 // 4 10
 ```
 
@@ -183,7 +181,6 @@ destination := make([]int, 2)
 defer delete(destination)
 copy_values(source, destination)
 fmt.println(destination)
-// Output:
 // [1, 2]
 ```
 
@@ -215,7 +212,6 @@ Infer a fixed array’s length and element type.
 ```odin
 values := [10, 20, 30]
 fmt.println(values)
-// Output:
 // [10, 20, 30]
 ```
 
@@ -242,7 +238,6 @@ Test collections and numeric or ordered intervals with `in` and `not_in`.
 values := [2, 4, 6]
 needle := 4
 fmt.println(needle in values, needle not_in values, needle in 0..<5)
-// Output:
 // true false true
 ```
 
@@ -271,7 +266,6 @@ Express allowed types and constant values as membership constraints.
 ```odin
 numeric :: proc(value: $T) -> T where T in [int, f64] { return value }
 fmt.println(numeric(3))
-// Output:
 // 3
 ```
 
@@ -299,7 +293,6 @@ enabled := true
 value := enabled ? 10
                  : 20
 fmt.println(value)
-// Output:
 // 10
 ```
 
@@ -326,7 +319,6 @@ Repeat a compile-time string with `*`.
 ```odin
 TEXT :: "ab" * 3
 fmt.println(TEXT)
-// Output:
 // ababab
 ```
 
@@ -354,7 +346,6 @@ FIRST :: [1, 2]
 SECOND :: [3, 4]
 ALL :: FIRST ++ SECOND
 fmt.println(ALL)
-// Output:
 // [1, 2, 3, 4]
 ```
 
@@ -382,7 +373,6 @@ Use infix `**` for integer and floating-point powers.
 <!-- readme-example: exponentiation:thor -->
 ```odin
 fmt.println(2 ** 10, 2.0 ** -3)
-// Output:
 // 1024 0.125
 ```
 
@@ -418,7 +408,6 @@ right := Pair{3, 4}
 result := left + right
 result += {5, 6}
 fmt.println(result.a, result.b)
-// Output:
 // 9 12
 ```
 
@@ -452,7 +441,6 @@ for i: i16 in 0..<3 { total += int(i) }
 values := [10, 20]
 for value, (i: u8) in values { total += value + int(i) }
 fmt.println(total)
-// Output:
 // 34
 ```
 
@@ -490,7 +478,6 @@ count := 3
 text := f"Hello {name}: {count}"
 defer delete(text)
 fmt.println(text)
-// Output:
 // Hello Ada: 3
 ```
 
@@ -521,7 +508,6 @@ import f "thor:format"
 text := f.format(1234567, grouping=true)
 defer delete(text)
 fmt.println(text)
-// Output:
 // 1,234,567
 ```
 
@@ -550,7 +536,6 @@ Build collections with an output expression, iteration and an optional filter.
 squares := [n*n for n in 0..<5 if n % 2 == 0]
 defer delete(squares)
 fmt.println(squares)
-// Output:
 // [0, 4, 16]
 ```
 
@@ -583,7 +568,6 @@ values := set[int]{1, 2, 2}
 defer delete(values)
 values += 3
 fmt.println(len(values), 2 in values)
-// Output:
 // 3 true
 ```
 
@@ -615,7 +599,6 @@ Count backward from the end of sequences.
 values := [10, 20, 30]
 values[-1] += 1
 fmt.println(values[-1], values[:-1])
-// Output:
 // 31 [10, 20]
 ```
 
@@ -645,7 +628,6 @@ Use a switch as a value, including multiple results and contextual literals.
 number := 2
 label := switch number { case 1: "one"; case 2: "two"; case: "other" }
 fmt.println(label)
-// Output:
 // two
 ```
 
@@ -675,7 +657,6 @@ number := 12
 result := 0
 switch number { case < 10: result = 1; case < 20: result = 2; case: result = 3 }
 fmt.println(result)
-// Output:
 // 2
 ```
 
@@ -706,7 +687,6 @@ Unwrap a successful optional result or panic with the original source context.
 import "core:strconv"
 number := strconv.parse_int("42") or_panic
 fmt.println(number)
-// Output:
 // 42
 ```
 
@@ -737,7 +717,6 @@ Provide a parenthesized fallback list with matching discarded positions.
 load :: proc() -> (int, string, bool) { return 0, "", false }
 _, text := load() or_else (_, "fallback")
 fmt.println(text)
-// Output:
 // fallback
 ```
 
@@ -766,7 +745,6 @@ Reduce sequences with `min`/`max` and receive an optional presence flag.
 values := [7, 2, 9]
 smallest, ok := min(..values[:])
 fmt.println(smallest, ok, max(**values))
-// Output:
 // 2 true 9
 ```
 
@@ -800,7 +778,6 @@ Person :: struct { age: int }
 person := Person{42}
 using person
 fmt.println(age)
-// Output:
 // 42
 ```
 
@@ -833,7 +810,6 @@ choose :: proc(a, b: $T, less := proc(x, y: T) -> bool { return x < y }) -> T {
     return a if less(a, b) else b
 }
 fmt.println(choose(7, 3))
-// Output:
 // 3
 ```
 
@@ -865,7 +841,6 @@ Declare deterministic functions with checked read-only inputs and effects.
 square :: fn(value: int) -> int { return value*value }
 number := 4
 fmt.println(square(number))
-// Output:
 // 16
 ```
 
@@ -893,7 +868,6 @@ Return a value-returning `fn` body’s last expression automatically.
 quad :: fn(x: int) -> int { 4*x }
 choose :: fn(x: int) -> int { switch x { case 0: 4; case: 8 } }
 fmt.println(quad(3), choose(0))
-// Output:
 // 12 4
 ```
 
@@ -925,7 +899,6 @@ apply :: fn(x: int, callback: fn(int) -> int) -> int { return callback(x) }
 callback: fn(int) -> int = twice
 number := 3
 fmt.println(apply(number, callback))
-// Output:
 // 6
 ```
 
@@ -957,7 +930,6 @@ show :: proc(value: int, expression :> #caller_expression(value)) {
 }
 number := 3
 show(number)
-// Output:
 // number 3
 ```
 
@@ -989,7 +961,6 @@ calculate :: proc(x: int) -> (value: int, valid: bool) { return x, x > 0 }
 Result :: ti.result_type_of(calculate(3))
 result := Result{3, true}
 fmt.println(result.value, result.valid)
-// Output:
 // 3 true
 ```
 
@@ -1020,7 +991,6 @@ SIZE :: square(4)
 NEXT :: #run ordinary(SIZE)
 values: [SIZE]int
 fmt.println(len(values), NEXT)
-// Output:
 // 16 17
 ```
 
@@ -1039,7 +1009,6 @@ Choose optional compile-time work and mark calls that should stay at runtime.
 square :: fn(x: int) -> int { return x*x }
 value := #runtime square(4)
 fmt.println(value)
-// Output:
 // 16
 ```
 
@@ -1067,7 +1036,6 @@ Select statements or values using `#switch` and leave inactive arms unchecked.
 MODE :: 2
 VALUE :: #switch MODE { case 1: 10; case: 20 }
 fmt.println(VALUE)
-// Output:
 // 20
 ```
 
@@ -1097,7 +1065,6 @@ Declare a local with `~:=` or immutable `~:>` to attach shallow end-of-scope cle
 values ~:= make([]int, 3)
 values[0] = 7
 fmt.println(values)
-// Output:
 // [7, 0, 0]
 ```
 
@@ -1133,7 +1100,6 @@ b := big.to_string(fraction)
 defer delete(a)
 defer delete(b)
 fmt.println(a, b)
-// Output:
 // 123456789012345678901234567890 5/4
 ```
 
@@ -1174,7 +1140,6 @@ sum :: proc(values: []int) -> int {
 }
 values := [1, 2, 3]
 fmt.println(sum(values[:]))
-// Output:
 // 6
 ```
 
@@ -1215,7 +1180,6 @@ Mark declarations intentionally unused and reject later references to them.
 @(unused)
 reserved :: 64
 fmt.println("ready")
-// Output:
 // ready
 ```
 
@@ -1252,7 +1216,6 @@ Silence selected vet advice on one declaration using named enum options.
 @(vet_ignore={.immutable})
 value := 4
 fmt.println(value)
-// Output:
 // 4
 ```
 
@@ -1284,7 +1247,6 @@ Use the package namespace, select individual names, or import all public helpers
 ```odin
 import * "thor:basic"
 print("Hello, Thor!")
-// Output:
 // Hello, Thor!
 ```
 
@@ -1317,7 +1279,6 @@ kept := basic.filter(values, positive)
 defer delete(mapped)
 defer delete(kept)
 fmt.println(mapped, kept)
-// Output:
 // [-2, 0, 6] [3]
 ```
 
@@ -1358,7 +1319,6 @@ main :: proc() {
     results := basic.pmap([]int{2, 3, 4}, square)
     defer delete(results)
     fmt.println(results)
-    // Output:
     // [4, 9, 16]
 }
 ```
@@ -1407,7 +1367,6 @@ values := []int{3, 1, 2}
 ordered := basic.sorted(values)
 defer delete(ordered)
 fmt.println(ordered, values)
-// Output:
 // [1, 2, 3] [3, 1, 2]
 ```
 
@@ -1441,7 +1400,6 @@ import "thor:basic"
     context.allocator = basic.scoped_arena()
     values := make([]int, 10)
     fmt.println(len(values))
-    // Output:
     // 10
 }
 ```
@@ -1481,7 +1439,6 @@ if err != .None { panic("clone failed") }
 defer { release_err := basic.deepfree(cloned); if release_err != .None { panic("free failed") } }
 cloned^[0] = 9
 fmt.println(source[0], cloned^[0])
-// Output:
 // 1 9
 ```
 
@@ -1514,7 +1471,6 @@ import "thor:basic"
 first := [1, 2]
 second := [1, 2]
 fmt.println(basic.hash(first) == basic.hash(second))
-// Output:
 // true
 ```
 
@@ -1545,7 +1501,6 @@ names := []string{"Ada", "Lin"}
 ages := []int{36, 28}
 people := basic.zip(name=names, age=ages)
 for person in people { fmt.println(person.name, person.age) }
-// Output:
 // Ada 36
 // Lin 28
 ```
@@ -1577,7 +1532,6 @@ number := basic._int("42") or_panic
 values := basic.range(1, 4)
 defer delete(values)
 basic.print(number, basic.sum(values), basic.and(true, false))
-// Output:
 // 42 6 false
 ```
 
