@@ -91,8 +91,7 @@ impl Lower<'_, '_> {
     }
     pub(super) fn sequence_trait(&mut self, id: NodeId) -> Result<String> {
         let typ = self.typ(id);
-        let mut base = &typ;
-        while let Type::Nominal(_, inner) = base { base = inner; }
+        let base = typ.storage_shape();
         match base {
             Type::Slice(_) | Type::Dynamic(_) | Type::Fixed { .. } | Type::String { .. }
             | Type::Array { length: Some(_), .. } => return Ok("true".into()),
@@ -117,7 +116,7 @@ impl Lower<'_, '_> {
                 if let Some(base) = self.source.role(parent, "expr") {
                     let typ = self.typ(base);
                     let mut shape = &typ;
-                    while let Type::Nominal(_, inner) | Type::Soa(inner) = shape { shape = inner; }
+                    while let Type::Nominal(_, inner) | Type::Soa(inner) | Type::SoaStorage(inner) = shape { shape = inner; }
                     if matches!(shape, Type::Slice(_) | Type::Dynamic(_) | Type::Pointer(_)) {
                         // Writing through a copied reference header leaves its
                         // containing value unchanged.
@@ -181,16 +180,17 @@ impl Lower<'_, '_> {
         }
         let base = self.role(id, "expr")?;
         let typ = self.typ(base);
+        let shape = typ.storage_shape();
         let inherited = self.addressable(base)?;
-        if matches!(typ, Type::Pointer(_)) {
+        if matches!(shape, Type::Pointer(_)) {
             return Ok("true".into());
         }
-        if matches!(typ, Type::Slice(_)|Type::Dynamic(_)) && node.kind == "Index" {
+        if matches!(shape, Type::Slice(_)|Type::Dynamic(_)) && node.kind == "Index" {
             return Ok("true".into());
         }
-        if !typ.is_unknown() {
+        if !shape.is_unknown() {
             return Ok(
-                if node.kind == "Selector" || matches!(typ, Type::Array { .. }|Type::Fixed {..}) {
+                if node.kind == "Selector" || matches!(shape, Type::Array { .. }|Type::Fixed {..}) {
                     inherited
                 } else {
                     "false".into()
@@ -299,7 +299,7 @@ impl Lower<'_, '_> {
         if let Type::Array {
             length: Some(length),
             ..
-        } = typ
+        } = typ.storage_shape()
         {
             if index {
                 if let Some(value) = self
@@ -362,8 +362,7 @@ impl Lower<'_, '_> {
                 let by_reference_row = source.node(symbol.reference.node).kind == "Range"
                     && symbol.index == 0 && source.node(symbol.name_node).kind == "Unary"
                     && source.node(symbol.name_node).op == "&";
-                let mut shape = &typ;
-                while let Type::Nominal(_, inner) = shape {shape = inner;}
+                let shape = typ.storage_shape();
                 if let Type::Array {length:Some(length), ..} = shape {
                     if by_reference_row {
                         // Native SOA array rows use a proxy lvalue. Keep its
@@ -420,8 +419,7 @@ impl Lower<'_, '_> {
             |this| {
                 let addr=this.addressable(base)?;
                 let typ = this.typ(base);
-                let mut shape = &typ;
-                while let Type::Nominal(_, inner) = shape { shape = inner; }
+                let shape = typ.storage_shape();
                 let known_array = match shape {
                     Type::Array { .. } | Type::Fixed { .. } => Some(true),
                     Type::Slice(_) | Type::Dynamic(_) | Type::String { .. } => Some(false),
@@ -528,7 +526,7 @@ impl Lower<'_, '_> {
                             "Cannot take a mutable address of an element in a temporary array.",
                         );
                         return Ok(Code::concat([
-                            this.g(format!("when {array} {{ _ = "), id),
+                            this.g(format!("when {array} {{ return "), id),
                             error,
                             this.g("} else {", id),
                             value,
@@ -665,10 +663,7 @@ impl Lower<'_, '_> {
                 .is_some_and(|base| self.assignment_reference(base)),
             "Selector" => self.source.role(id, "expr").is_some_and(|base| {
                 let typ = self.typ(base);
-                let mut shape = &typ;
-                while let Type::Nominal(_, inner) = shape {
-                    shape = inner;
-                }
+                let shape = typ.storage_shape();
                 matches!(shape, Type::Pointer(_)) || self.assignment_reference(base)
             }),
             _ => false,

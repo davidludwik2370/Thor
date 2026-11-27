@@ -17,11 +17,8 @@ pub struct Evaluator<'a, 'r, 'f> {
     pub resolver: &'r mut Resolver<'a>,
     pub arena: &'f mut Arena,
 }
-fn base(mut typ: &Type) -> &Type {
-    while let Type::Nominal(_, inner) = typ {
-        typ = inner;
-    }
-    typ
+fn base(typ: &Type) -> &Type {
+    typ.storage_shape()
 }
 impl Evaluator<'_, '_, '_> {
     fn empty(&mut self) -> Id {

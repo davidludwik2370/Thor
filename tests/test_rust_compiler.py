@@ -340,6 +340,33 @@ generic_read::proc(board:$T,row,col:int)->int{return board.cells[row][col]}
 last::proc(value:$T)->int{return int(value[-1])}
 '''),expected='access')
 
+    def test_distinct_nested_sequence_writes_preserve_storage(self):
+        prefix = '''Rows :: distinct [][2]int
+Board :: distinct [2][2]int
+Buffer :: distinct [dynamic][2]int
+'''
+        source = self.program('''
+board := Board{{1,2},{3,4}}
+rows := Rows(board[:])
+buffer := make(Buffer, 2)
+defer delete(buffer)
+buffer[1] = {5,6}
+i := -1
+rows[i][i] += 4
+cell := &board[i][i]
+cell^ += 2
+buffer[i][i] = rows[i][i]
+if board[1][1] != 10 || buffer[1][1] != 10 { panic("nested storage") }
+''', prefix)
+        for flags in ([], ['-disable-assert'], UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(source, flags=flags)
+
+        temporary = self.program('i:=-1;rows()[i][i]=8',
+                                 prefix+'rows::proc()->Board{return {}}\n')
+        diagnostic = self.compare(temporary, command='check', fail='temporary array')
+        self.assertNotIn('Missing return statement', diagnostic.stderr)
+
     def test_runtime_sequence_generic_writes_keep_headers_and_lhs_order(self):
         code=self.program('''
 m:=make(map[int]int);m[-1]=3;updated:=write(m);defer delete(updated)

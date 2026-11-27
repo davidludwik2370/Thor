@@ -500,6 +500,7 @@ fn shape(typ: &Type, r: &Resolver<'_>) -> Value {
         ])
     };
     match typ {
+        Type::SoaStorage(storage) => json!(["soa-storage",shape(storage, r)]),
         Type::Nominal(owner, base) => json!(["nominal", origin(owner), shape(base, r)]),
         Type::Struct(owner) | Type::Enum(owner) => {
             json!(["named", origin(owner)])

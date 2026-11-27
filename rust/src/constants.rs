@@ -143,6 +143,7 @@ impl Type {
             | Self::Slice(elem)
             | Self::Dynamic(elem)
             | Self::Pointer(elem)
+            | Self::SoaStorage(elem)
             | Self::Soa(elem)
             | Self::Set(elem) => elem.resolved(),
             Self::Map { key, value } => key.resolved() && value.resolved(),

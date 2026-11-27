@@ -622,11 +622,8 @@ struct Analysis<'a, 'r> {
     async_callback:bool,
     demand_count:usize,
 }
-fn base(mut t: &Type) -> &Type {
-    while let Type::Nominal(_, b) = t {
-        t = b;
-    }
-    t
+fn base(t: &Type) -> &Type {
+    t.storage_shape()
 }
 fn reference(t: &Type) -> bool {
     matches!(
@@ -649,6 +646,7 @@ fn generic(t: &Type) -> bool {
         | Type::Slice(t)
         | Type::Dynamic(t)
         | Type::Set(t)
+        | Type::SoaStorage(t)
         | Type::Soa(t)
         | Type::Nominal(_, t)
         | Type::Array { elem: t, .. }

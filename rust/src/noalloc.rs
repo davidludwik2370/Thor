@@ -23,16 +23,13 @@ mod collections;
 mod system;
 #[path = "noallocdeferred.rs"]
 mod deferred;
-fn base_type(mut typ: &Type) -> &Type {
-    while let Type::Nominal(_, inner) = typ {
-        typ = inner;
-    }
-    typ
+fn base_type(typ: &Type) -> &Type {
+    typ.storage_shape()
 }
 fn indexed_type(mut typ: &Type) -> &Type {
     loop {
         match typ {
-            Type::Nominal(_, inner) | Type::Pointer(inner) => typ = inner,
+            Type::Nominal(_, inner) | Type::SoaStorage(inner) | Type::Pointer(inner) => typ = inner,
             _ => return typ,
         }
     }
@@ -210,14 +207,16 @@ impl<'a, 'r> Check<'a, 'r> {
                     break;
                 }
                 match typ {
-                    Type::Array { elem, .. } | Type::Matrix{elem,..}
-            | Type::Vector { elem, .. }
+                    Type::Array { elem, .. }
+                    | Type::Matrix { elem, .. }
+                    | Type::Vector { elem, .. }
                     | Type::Fixed { elem, .. }
                     | Type::Slice(elem)
                     | Type::Dynamic(elem)
                     | Type::Set(elem)
                     | Type::Pointer(elem)
                     | Type::Nominal(_, elem)
+                    | Type::SoaStorage(elem)
                     | Type::Soa(elem) => pending.push(elem),
                     Type::Map { key, value } => pending.extend([key.as_ref(), value.as_ref()]),
                     Type::Record(_, fields) | Type::Union(_, fields) | Type::Anonymous(fields) => {
@@ -536,6 +535,7 @@ impl<'a, 'r> Check<'a, 'r> {
             | Type::Vector { elem, .. }
             | Type::Fixed { elem, .. }
             | Type::Nominal(_, elem)
+            | Type::SoaStorage(elem)
             | Type::Soa(elem) => self.owned(elem, seen),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r
@@ -574,7 +574,7 @@ impl<'a, 'r> Check<'a, 'r> {
         match t {
             Type::BigInteger | Type::BigRational => true,
             Type::Unknown | Type::Generic => unknown,
-            Type::Array { elem, .. } | Type::Vector{elem,..} | Type::Matrix{elem,..} | Type::Fixed { elem, .. } | Type::Nominal(_, elem) => {
+            Type::Array { elem, .. } | Type::Vector{elem,..} | Type::Matrix{elem,..} | Type::Fixed { elem, .. } | Type::SoaStorage(elem) | Type::Nominal(_, elem) => {
                 self.value_storage(elem, seen, unknown)
             }
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self

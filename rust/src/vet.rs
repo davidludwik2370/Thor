@@ -157,7 +157,7 @@ fn possible(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -
         {
             false
         }
-        Type::Nominal(_, base)
+        Type::Nominal(_, base) | Type::SoaStorage(base)
         | Type::Slice(base)
         | Type::Array { elem: base, .. }
         | Type::Soa(base) => possible(base, resolver, seen),
@@ -196,7 +196,7 @@ fn owned(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> b
         | Type::Dynamic(_)
         | Type::Map { .. }
         | Type::Set(_) => true,
-        Type::Nominal(_, base)
+        Type::Nominal(_, base) | Type::SoaStorage(base)
         | Type::Array { elem: base, .. }
         | Type::Fixed { elem: base, .. } => owned(base, resolver, seen),
         Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver
@@ -221,7 +221,7 @@ fn inline_value(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Typ
     known.insert(typ.clone(), false);
     crate::profile::count("vet.inline_types_scanned", 1);
     let value = match typ {
-        Type::Nominal(_, base) | Type::Array { elem: base, .. } | Type::Fixed { elem: base, .. } =>
+        Type::Nominal(_, base) | Type::SoaStorage(base) | Type::Array { elem: base, .. } | Type::Fixed { elem: base, .. } =>
             inline_value(base, resolver, known),
         Type::Struct(owner) | Type::Record(owner, _) if resolver.sources[owner.file].node(owner.node).op == "raw_union" => false,
         Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)

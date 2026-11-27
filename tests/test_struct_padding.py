@@ -93,6 +93,19 @@ local::fn()->Value{x:=Value{a=4,b=6};x+=x;return x}
 COMPREHENSION::[item+item for item in [Value{a=1,b=3},Value{a=2,b=4}]]
 ''')
 
+    def test_generic_purity_distinguishes_procedure_padding_from_callable_fields(self):
+        prefix = '''Inner::struct{_:proc(), n:int}
+Outer::struct{items:[2]Inner}
+sum::fn(x:$T)->int{x.items[0].n+x.items[1].n}
+'''
+        for flags in ([], ['-disable-assert'], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(self.program('v:=Outer{items={{n=2},{n=3}}};if sum(v)!=5{panic("sum")}',prefix),
+                             flags=flags)
+        # Naming the very same field makes the procedure part of the value.
+        self.compare(self.program('v:Outer;_=sum(v)', prefix.replace('_:proc()', 'callback:proc()')),
+                     command='check', fail='ordinary procedure values')
+
     def test_imported_native_private_layouts(self):
         for flags in ([],native.UNCHECKED):
             self.compare(self.program('x:=model.make_value(4);y:=add(x,x);if y.value!=8 {panic("native private")}',

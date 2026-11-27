@@ -73,11 +73,8 @@ impl Default for Flow {
 pub struct Arena {
     pub values: Vec<Flow>,
 }
-fn base(mut typ: &Type) -> &Type {
-    while let Type::Nominal(_, inner) = typ {
-        typ = inner;
-    }
-    typ
+fn base(typ: &Type) -> &Type {
+    typ.storage_shape()
 }
 fn numeric_permission(flow:&Flow)->Permission {
     flow.numeric_borrowed.clone().unwrap_or_else(||flow.borrowed.substitute(&mut |access| {

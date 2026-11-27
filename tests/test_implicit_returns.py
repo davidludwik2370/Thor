@@ -42,6 +42,32 @@ main::proc(){n:=2;cb:fn(int)->int=quad;fmt.println(A,B,C,apply(n,cb),apply(n,fn(
         for mode in ['required','normal','aggressive','override']:
             with self.subTest(mode=mode):self.compare(text,flags=['--comptime='+mode],expected='12 20 28 8 3')
 
+    def test_tail_switch_generic_power_and_runtime_views_agree_across_modes(self):
+        source = '''package main
+import "core:fmt" / println
+score :: fn(row: [2]$T, i: int) -> T {
+    switch i {
+    case < 0: row[i] ** 2
+    case: row[i]
+    }
+}
+expected :: #run score([2]int{2,3}, -1)
+main :: proc() {
+    rows ~:= make([][2]int, 2)
+    rows[0] = {2,3}
+    rows[1] = {4,5}
+    total := 0
+    for row, (i: u8) in rows {
+        total += score(row, int(i)-1)
+    }
+    println(f"{expected}/{total}")
+}
+'''
+        for mode in ('required', 'normal', 'aggressive', 'override'):
+            for flags in ([], ['-disable-assert'], base.UNCHECKED):
+                with self.subTest(mode=mode, flags=flags):
+                    self.compare(source, flags=['--comptime='+mode, *flags], expected='9/13')
+
     def test_contextual_literals_and_multi_result_forwarding(self):
         self.compare('''package main
 import "core:fmt"

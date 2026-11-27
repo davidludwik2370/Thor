@@ -169,7 +169,9 @@ impl Plan {
             | Type::Fixed { elem, .. }
             | Type::Pointer(elem)
             | Type::Slice(elem)
-            | Type::Dynamic(elem) => self.emits_type(elem, sources),
+            | Type::Dynamic(elem)
+            | Type::SoaStorage(elem)
+            | Type::Soa(elem) => self.emits_type(elem, sources),
             _ => true,
         }
     }

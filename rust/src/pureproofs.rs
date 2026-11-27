@@ -513,7 +513,7 @@ impl Lower<'_, '_> {
             {
                 return Some(true)
             }
-            Type::Nominal(_, base) => vec![*base.clone()],
+            Type::Nominal(_, base) | Type::SoaStorage(base) => vec![*base.clone()],
             Type::Array { elem, .. }
             | Type::Slice(elem)
             | Type::Dynamic(elem)
@@ -649,7 +649,7 @@ impl Lower<'_, '_> {
             return false;
         }
         match typ {
-            Type::Unknown | Type::Generic | Type::Soa(_) => true,
+            Type::Unknown | Type::Generic | Type::Soa(_) | Type::SoaStorage(_) => true,
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .resolver
                 .record_fields(typ)

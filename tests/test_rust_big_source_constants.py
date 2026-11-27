@@ -64,6 +64,18 @@ delete(copy);delete(text)
         body+='delete(a);delete(b)\n'
         self.tracked(self.numeric(body,prefix))
 
+    def test_power_budget_checks_both_rational_components(self):
+        for expression in ('Rational(1,256)**16777216', 'Rational(-256,3)**-16777216',
+                           'Integer(256)**16777216', 'Integer(256)<<134217720'):
+            with self.subTest(expression=expression):
+                source = self.numeric('_=VALUE', 'VALUE::'+expression+'\n')
+                self.compare(source, command='check', fail='Compile-time result exceeds 16 MiB')
+        prefix = '''SMALL::Rational(-1,2)**-3
+UNIT::Rational(-1)**-100000000000000000001
+ZERO::Integer(0)**100000000000000000001
+'''
+        self.tracked(self.numeric('if SMALL!=-8 || UNIT!=-1 || ZERO!=0{panic("power")}', prefix))
+
 
     def test_compile_switch_constants_keep_selected_types_and_lazy_arms(self):
         self.tracked(self.numeric('''LOCAL::Integer(123)

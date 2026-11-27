@@ -10,6 +10,7 @@ impl Scheduler<'_> {
             | Type::Slice(element)
             | Type::Dynamic(element)
             | Type::Pointer(element)
+            | Type::SoaStorage(element)
             | Type::Soa(element)
             | Type::Set(element) => return self.binding_condition(element),
             _ => {}

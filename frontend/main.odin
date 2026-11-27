@@ -336,7 +336,12 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "EnumType"
         info.roles["base"] = span(n.base_type)
         info.lists["members"] = spans(n.fields)
-    case ^ast.Pointer_Type: info.kind = "PointerType"; info.roles["elem"] = span(n.elem)
+    case ^ast.Pointer_Type:
+        info.kind = "PointerType"
+        info.roles["elem"] = span(n.elem)
+        if n.tag != nil {
+            if tag, ok := n.tag.derived.(^ast.Basic_Directive); ok { info.op = tag.name }
+        }
     case ^ast.Multi_Pointer_Type: info.kind = "MultiPointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Typeid_Type: info.kind = "TypeidType"
     case ^ast.Map_Type: info.kind = "MapType"; info.roles["key"] = span(n.key); info.roles["value"] = span(n.value)

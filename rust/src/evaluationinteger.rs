@@ -37,12 +37,7 @@ impl Scheduler<'_> {
         match ast.kind.as_str() {
             "Literal" if ast.op == "integer" => {
                 let text = source.text(node.node).replace('_', "");
-                let (radix, digits) = [("0x", 16), ("0b", 2), ("0o", 8), ("0d", 10)]
-                    .iter()
-                    .find_map(|(prefix, radix)| {
-                        text.strip_prefix(prefix).map(|digits| (*radix, digits))
-                    })
-                    .unwrap_or((10, &text));
+                let (radix, digits) = crate::semantics::integer_digits(&text);
                 BigInt::parse_bytes(digits.as_bytes(), radix)
             }
             "Paren" | "Unary" => {

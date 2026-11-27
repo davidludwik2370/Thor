@@ -44,6 +44,22 @@ identity::proc(row:$T)->T{return row}
 take_empty::proc(row:struct{})->int{return 7}
 '''))
 
+    def test_named_results_follow_rune_and_i32_overload_identity(self):
+        source = self.program('''
+chars := basic.pmap([]rune{'a'}, classify)
+defer delete(chars)
+numbers := basic.pmap([]i32{65}, classify)
+defer delete(numbers)
+if chars[0].character!='a' || numbers[0].integer!=65 {panic("overload result")}
+''', '''import "thor:basic"
+by_rune::fn(c:rune)->(character:rune, ok:bool){return c,true}
+by_i32::fn(n:i32)->(integer:i32, ok:bool){return n,true}
+classify::proc{by_rune,by_i32}
+''')
+        for flags in ([], ['-disable-assert'], base.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.invoke(source, flags=flags)
+
     def test_fixed_arrays_and_slices_are_single_arguments(self):
         self.checked_and_unchecked(self.program('''
 arrays:=[][2]int{{1,2},{3,4}}

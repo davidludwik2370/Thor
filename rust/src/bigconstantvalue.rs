@@ -3,6 +3,7 @@ use crate::bigvalues::{self, Fraction};
 use num_bigint::BigInt;
 use num_traits::{One, Signed, ToPrimitive, Zero};
 use serde_json::{json, Value};
+const MAX_RESULT_BITS: u64 = 16 * 1024 * 1024 * 8;
 fn add(a: &Fraction, b: &Fraction, subtract: bool) -> bigvalues::Result<Fraction> {
     let right = b.numerator() * a.denominator();
     Fraction::new(
@@ -47,17 +48,16 @@ pub fn binary(left: &Value, right: &Value, op: &str) -> bigvalues::Result<Value>
     }
     let a = bigvalues::number(left)?;
     let b = bigvalues::number(right)?;
-    let comparison = (a.numerator() * b.denominator()).cmp(&(b.numerator() * a.denominator()));
-    let boolean = match op {
-        "==" => Some(comparison.is_eq()),
-        "!=" => Some(!comparison.is_eq()),
-        "<" => Some(comparison.is_lt()),
-        "<=" => Some(!comparison.is_gt()),
-        ">" => Some(comparison.is_gt()),
-        ">=" => Some(!comparison.is_lt()),
-        _ => None,
-    };
-    if let Some(value) = boolean {
+    if matches!(op, "==" | "!=" | "<" | "<=" | ">" | ">=") {
+        let comparison = (a.numerator() * b.denominator()).cmp(&(b.numerator() * a.denominator()));
+        let value = match op {
+            "==" => comparison.is_eq(),
+            "!=" => !comparison.is_eq(),
+            "<" => comparison.is_lt(),
+            "<=" => !comparison.is_gt(),
+            ">" => comparison.is_gt(),
+            _ => !comparison.is_lt(),
+        };
         return Ok(json!({"kind":"bool","value":value}));
     }
     if matches!(op, "&" | "|" | "~" | "&~" | "<<" | ">>") && kind != "big_integer" {
@@ -100,7 +100,8 @@ pub fn binary(left: &Value, right: &Value, op: &str) -> bigvalues::Result<Value>
             if a.numerator().is_zero() {
                 Fraction::integer(BigInt::zero())
             } else if op == "<<" {
-                if b.numerator() > &BigInt::from(8 * 16 * 1024 * 1024) {
+                if a.numerator().bits() > MAX_RESULT_BITS ||
+                    b.numerator() > &BigInt::from(MAX_RESULT_BITS - a.numerator().bits()) {
                     return Err("Compile-time result exceeds 16 MiB.".into());
                 }
                 Fraction::integer(
@@ -131,8 +132,11 @@ pub fn binary(left: &Value, right: &Value, op: &str) -> bigvalues::Result<Value>
             if a.numerator().is_zero() && negative {
                 return Err("A big-number divisor must not be zero.".into());
             }
-            if a.numerator().abs() > *a.denominator()
-                && exponent > BigInt::from(8 * 16 * 1024 * 1024)
+            // The fraction is reduced, so powers of its numerator and
+            // denominator cannot cancel. Each k-bit component contributes
+            // at least (k - 1) bits of growth per factor in either direction.
+            let bits = a.numerator().bits().max(a.denominator().bits());
+            if bits > 1 && exponent > BigInt::from((MAX_RESULT_BITS - 1) / (bits - 1))
             {
                 return Err("Compile-time result exceeds 16 MiB.".into());
             }
@@ -151,6 +155,9 @@ pub fn binary(left: &Value, right: &Value, op: &str) -> bigvalues::Result<Value>
                     .to_u32()
                     .ok_or("Compile-time result exceeds 16 MiB.")?;
                 let (n, d) = (a.numerator().pow(exponent), a.denominator().pow(exponent));
+                if n.bits().max(d.bits()) > MAX_RESULT_BITS {
+                    return Err("Compile-time result exceeds 16 MiB.".into());
+                }
                 if negative {
                     Fraction::new(d, n)?
                 } else {

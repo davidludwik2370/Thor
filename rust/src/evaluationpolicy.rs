@@ -11,7 +11,7 @@ impl Scheduler<'_> {
             Type::Function(..)|Type::Procedure(_)=>true,
             Type::Nominal(_,base)|Type::Array{elem:base,..}|Type::Fixed{elem:base,..}
             |Type::Slice(base)|Type::Dynamic(base)|Type::Matrix{elem:base,..}
-            |Type::Vector{elem:base,..}|Type::Soa(base)=>self.callback_result(base),
+            |Type::Vector{elem:base,..}|Type::Soa(base)|Type::SoaStorage(base)=>self.callback_result(base),
             Type::Struct(_)|Type::Record(..)|Type::Anonymous(_)=>self.resolver.record_fields(typ)
                 .iter().any(|(_,field)|self.callback_result(field)),
             Type::Union(..)=>self.resolver.union_variants(typ).iter().any(|field|self.callback_result(field)),

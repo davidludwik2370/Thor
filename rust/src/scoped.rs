@@ -199,11 +199,8 @@ pub(crate) fn allocator_argument(r: &mut Resolver<'_>, call: Ref) -> Option<Ref>
     }
     None
 }
-fn base(mut typ: &Type) -> &Type {
-    while let Type::Nominal(_, inner) = typ {
-        typ = inner;
-    }
-    typ
+fn base(typ: &Type) -> &Type {
+    typ.storage_shape()
 }
 fn reference(typ: &Type) -> bool {
     if matches!(base(typ),Type::Scalar{name,..} if matches!(name.as_str(),"rawptr"|"any")) {

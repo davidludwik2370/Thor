@@ -111,7 +111,14 @@ impl Resolver<'_> {
                 let types=groups.into_iter().flat_map(|(typ,n)|std::iter::repeat_n(typ,n));
                 Some(Type::Anonymous(types.enumerate().map(|(i,t)|(format!("v{i}"),t)).collect()))
             }
-            "raw_data" => Some(Type::Pointer(Box::new(if typ.is_string(){Type::scalar("u8")}else{typ.element().cloned().unwrap_or(Type::Unknown)}))),
+            "raw_data" => {
+                let element = match base {
+                    Type::Pointer(inner) => inner.element().cloned(),
+                    Type::Slice(elem) | Type::Dynamic(elem) => Some(*elem.clone()),
+                    _ => typ.string_code_unit(),
+                };
+                Some(Type::Pointer(Box::new(element.unwrap_or(Type::Unknown))))
+            }
             "copy" => Some(Type::scalar("int")),
             _ => None,
         }

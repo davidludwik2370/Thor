@@ -345,6 +345,14 @@ pub(crate) fn clean(
             .as_ref()
             .map(|origin| origin.kind.as_str())
             .unwrap_or("");
+        if kind == "pure-type-validator" {
+            if let Some(typ) = msgs.first().and_then(|text|
+                text.strip_prefix("Expected a struct type for 'type_has_shared_fields', got ")) {
+                // The native checker accepts ordinary structs here, but rejects
+                // their SOA representation, including named SOA types.
+                msgs[0] = format!("Pure functions cannot verify the fields of the structure-of-arrays type '{typ}'.");
+            }
+        }
         let mut location = span(&error);
         let mentions_concat = msgs.iter().any(|message| {
             message.contains("'concatenate'") || message.starts_with("Invalid declaration value")

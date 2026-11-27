@@ -411,7 +411,7 @@ impl Project {
             if !seen.insert(typ.clone()) { continue; }
             match typ {
                 Type::Slice(elem) | Type::Dynamic(elem) | Type::Set(elem)
-                | Type::Soa(elem) | Type::Nominal(_, elem) | Type::Array { elem, .. }
+                | Type::SoaStorage(elem) | Type::Soa(elem) | Type::Nominal(_, elem) | Type::Array { elem, .. }
                 | Type::Fixed { elem, .. } => pending.push(*elem),
                 Type::Map { key, value } => pending.extend([*key, *value]),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {

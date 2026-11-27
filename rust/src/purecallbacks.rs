@@ -224,6 +224,7 @@ impl Checker<'_, '_> {
             | Type::Dynamic(t)
             | Type::Array { elem: t, .. }
             | Type::Fixed { elem: t, .. }
+            | Type::SoaStorage(t)
             | Type::Soa(t) => self.has_callback(t, seen),
             Type::Map { key, value } => {
                 self.has_callback(key, seen) || self.has_callback(value, seen)
@@ -266,12 +267,13 @@ impl Checker<'_, '_> {
             | Type::Dynamic(t)
             | Type::Array { elem: t, .. }
             | Type::Fixed { elem: t, .. }
+            | Type::SoaStorage(t)
             | Type::Soa(t) => self.impure_storage(t, seen),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r
                 .record_fields(typ)
                 .iter()
-                .any(|(_, t)| self.impure_storage(t, seen)),
+                .any(|(name, t)| name != "_" && self.impure_storage(t, seen)),
             Type::Union(..) => self
                 .r
                 .union_variants(typ)
@@ -338,6 +340,7 @@ impl Checker<'_, '_> {
             | (Type::Dynamic(e), Type::Dynamic(a))
             | (Type::Array { elem: e, .. }, Type::Array { elem: a, .. })
             | (Type::Fixed { elem: e, .. }, Type::Fixed { elem: a, .. })
+            | (Type::SoaStorage(e), Type::SoaStorage(a))
             | (Type::Soa(e), Type::Soa(a)) => self.compatible(e, a, true),
             (Type::Map { key: e, value: ev }, Type::Map { key: a, value: av }) => {
                 self.compatible(e, a, true) && self.compatible(ev, av, true)

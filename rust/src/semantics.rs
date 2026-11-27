@@ -43,6 +43,16 @@ mod resolverseed;
 pub(crate) use resolverseed::ResolverSeed;
 pub(crate) use typepool::{SharedType, TypeId, TypeInput};
 
+/// Odin integer prefixes, after the lexer has validated the literal.
+pub(crate) fn integer_digits(text: &str) -> (u32, &str) {
+    for (prefix, radix) in [("0b", 2), ("0o", 8), ("0d", 10), ("0z", 12), ("0x", 16)] {
+        if let Some(digits) = text.strip_prefix(prefix) {
+            return (radix, digits);
+        }
+    }
+    (10, text)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct Ref {
     pub file: usize,
@@ -89,7 +99,8 @@ pub enum Type {
     Set(Box<Type>),
     Struct(Ref),
     Anonymous(Vec<(String, Type)>),
-    Soa(Box<Type>),
+    Soa(Box<Type>), // Slice of SOA rows.
+    SoaStorage(Box<Type>), // Fixed or dynamic SOA; retains native container shape.
     Record(Ref, Vec<(String, Type)>),
     Nominal(Ref, Box<Type>),
     Fixed {
@@ -103,6 +114,15 @@ pub enum Type {
     Function(Ref, Vec<(String, Type)>),
 }
 impl Type {
+    /// Storage operations follow the underlying container. Reflection and
+    /// overload resolution must retain nominal and SOA type identities.
+    pub(crate) fn storage_shape(&self) -> &Type {
+        let mut shape = self;
+        while let Self::Nominal(_, inner) | Self::SoaStorage(inner) = shape {
+            shape = inner;
+        }
+        shape
+    }
     pub(crate) fn signature(&self) -> Option<Ref> {
         match self { Self::Procedure(r) | Self::Function(r, _) => Some(*r), Self::Nominal(_, t) => t.signature(), _ => None }
     }
@@ -130,6 +150,28 @@ impl Type {
             _ => false,
         }
     }
+    pub(super) fn string_code_unit(&self) -> Option<Type> {
+        match self.storage_shape() {
+            Self::String { name, .. } if name == "string" => Some(Self::scalar("u8")),
+            Self::String { name, .. } if name == "string16" => Some(Self::scalar("u16")),
+            _ => None,
+        }
+    }
+    fn range_binding(&self, index: usize) -> Type {
+        let mut iterable = self;
+        while let Self::Pointer(inner) = iterable.storage_shape() {
+            iterable = inner;
+        }
+        match iterable.storage_shape() {
+            Self::Map { key, value } => if index == 0 { *key.clone() } else { *value.clone() },
+            // An unresolved array bound can denote an enum index type.
+            Self::Array { length: None, .. } if index == 1 => Self::Unknown,
+            _ if index == 1 => Self::scalar("int"),
+            Self::String { .. } => Self::scalar("rune"),
+            Self::Scalar { name, .. } if name == "bit_set" => Self::Unknown,
+            _ => iterable.element().cloned().unwrap_or_else(|| iterable.clone().defaulted()),
+        }
+    }
     pub fn scalar(name: &str) -> Self {
         Self::Scalar {
             name: name.into(),
@@ -148,7 +190,7 @@ impl Type {
             | Self::Pointer(elem)
             | Self::Set(elem) => Some(elem),
             Self::Soa(elem) => Some(elem),
-            Self::Nominal(_, base) => base.element(),
+            Self::Nominal(_, base) | Self::SoaStorage(base) => base.element(),
             Self::Fixed { elem, .. } => Some(elem),
             Self::Map { value, .. } => Some(value),
             _ => None,
@@ -165,7 +207,7 @@ impl Type {
         }
     }
     pub fn is_sequence(&self) -> bool {
-        if let Self::Nominal(_, base) = self {
+        if let Self::Nominal(_, base) | Self::SoaStorage(base) = self {
             return base.is_sequence();
         }
         matches!(
@@ -1400,26 +1442,8 @@ impl<'a> Resolver<'a> {
                     }
                     if s.node(sym.reference.node).kind == "Range" {
                         if let Some(expr) = s.role(sym.reference.node, "expr") {
-                            let mut t = self.type_of(Ref {
-                                file: r.file,
-                                node: expr,
-                            });
-                            while let Type::Pointer(elem) = t {
-                                t = *elem;
-                            }
-                            if let Type::Map { key, value } = t {
-                                return if sym.index == 0 { *key } else { *value };
-                            }
-                            if sym.index == 1 {
-                                return Type::scalar("int");
-                            }
-                            if matches!(t, Type::String { .. }) {
-                                return Type::scalar("rune");
-                            }
-                            if let Some(elem) = t.element() {
-                                return elem.clone();
-                            }
-                            return t.defaulted();
+                            let iterable = self.type_of(Ref { file: r.file, node: expr });
+                            return iterable.range_binding(sym.index);
                         }
                     }
                 }
@@ -1509,10 +1533,12 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(Type::Unknown),
                 );
                 if let Some(len) = child("len") {
-                    if n.op=="simd" {Type::Vector{elem,length:self.constant_int(len)}}else{Type::Array {
-                        elem,
-                        length: self.constant_int(len),
-                    }}
+                    let length = self.constant_int(len);
+                    match n.op.as_str() {
+                        "soa" => Type::SoaStorage(Box::new(Type::Array { elem, length })),
+                        "simd" => Type::Vector { elem, length },
+                        _ => Type::Array { elem, length },
+                    }
                 } else if n.op == "soa" {
                     Type::Soa(elem)
                 } else {
@@ -1533,7 +1559,9 @@ impl<'a> Resolver<'a> {
                         .map(|r| self.type_of(r))
                         .unwrap_or(Type::Unknown),
                 );
-                if let Some(capacity) = child("capacity") {
+                if n.op == "soa" {
+                    Type::SoaStorage(Box::new(Type::Dynamic(elem)))
+                } else if let Some(capacity) = child("capacity") {
                     Type::Fixed {
                         elem,
                         length: self.constant_int(capacity),
@@ -1840,12 +1868,8 @@ impl<'a> Resolver<'a> {
         match n.kind.as_str() {
             "Literal" => {
                 let text = s.text(r.node).replace('_', "");
-                for (prefix, radix) in [("0x", 16), ("0b", 2), ("0o", 8), ("0d", 10)] {
-                    if let Some(value) = text.strip_prefix(prefix) {
-                        return i128::from_str_radix(value, radix).ok();
-                    }
-                }
-                text.parse().ok()
+                let (radix, digits) = integer_digits(&text);
+                i128::from_str_radix(digits, radix).ok()
             }
             "Paren" => self.integer(child("expr")?, seen),
             "Call" => {

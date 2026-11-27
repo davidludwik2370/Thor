@@ -7,7 +7,6 @@ fn type_identity(typ: Type) -> Type {
         Type::Scalar { name, .. } => Type::Scalar {
             name: match name.as_str() {
                 "byte" => "u8".into(),
-                "rune" => "i32".into(),
                 _ => name,
             },
             untyped: false,
@@ -43,6 +42,16 @@ fn type_identity(typ: Type) -> Type {
         Type::Dynamic(elem) => Type::Dynamic(Box::new(type_identity(*elem))),
         Type::Pointer(elem) => Type::Pointer(Box::new(type_identity(*elem))),
         Type::Nominal(owner, elem) => Type::Nominal(owner, Box::new(type_identity(*elem))),
+        Type::Map { key, value } => Type::Map {
+            key: Box::new(type_identity(*key)), value: Box::new(type_identity(*value)),
+        },
+        Type::Set(elem) => Type::Set(Box::new(type_identity(*elem))),
+        Type::Soa(elem) => Type::Soa(Box::new(type_identity(*elem))),
+        Type::SoaStorage(seq) => Type::SoaStorage(Box::new(type_identity(*seq))),
+        Type::Anonymous(fields) => Type::Anonymous(fields.into_iter()
+            .map(|(name, typ)| (name, type_identity(typ))).collect()),
+        Type::Union(owner, args) => Type::Union(owner, args.into_iter()
+            .map(|(name, typ)| (name, type_identity(typ))).collect()),
         Type::Record(owner, args) => Type::Record(
             owner,
             args.into_iter()
@@ -53,32 +62,44 @@ fn type_identity(typ: Type) -> Type {
     }
 }
 
-fn exact_identity(typ: &Type) -> bool {
-    match typ {
-        // Signature references/effect qualifiers are not native typeids.
-        // Distinct signatures can describe the same Odin procedure type, and
-        // fn's pure qualifier is deliberately erased in native type queries.
-        Type::Function(..) | Type::Procedure(_) => false,
-        Type::Scalar { name, .. } => name != "bit_set",
-        Type::Nominal(_, inner)
-        | Type::Pointer(inner)
-        | Type::Slice(inner)
-        | Type::Dynamic(inner)
-        | Type::Soa(inner)
-        | Type::Set(inner) => exact_identity(inner),
-        Type::Array { elem, .. }
-        | Type::Vector { elem, .. }
-        | Type::Matrix { elem, .. }
-        | Type::Fixed { elem, .. } => exact_identity(elem),
-        Type::Map { key, value } => exact_identity(key) && exact_identity(value),
-        Type::Anonymous(fields) | Type::Record(_, fields) | Type::Union(_, fields) => {
-            fields.iter().all(|(_, typ)| exact_identity(typ))
-        }
-        _ => typ.resolved(),
-    }
-}
-
 impl Resolver<'_> {
+    // Two inline record definitions with identical layouts can have the same
+    // native typeid. A source offset only identifies a named declaration.
+    fn declared_identity(&self, owner: Ref) -> bool {
+        let source = &self.sources[owner.file];
+        source.node(owner.node).parent.is_some_and(|id|
+            source.node(id).kind == "Declaration" && source.group(id, "values").contains(&owner.node))
+            && !source.ancestors(owner.node).any(|id| source.node(id).kind == "Procedure")
+    }
+    fn exact_identity(&self, typ: &Type) -> bool {
+        match typ {
+            // Signature references/effect qualifiers are not native typeids.
+            // Distinct signatures can describe the same Odin procedure type, and
+            // fn's pure qualifier is deliberately erased in native type queries.
+            Type::Function(..) | Type::Procedure(_) => false,
+            Type::Scalar { name, .. } => name != "bit_set",
+            Type::Nominal(_, inner)
+            | Type::Slice(inner)
+            | Type::Dynamic(inner)
+            | Type::SoaStorage(inner)
+            | Type::Soa(inner)
+            | Type::Set(inner) => self.exact_identity(inner),
+            // Pointer erases the distinction between ^T and [^]T. An array
+            // with no resolved length can also be an enum-indexed array.
+            Type::Pointer(_) | Type::Array { length: None, .. } => false,
+            Type::Array { elem, .. }
+            | Type::Vector { elem, .. }
+            | Type::Matrix { elem, .. }
+            | Type::Fixed { elem, .. } => self.exact_identity(elem),
+            Type::Map { key, value } => self.exact_identity(key) && self.exact_identity(value),
+            Type::Record(owner, fields) | Type::Union(owner, fields) => {
+                self.declared_identity(*owner) && fields.iter().all(|(_, typ)| self.exact_identity(typ))
+            }
+            Type::Struct(owner) | Type::Enum(owner) => self.declared_identity(*owner),
+            Type::Anonymous(_) => false,
+            _ => typ.resolved(),
+        }
+    }
     fn effect_qualified_type(
         &mut self,
         typ: &Type,
@@ -115,6 +136,7 @@ impl Resolver<'_> {
             | Type::Pointer(t)
             | Type::Slice(t)
             | Type::Dynamic(t)
+            | Type::SoaStorage(t)
             | Type::Soa(t)
             | Type::Set(t)
             | Type::Array { elem: t, .. }
@@ -191,9 +213,7 @@ impl Resolver<'_> {
                     }
                     serde_json::json!(["procedure", cc, roles])
                 }
-                Type::Pointer(t) => {
-                    serde_json::json!(["pointer", self.callable_identity(t, seen)?])
-                }
+                Type::Pointer(_) => return None,
                 Type::Slice(t) => serde_json::json!(["slice", self.callable_identity(t, seen)?]),
                 Type::Dynamic(t) => {
                     serde_json::json!(["dynamic", self.callable_identity(t, seen)?])
@@ -214,7 +234,7 @@ impl Resolver<'_> {
                 | Type::String { .. }
                 | Type::BigInteger
                 | Type::BigRational
-                    if exact_identity(typ) =>
+                    if self.exact_identity(typ) =>
                 {
                     serde_json::json!(format!("{:?}", type_identity(typ.clone())))
                 }
@@ -321,7 +341,7 @@ impl Resolver<'_> {
                     let erased=self.pure_callbacks_present() && (
                         self.effect_qualified_type(&a,bindings,&mut HashSet::new())
                         ||self.effect_qualified_type(&b,bindings,&mut HashSet::new()));
-                    if !erased && a.resolved() && b.resolved() && exact_identity(&a) && exact_identity(&b) {
+                    if !erased && a.resolved() && b.resolved() && self.exact_identity(&a) && self.exact_identity(&b) {
                         return Some((type_identity(a) == type_identity(b)) == (op == "=="));
                     }
                     if a.resolved() && b.resolved() {
@@ -348,6 +368,7 @@ impl Resolver<'_> {
                             }
                             return Some(match name.as_str() {
                                 "type_is_slice" => matches!(base, Type::Slice(_)),
+                                "type_is_array" if matches!(base, Type::Array { length: None, .. }) => return None,
                                 "type_is_array" => matches!(base, Type::Array { .. }),
                                 "type_is_matrix" => matches!(base, Type::Matrix { .. }),
                                 "type_is_matrix_row_major" => matches!(
@@ -366,10 +387,21 @@ impl Resolver<'_> {
                                 ),
                                 "type_is_simd_vector" => matches!(base, Type::Vector { .. }),
                                 "type_is_dynamic_array" => matches!(base, Type::Dynamic(_)),
-                                "type_is_pointer" => matches!(base, Type::Pointer(_)),
+                                "type_is_pointer" | "type_is_multi_pointer" => {
+                                    if matches!(base, Type::Pointer(_)) {
+                                        self.multipointer(arg, 0)? == (name == "type_is_multi_pointer")
+                                    } else {
+                                        name == "type_is_pointer" && matches!(base, Type::Scalar{name,..} if name=="rawptr")
+                                    }
+                                }
                                 "type_is_proc" => matches!(base, Type::Procedure(_) | Type::Function(..)),
                                 "type_is_struct" => {
-                                    matches!(base, Type::Struct(_) | Type::Record(..))
+                                    match base {
+                                        Type::Struct(owner) => self.sources[owner.file].node(owner.node).kind == "StructType",
+                                        Type::Record(..) | Type::Anonymous(_) | Type::Set(_) | Type::Soa(_)
+                                        | Type::SoaStorage(_) | Type::BigInteger | Type::BigRational => true,
+                                        _ => false,
+                                    }
                                 }
                                 "type_is_map" => matches!(base, Type::Map { .. }),
                                 "type_is_union" => matches!(base, Type::Union(..)),

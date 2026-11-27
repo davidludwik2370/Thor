@@ -3889,11 +3889,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
     }
 }
 fn base_type(typ: &Type) -> &Type {
-    if let Type::Nominal(_, base) = typ {
-        base_type(base)
-    } else {
-        typ
-    }
+    typ.storage_shape()
 }
 // Union payload provenance survives copies, but copying a union value is not
 // itself a writable slice alias. Narrowing checks the selected payload later.

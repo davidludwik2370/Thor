@@ -31,7 +31,7 @@ pub(super) fn arithmetic_shape(op:&str,left:&Type,right:&Type)->Option<Type>{
 impl Resolver<'_> {
     /// Preserve the native distinction erased by the compact Pointer shape.
     /// A pointer to an array auto-dereferences; a multipointer to arrays does not.
-    fn multipointer(&mut self, at:Ref, depth:usize)->Option<bool> {
+    pub(super) fn multipointer(&mut self, at:Ref, depth:usize)->Option<bool> {
         self.multipointer_bounded(at, depth, &mut 128)
     }
     fn multipointer_bounded(&mut self, at:Ref, depth:usize, budget:&mut usize)->Option<bool> {
@@ -48,6 +48,7 @@ impl Resolver<'_> {
             return if a == b { a } else { None };
         }
         let next=match n.kind.as_str(){
+            "PointerType" if n.op == "soa" => return None,
             "PointerType"=>return Some(false),"MultiPointerType"=>return Some(true),
             "Unary" if n.op=="&"=>return Some(false),
             "Paren"|"HelperType"=>role("expr"),"Cast"=>role("type"),
@@ -79,15 +80,18 @@ impl Resolver<'_> {
             };
         }
         if matches!(base,Type::Soa(_)){return typ;}
+        if let Type::SoaStorage(storage) = base {
+            return Type::Soa(Box::new(storage.element().cloned().unwrap_or(Type::Unknown)));
+        }
         Type::Slice(Box::new(typ.element().cloned().unwrap_or(Type::Unknown)))
     }
     pub(super) fn index_type(&mut self, operand:Ref, typ:Type)->Type {
         let mut base=&typ;while let Type::Nominal(_,inner)=base{base=inner;}
-        if typ.is_string(){return Type::scalar("u8");}
+        if let Some(unit) = typ.string_code_unit() { return unit; }
         if let Type::Pointer(inner)=base {
             return match self.multipointer(operand,0){
                 Some(true)=>*inner.clone(),
-                Some(false)=>if inner.is_string(){Type::scalar("u8")}else{inner.indexed_element().cloned().unwrap_or(Type::Unknown)},
+                Some(false) => inner.string_code_unit().or_else(|| inner.indexed_element().cloned()).unwrap_or(Type::Unknown),
                 None=>Type::Unknown,
             };
         }
@@ -103,7 +107,7 @@ impl Resolver<'_> {
             match typ {
                 Type::Slice(_) | Type::Soa(_) | Type::Array {..} | Type::Fixed {..}
                 | Type::Unknown | Type::Generic => return true,
-                Type::Nominal(_, inner) => pending.push(*inner),
+                Type::Nominal(_, inner) | Type::SoaStorage(inner) => pending.push(*inner),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) =>
                     pending.extend(self.shared_record_fields(&typ).iter().map(|(_, typ)| typ.clone())),
                 Type::Union(..) => pending.extend(self.union_variants(&typ)),
@@ -215,6 +219,13 @@ impl Resolver<'_> {
                     }}
                 }
             }
+            Type::SoaStorage(storage) => match storage.as_ref() {
+                Type::Array { elem, length } => Type::Array {
+                    elem: Box::new(self.member_type(elem, name)), length: *length,
+                },
+                Type::Dynamic(elem) => Type::Pointer(Box::new(self.member_type(elem, name))),
+                _ => Type::Unknown,
+            },
             Type::Soa(elem) => Type::Pointer(Box::new(self.member_type(elem, name))),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                 let Some(path) = self.member_path(typ, name) else {
@@ -513,14 +524,8 @@ impl Resolver<'_> {
                 let source = &self.sources[symbol.reference.file];
                 if source.node(symbol.reference.node).kind == "Range" {
                     if let Some(node) = source.role(symbol.reference.node, "expr") {
-                        let mut typ = self.specialize(Ref { file: symbol.reference.file, node }, bindings, seen);
-                        while let Type::Pointer(elem) = typ { typ = *elem; }
-                        if let Type::Map { key, value } = typ {
-                            return if symbol.index == 0 { *key } else { *value };
-                        }
-                        if symbol.index == 1 { return Type::scalar("int"); }
-                        if matches!(typ, Type::String { .. }) { return Type::scalar("rune"); }
-                        return typ.element().cloned().unwrap_or_else(|| typ.defaulted());
+                        let iterable = self.specialize(Ref { file: symbol.reference.file, node }, bindings, seen);
+                        return iterable.range_binding(symbol.index);
                     }
                 }
             }
@@ -615,10 +620,12 @@ impl Resolver<'_> {
             "ArrayType" => {
                 let elem = Box::new(subtype("elem"));
                 if let Some(len) = child("len") {
-                    if n.op=="simd"{Type::Vector{elem,length:self.context_integer(len,bindings)}}else{Type::Array {
-                        elem,
-                        length: self.context_integer(len, bindings),
-                    }}
+                    let length = self.context_integer(len, bindings);
+                    match n.op.as_str() {
+                        "soa" => Type::SoaStorage(Box::new(Type::Array { elem, length })),
+                        "simd" => Type::Vector { elem, length },
+                        _ => Type::Array { elem, length },
+                    }
                 } else if n.op == "soa" {
                     Type::Soa(elem)
                 } else {
@@ -627,7 +634,9 @@ impl Resolver<'_> {
             }
             "DynamicArrayType" => {
                 let elem = Box::new(subtype("elem"));
-                if let Some(capacity) = child("capacity") {
+                if n.op == "soa" {
+                    Type::SoaStorage(Box::new(Type::Dynamic(elem)))
+                } else if let Some(capacity) = child("capacity") {
                     Type::Fixed {
                         elem,
                         length: self.context_integer(capacity, bindings),
@@ -1004,6 +1013,12 @@ impl Resolver<'_> {
             "MatrixType" | "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis"
         ) {
             let expected_kind = n.kind.as_str();
+            let actual = match actual {
+                Type::SoaStorage(storage) if n.op == "soa" => storage.as_ref(),
+                Type::SoaStorage(_) => return None,
+                Type::Array { .. } | Type::Dynamic(_) if n.op == "soa" => return None,
+                other => other,
+            };
             let elem = match (expected_kind, actual) {
                 ("MatrixType",Type::Matrix{elem,rows,columns,..})=>{
                     for (role,actual) in [("rows",rows),("columns",columns)]{
@@ -1026,7 +1041,7 @@ impl Resolver<'_> {
                 ("ArrayType", Type::Slice(elem)) if child("len").is_none() && n.op != "soa" => {
                     elem.as_ref()
                 }
-                ("ArrayType", Type::Soa(elem)) if n.op == "soa" => elem.as_ref(),
+                ("ArrayType", Type::Soa(elem)) if n.op == "soa" && child("len").is_none() => elem.as_ref(),
                 ("DynamicArrayType", Type::Dynamic(elem)) if child("capacity").is_none() => {
                     elem.as_ref()
                 }
@@ -1070,7 +1085,7 @@ impl Resolver<'_> {
         if expected.is_unknown() || actual.is_unknown() {
             return Some(0);
         }
-        fn canonical(name:&str)->&str{match name{"byte"=>"u8","rune"=>"i32",other=>other}}
+        fn canonical(name:&str)->&str{match name{"byte"=>"u8",other=>other}}
         match (expected, actual) {
             (Type::Scalar { name, .. }, _) if name == "any" => Some(0),
             (Type::Scalar { name, .. }, Type::Pointer(_)) if name == "rawptr" => Some(1),
@@ -1117,6 +1132,7 @@ impl Resolver<'_> {
             | (Type::Dynamic(a), Type::Dynamic(b))
             | (Type::Pointer(a), Type::Pointer(b))
             | (Type::Set(a), Type::Set(b))
+            | (Type::SoaStorage(a), Type::SoaStorage(b))
             | (Type::Soa(a), Type::Soa(b)) => Self::type_score(a, b).map(|score| score + 3),
             (Type::Map { key: a, value: b }, Type::Map { key: c, value: d }) => {
                 Some(Self::type_score(a, c)? + Self::type_score(b, d)? + 3)
@@ -1191,6 +1207,7 @@ impl Resolver<'_> {
                 }
             }
             "MatrixType" | "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis" => {
+                let actual = match actual { Type::SoaStorage(storage) => storage.as_ref(), other => other };
                 if let Type::Matrix{rows,columns,..}=actual{
                     for (role,count) in [("rows",rows),("columns",columns)]{
                         if let (Some(count),Some(value))=(count,child(role)){

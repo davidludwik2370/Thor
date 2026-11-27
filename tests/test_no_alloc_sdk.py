@@ -317,11 +317,66 @@ main::proc(){
                    'import "core:slice"',fail='no_alloc:')
 
     def test_native_alias_identity_and_opaque_bitset_guards_never_hide_effects(self):
-        for actual,expected in [('byte','u8'),('rune','i32')]:
-            with self.subTest(actual=actual):
-                self.check('inspect('+actual+'(1))','inspect::proc(value:$T){when T=='+expected+'{_=make([]int,1)}}',fail="builtin 'make'")
+        for actual,expected,equal in [('byte','u8',True),('rune','i32',False),
+                                      ('map[byte]int','map[u8]int',True)]:
+            for operator in ('==','!='):
+                with self.subTest(actual=actual,operator=operator):
+                    self.check('item:'+actual+';inspect(item)',
+                               'inspect::proc(value:$T){when T'+operator+expected+'{_=make([]int,1)}}',
+                               fail="builtin 'make'" if equal==(operator=='==') else None)
         self.check('inspect(bit_set[0..<4]{})',
                    'inspect::proc(value:$T){when T==bit_set[0..<4]{_=make([]int,1)}}',fail="builtin 'make'")
+
+    def test_native_pointer_and_enumerated_array_guards_never_hide_allocations(self):
+        for typ,condition in [('rawptr','i.type_is_pointer(T)'),('[^]int','!i.type_is_pointer(T)'),
+                              ('[^]int','i.type_is_multi_pointer(T)'),('[^]int','T!=^int'),
+                              ('[E]int','!i.type_is_array(T)'),('set[int]','i.type_is_struct(T)')]:
+            with self.subTest(typ=typ,condition=condition):
+                self.check('v:'+typ+';inspect(v)','E::enum{a,b}\n'
+                           'inspect::proc(v:$T){when '+condition+'{_=make([]int,1)}}',
+                           'import i "base:intrinsics"',fail="builtin 'make'")
+
+        self.check('when !i.type_is_pointer(#soa^#soa[]Row){_=make([]int,1)}',
+                   'Row::struct{x,y:int}', 'import i "base:intrinsics"', fail="builtin 'make'")
+
+    def test_inline_native_type_identity_and_bit_field_reflection(self):
+        for typ in ('struct{x:int}', '[]struct{x:int}', 'enum{a,b}', 'union{int,string}'):
+            with self.subTest(typ=typ):
+                self.check('v:'+typ+';inspect(v)',
+                           'inspect::proc(v:$T){when T=='+typ+'{_=make([]int,1)}}',
+                           fail="builtin 'make'")
+        self.check('v:Bits;inspect(v)', 'Bits::bit_field u8{x:u8|2}\n'
+                   'inspect::proc(v:$T){when !i.type_is_struct(T){_=make([]int,1)}}',
+                   'import i "base:intrinsics"', fail="builtin 'make'")
+
+    def test_soa_storage_and_ordinary_collections_select_native_branches(self):
+        for typ, ordinary in [('#soa[2]Row','[2]Row'),('#soa[dynamic]Row','[dynamic]Row')]:
+            for actual, is_soa in [(typ,True),(ordinary,False)]:
+                for condition in ('i.type_is_struct(T)', 'T=='+typ, 'T!='+ordinary):
+                    with self.subTest(actual=actual,condition=condition):
+                        self.check('v:'+actual+';inspect(v)', 'Row::struct{x,y:int}\n'
+                                   'inspect::proc(v:$T){when '+condition+'{_=make([]int,1)}}',
+                                   'import i "base:intrinsics"', fail="builtin 'make'" if is_soa else None)
+
+    def test_indexed_and_iterated_values_select_the_native_effects(self):
+        cases = [
+            ('s:Wide;inspect(s[0])', 'u16'),
+            ('s:Wide;p:=&s;inspect(p[0])', 'u16'),
+            ('s:Wide;inspect(raw_data(s)[0])', 'u16'),
+            ('a:[2]int;inspect(raw_data(&a)[0])', 'int'),
+            ('a:[2][3]int;inspect(raw_data(&a)[0])', '[3]int'),
+            ('m:Mapping;for k in m{inspect(k)}', 'u16'),
+            ('m:Mapping;for _,v in m{inspect(v)}', 'string'),
+            ('s:Wide;for r in s{inspect(r)}', 'rune'),
+            ('a:[E]int;for _,i in a{inspect(i)}', 'E'),
+            ('b:bit_set[E];for e in b{inspect(e)}', 'E'),
+        ]
+        for body, expected in cases:
+            with self.subTest(body=body):
+                self.check(body, 'Wide::distinct string16\nMapping::distinct map[u16]string\nE::enum{A,B}\n'
+                           'inspect::proc(v:$T){when T=='+expected+'{_=make([]int,1)}}', fail='no_alloc:')
+        self.check('s:string;inspect(s[0]);inspect(raw_data(s)[0])',
+                   'inspect::proc(v:$T){when T==u16{_=make([]int,1)}}')
 
     def test_native_vector_and_array_type_conditions_remain_distinct(self):
         imports='import "base:intrinsics"'

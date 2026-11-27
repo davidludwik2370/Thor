@@ -1,6 +1,4 @@
 """Power precedence, native numeric contracts, folding and interactions."""
-import json
-import subprocess
 import unittest
 from tests import test_thor as base
 
@@ -19,6 +17,16 @@ assert(2.0**-2**2==0.0625)
 assert((2**3)**2==64)
 assert(3 in 0..<2**3 && 8 not_in 0..<2**3)
 '''))
+
+    def test_dozenal_constants_share_exact_power_and_range_diagnostics(self):
+        huge = '0z1' + '0' * 37
+        source = self.program('if ONE!=1 || NEG!=-1 || SMALL!=144{panic("dozenal powers")}',
+                              f'ONE::{huge}**0\nNEG::(-1)**({huge}+1)\nSMALL::0z10**2\n')
+        for flags in ([], ['-disable-assert'], ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(source, flags=flags)
+        self.invoke(self.program('_=VALUE', f'VALUE::{huge}**1\n'), command='check',
+                    fail="Power constant exceeds Odin's 128-bit integer range")
 
     def test_matching_runtime_types_and_literal_coercion(self):
         self.invoke(self.program('''
@@ -141,18 +149,13 @@ if len(record.data)!=256 {panic("wrong generic array length")}
             'import "core:math"\nNAN::(-1.0)**0.5\nINFINITY::0.0**-1\n'))
 
     def test_float_power_cache_hits_and_exponent_invalidation(self):
-        source=self.program('assert(VALUE==.125)','VALUE::2.0**-3\n')
-        root,first=self.invoke(source,flags=['--cache-report'])
-        self.assertEqual(json.loads(first.stdout)['thor_cache']['writes'],1)
-        entry=root/'input/main.thor'
-        def again():
-            result=subprocess.run([str(base.THOR),'run',str(entry),'--output-dir',str(root/'output'),'--cache-report'],
-                                  capture_output=True,text=True,timeout=40)
-            self.assertEqual(result.returncode,0,result.stderr)
-            return json.loads(result.stdout)['thor_cache']
-        self.assertEqual(again()['hits'],1)
-        entry.write_text(source.replace('**-3','**-4').replace('VALUE==.125','VALUE==.0625'))
-        self.assertEqual(again()['writes'],1)
+        from tests.test_t21_t22 import CacheTests
+        source = self.program('assert(VALUE==.125)', 'VALUE::2.0**-3\n')
+        root, first = CacheTests.invoke(self, source, flags=['--cache-report'])
+        self.assertEqual(CacheTests.report(self, first)['writes'], 1)
+        self.assertEqual(CacheTests.report(self, CacheTests.again(self, root))['hits'], 1)
+        (root/'input/main.thor').write_text(source.replace('**-3', '**-4').replace('VALUE==.125', 'VALUE==.0625'))
+        self.assertEqual(CacheTests.report(self, CacheTests.again(self, root))['writes'], 1)
 
     def test_unresolved_type_level_exponent_has_an_explicit_diagnostic(self):
         self.invoke(self.program('value:Grid(2,3);_=value',

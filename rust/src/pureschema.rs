@@ -74,7 +74,7 @@ impl Lower<'_, '_> {
             if depth > 24 { return self.pure_validator(site); }
             if !seen.insert(typ.clone()) { continue; }
             match typ {
-                Type::Unknown | Type::Generic | Type::Set(_) | Type::Soa(_) =>
+                Type::Unknown | Type::Generic | Type::Set(_) | Type::Soa(_) | Type::SoaStorage(_) =>
                     return self.pure_validator(site),
                 Type::Nominal(_, inner) | Type::Slice(inner) | Type::Dynamic(inner)
                 | Type::Pointer(inner) | Type::Array {elem:inner,..} | Type::Matrix{elem:inner,..}
@@ -226,7 +226,7 @@ impl Lower<'_, '_> {
         let code=format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n{}\n}}\n@(private=\"file\")\n{name}_union::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string,$Mode:int){{when Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site,Mode)}}}}\n",parts.join("\n").replace("\nelse", " else"));
         let code = code + &format!("\n@(private=\"file\")\n{name}_record::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n{}\n}}\n",record_parts.join("\n"));
         let code = code + &format!("\n@(private=\"file\")\n{public}::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{{name}(T,Result,Allow_Owned,Allow_Refs,Depth,Site,0)}}\n");
-        self.helpers.insert(key, self.g(code, site));
+        self.helpers.insert(key, self.gen(code, self.source.node(site).span, "pure-type-validator"));
         public
     }
 }
