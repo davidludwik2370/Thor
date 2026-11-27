@@ -1400,6 +1400,13 @@ impl Project {
                 print!("{}", String::from_utf8_lossy(&output.stdout));
             }
         }
+        // Odin reports generated-file offsets. Convert them to the original
+        // Thor source before an apply can move that source's declarations.
+        let source_positions = output.status.success() && action == "vet"
+            && (self.options.vet_apply || self.options.vet_ask);
+        if source_positions {
+            errors = self.translate(&errors);
+        }
         if output.status.success() && (action == "vet" || self.options.vet.is_some()) {
             let checks = self
                 .options
@@ -1432,6 +1439,8 @@ impl Project {
         }
         let reported_errors = if self.options.raw_diagnostics && errors.is_empty() {
             false
+        } else if source_positions {
+            self.report_translated(errors, &information)
         } else {
             self.report_details(&errors, &information)
         };
@@ -1474,7 +1483,7 @@ impl Project {
             {
                 use std::os::unix::process::ExitStatusExt;
                 if let Some(signal) = status.signal() {
-                    return Ok(256 - signal);
+                    return Ok(128 + signal);
                 }
             }
             return Ok(1);
@@ -1789,12 +1798,13 @@ impl Project {
         text
     }
     fn report_details(&self, errors: &[Value], information: &str) -> bool {
+        self.report_translated(self.translate(errors), information)
+    }
+    fn report_translated(&self, errors: Vec<Value>, information: &str) -> bool {
         let _phase = crate::profile::span("diagnostics.report");
         let mut summary = crate::unverified::Summary::default();
         let mut seen = HashSet::new();
-        let errors = self
-            .translate(errors)
-            .into_iter()
+        let errors = errors.into_iter()
             .filter_map(|mut error| {
                 let unverified = crate::unverified::is_unverified(&error);
                 if unverified {

@@ -1167,7 +1167,7 @@ pub fn run(
                 finding["pos"]["file"].as_str().unwrap().into(), finding["pos"]["offset"].as_u64().unwrap() as usize)));
             apply(&accepted, &project.sources)?;
             let updated = revisions(&accepted, &project.sources);
-            for finding in &mut findings {
+            for finding in findings.iter_mut().chain(existing.iter_mut()) {
                 remap_finding_positions(finding, &updated, &accepted, &project.sources);
             }
             println!("Applied {} corrections.", accepted.len());

@@ -75,7 +75,7 @@ fn data_dir(o: &Options) -> Result<PathBuf> {
     if let Some(p) = &o.code_data { return absolute(p); }
     Ok(if cfg!(target_os="macos") { home()?.join("Library/Application Support/Code") }
     else if cfg!(windows) { env::var_os("APPDATA").map(PathBuf::from).unwrap_or(home()?.join("AppData/Roaming")).join("Code") }
-    else { env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or(home()?.join(".config")).join("Code") })
+    else { xdg_home("XDG_CONFIG_HOME",".config")?.join("Code") })
 }
 pub(super) fn cli(code: &Path,o: &Options,bin: &Path,root:&Path) -> Result<Command> {
     let mut cmd=code_command(code);
@@ -168,11 +168,8 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
     let existing_extensions=String::from_utf8_lossy(&output.stdout).lines().map(|s|s.to_ascii_lowercase()).collect::<BTreeSet<_>>();
     let identity=json!({"code":code,"profile":o.profile,"data":o.code_data,"extensions":o.extensions});
     let entries=state["editors"].as_array_mut().ok_or("invalid editor ownership inventory")?;
-    let index=if let Some(i)=entries.iter().position(|v|v["identity"]==identity){i}else{entries.push(json!({"identity":identity,"owned":[]}));entries.len()-1};
-    for id in ["thor-local.thor-language","danielgavin.ols","vadimcn.vscode-lldb"] {
-        if !existing_extensions.contains(id) && !entries[index]["owned"].as_array().unwrap().iter().any(|v|v==id) {
-            entries[index]["owned"].as_array_mut().unwrap().push(json!(id));
-        }
+    if !entries.iter().any(|v|v["identity"]==identity) {
+        entries.push(json!({"identity":identity,"owned":[]}));
     }
     lifecycle::save(&prefix,&state)?;
     {
@@ -186,15 +183,24 @@ pub(super) fn setup(o: &Options,code: &Path,root: &Path) -> Result<()> {
             println!("Profile {name}: missing Thor defaults initialized; explicit settings and keybindings preserved.");
         }
     }
-    for extension in [root.join("editors/thor-language.vsix").to_string_lossy().into_owned(),"DanielGavin.ols".into(),"vadimcn.vscode-lldb".into()] {
+    for (id, extension) in [("thor-local.thor-language",root.join("editors/thor-language.vsix").into_os_string()),
+        ("danielgavin.ols","DanielGavin.ols".into()),("vadimcn.vscode-lldb","vadimcn.vscode-lldb".into())] {
         let mut cmd=cli(code,o,&bin,root)?;
         if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
         cmd.arg("--install-extension").arg(&extension);
         // The bundled Thor VSIX is the tested payload even when a previous
         // installation has the same extension version. Do not force updates
         // of independently installed OLS/CodeLLDB marketplace extensions.
-        if extension.ends_with(".vsix"){cmd.arg("--force");}
+        if id=="thor-local.thor-language"{cmd.arg("--force");}
         command(cmd).map_err(|e|format!("Thor CLI is installed, but editor setup is incomplete. Correct the error and rerun the same installer command. {e}"))?;
+        if !existing_extensions.contains(id) {
+            // Settings configuration also updates this record. Read it again
+            // before claiming the extension that VS Code actually installed.
+            let mut state=lifecycle::state(&prefix)?;
+            let owned=state["editors"].as_array_mut().and_then(|editors|editors.iter_mut().find(|e|e["identity"]==identity))
+                .and_then(|editor|editor["owned"].as_array_mut()).ok_or("invalid editor ownership inventory")?;
+            if !owned.iter().any(|v|v==id) {owned.push(json!(id));lifecycle::save(&prefix,&state)?;}
+        }
     }
     println!("Thor, the standard Odin Language Server (OLS), and CodeLLDB extensions installed. Reload the profile's window to activate them, then open a new terminal for Thor's PATH. OLS owns .odin files; TLS owns .thor files. Shortcuts apply only in Thor editors.");
     if let Some(profile)=&o.profile {

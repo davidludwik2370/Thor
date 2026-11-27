@@ -70,7 +70,7 @@ try {
                 $git=Get-Command git -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($git) {
                     $origin=(& $git.Source -C $checkoutRoot remote get-url origin 2>$null)
-                    if ($origin -match '^(https://github.com/|git@github.com:)([^/]+/[^/]+?)(\.git)?$') {$slug=$Matches[2]}
+                    if ($origin -match '^(https://github\.com/|ssh://git@github\.com/|git@github\.com:)([^/]+/[^/]+?)(\.git)?$') {$slug=$Matches[2]}
                 }
             } else {
                 # GitHub source ZIPs carry the release repository explicitly.

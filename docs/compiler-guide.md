@@ -114,6 +114,8 @@ to choose the artifact's name and location. Building from the Thor checkout
 requires a different output name, such as `-out:demo-program`, to protect the
 existing `thor` launcher.
 `run` and `test` keep their temporary executables under the generated output tree.
+They forward the program's exit status. On POSIX, a program terminated by a signal
+returns the shell status of 128 plus the signal number.
 Odin's other native build modes can be selected with `-build-mode:...`.
 
 The source path defaults to `.` for commands that operate on existing source:
@@ -497,7 +499,15 @@ including indentation and its newline, is removed without creating a blank line.
 Comments and neighboring same-line statements are preserved, as are existing
 intentional blank lines and the file's newline style.
 Explicit blank imports (`import _ "package"`) remain intentional, including
-imports needed for initialization. Imports used only in inactive debug/platform
+imports needed for initialization. Vet also keeps a named import when its project
+dependency chain leads to an initializer, finalizer, exported or required declaration.
+It checks direct native SDK packages for these declarations, including codec registration.
+A project that queries package presence with `intrinsics.is_package_imported` also
+keeps its imports, since removing a dependency can change the query result.
+If an SDK import has further package dependencies whose load-time effects are unknown,
+vet reports the unused namespace for manual review. Neither `--apply` nor the editor
+removes it automatically. Use a blank import when loading a package for its side effects.
+Imports used only in inactive debug/platform
 branches are retained so applying corrections does not break other configurations.
 In test mode with `-all-packages`, imports are test-discovery roots and are also
 retained, even if their namespace is otherwise unused.

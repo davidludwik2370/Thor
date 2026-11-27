@@ -216,7 +216,7 @@ main::proc(){
 
     def test_combined_corrections_rebase_remaining_manual_warnings(self):
         text='''package main
-import "core:thread"
+import "base:builtin"
 helper::proc(parameter:int)->int{return 1}
 main::proc(){
  values:>[1,2]
@@ -225,7 +225,7 @@ main::proc(){
  _=helper(0)
 }
 '''
-        expected=text.replace('import "core:thread"\n','').replace('helper::proc','helper::fn').replace(', unused_index','')
+        expected=text.replace('import "base:builtin"\n','').replace('helper::proc','helper::fn').replace(', unused_index','')
         for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)

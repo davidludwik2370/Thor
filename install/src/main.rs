@@ -95,15 +95,21 @@ fn home() -> Result<PathBuf> {
     env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).filter(|s| !s.is_empty())
         .map(PathBuf::from).ok_or_else(|| "could not determine the user's home directory".into())
 }
+fn xdg_home(variable: &str, fallback: &str) -> Result<PathBuf> {
+    match env::var_os(variable).map(PathBuf::from).filter(|p| p.is_absolute()) {
+        Some(base) => Ok(base),
+        None => Ok(home()?.join(fallback)),
+    }
+}
 fn data_home() -> Result<PathBuf> {
     Ok(if cfg!(windows) {
         env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or(home()?.join("AppData/Local")).join("Thor")
     } else if cfg!(target_os = "macos") { home()?.join("Library/Application Support/Thor") }
-    else { env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or(home()?.join(".local/share")).join("thor") })
+    else { xdg_home("XDG_DATA_HOME",".local/share")?.join("thor") })
 }
 fn registry() -> Result<PathBuf> {
     Ok(if cfg!(windows) || cfg!(target_os = "macos") { data_home()?.join("installation.json") }
-    else { env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or(home()?.join(".config")).join("thor/installation.json") })
+    else { xdg_home("XDG_CONFIG_HOME",".config")?.join("thor/installation.json") })
 }
 fn absolute(p: &Path) -> Result<PathBuf> {
     let p = if p.is_absolute() { p.to_owned() } else { env::current_dir().map_err(err)?.join(p) };
@@ -128,6 +134,28 @@ fn windows_path(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn installed_launcher_can_remove_its_own_inventory_and_forward_status() {
+        use super::*;
+        let temp=env::temp_dir().join(format!("thor launcher test ! {}",unique()));
+        fs::create_dir(&temp).unwrap();
+        let _guard=RemoveDir(temp.clone());
+        let target=temp.join("thor-install.exe");
+        let launcher=temp.join("thor-install.cmd");
+        let shell=env::var_os("ComSpec").unwrap();
+        for expected in [0,17] {
+            fs::copy(&shell,&target).unwrap();
+            fs::write(&launcher,windows_launcher(&target)).unwrap();
+            fs::write(temp.join("child.cmd"),format!("@echo off\r\ndel thor-install.exe\r\nif exist thor-install.exe exit /b 2\r\ndel thor-install.cmd\r\nexit /b {expected}\r\n")).unwrap();
+            let status=Command::new(&shell).args(["/d","/c","thor-install.cmd /d /c child.cmd"])
+                .current_dir(&temp).env("TEMP",&temp).status().unwrap();
+            assert_eq!(status.code(),Some(expected));
+            let remaining=fs::read_dir(&temp).unwrap().count();
+            assert_eq!(remaining,1);
+        }
+    }
+
     #[test]
     fn windows_canonical_paths_keep_odin_compatible_spelling() {
         let drive=super::windows_path(r"\\?\C:\Users\david\Thor");
@@ -228,10 +256,27 @@ struct RemoveDir(PathBuf);
 impl Drop for RemoveDir { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
 fn unique() -> String { format!("{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()) }
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    atomic_write_with_permissions(path, bytes, true)
+}
+fn atomic_write_with_permissions(path: &Path, bytes: &[u8], _preserve_existing: bool) -> Result<()> {
     fs::create_dir_all(path.parent().ok_or("invalid output parent")?).map_err(err)?;
     let temp = path.with_file_name(format!(".thor-write-{}",unique()));
-    fs::write(&temp, bytes).map_err(err)?;
-    let result = fs::rename(&temp,path).map_err(err);
+    let mut options=fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)] {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file=options.open(&temp).map_err(err)?;
+    let result=(|| {
+        file.write_all(bytes).map_err(err)?;
+        #[cfg(unix)]
+        if _preserve_existing {
+            if let Ok(metadata)=fs::metadata(path) {file.set_permissions(metadata.permissions()).map_err(err)?;}
+        }
+        drop(file);
+        fs::rename(&temp,path).map_err(err)
+    })();
     let _ = fs::remove_file(temp); result
 }
 fn command(mut command: Command) -> Result<()> {
@@ -264,13 +309,12 @@ fn registered() -> Result<Value> {
 }
 fn run(o: Options) -> Result<()> {
     #[cfg(windows)]
-    if o.uninstall && env::var_os("THOR_UNINSTALL_COPY").is_none() {
-        // Windows cannot unlink a running .exe. A short-lived copy lives outside
-        // the installation and is removed by this parent after its child exits.
-        let temp=env::temp_dir().join(format!("thor-uninstall-{}",unique()));fs::create_dir(&temp).map_err(err)?;let _guard=RemoveDir(temp.clone());
-        let copy=temp.join("thor-install.exe");fs::copy(env::current_exe().map_err(err)?,&copy).map_err(err)?;
-        let status=Command::new(copy).args(env::args().skip(1)).env("THOR_UNINSTALL_COPY","1").status().map_err(err)?;
-        if !status.success(){return Err("uninstall did not complete; retained files are reported above".into());}return Ok(());
+    if o.uninstall && !o.dry && registry()?.is_file() {
+        let record=registered()?;
+        let versions=Path::new(field(&record,"prefix")?).join("versions");
+        if absolute(&env::current_exe().map_err(err)?)?.starts_with(absolute(&versions)?) {
+            return Err("Use the installed bin/thor-install.cmd or the checkout's thor-install.cmd --uninstall so Windows can remove the executable.".into());
+        }
     }
     if o.uninstall {return lifecycle::uninstall(&o);}
     if o.doctor {
@@ -481,7 +525,16 @@ fn activate(prefix: &Path, root: &Path, manifest: &Value) -> Result<()> {
 }
 #[cfg(windows)]
 fn windows_launcher(target:&Path)->String {
-    format!("@rem Managed by thor-install\r\n@echo off\r\nsetlocal DisableDelayedExpansion\r\n\"{}\" %*\r\n",target.to_string_lossy().replace('%',"%%"))
+    let target_path=target.to_string_lossy().replace('%',"%%");
+    if target.file_name().is_some_and(|name|name=="thor-install.exe") {
+        // Start outside the inventory. A copied child still cannot remove
+        // its parent if that parent is the installed executable. Transfer the
+        // batch context as well so CMD can finish after its launcher is gone.
+        include_str!("windows_installer.cmd.in").replace("\r\n","\n")
+            .replace("@THOR_INSTALLER@",&target_path).replace('\n',"\r\n")
+    } else {
+        format!("@rem Managed by thor-install\r\n@echo off\r\nsetlocal DisableDelayedExpansion\r\n\"{target_path}\" %*\r\n")
+    }
 }
 #[cfg(unix)]
 fn shell_quote(p: &Path) -> String { format!("'{}'",p.to_string_lossy().replace('\'',"'\\''")) }

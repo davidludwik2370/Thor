@@ -1,0 +1,17 @@
+@rem Managed by thor-install
+@echo off
+setlocal DisableDelayedExpansion
+if /i "%~f0"=="%thor_work%\worker.cmd" goto run
+set "thor_work=%TEMP%\thor-install-%RANDOM%-%RANDOM%"
+mkdir "%thor_work%" || exit /b 1
+copy /b /y "@THOR_INSTALLER@" "%thor_work%\thor-install.exe" >nul || (rd "%thor_work%" & exit /b 1)
+copy /b /y "%~f0" "%thor_work%\worker.cmd" >nul || (del "%thor_work%\thor-install.exe" & rd "%thor_work%" & exit /b 1)
+"%thor_work%\worker.cmd" %*
+exit /b 1
+
+:run
+"%thor_work%\thor-install.exe" %*
+set "thor_status=%errorlevel%"
+del "%thor_work%\thor-install.exe"
+@rem Leave the batch context before deleting its file. Restore the native exit status last.
+(goto) 2>nul & del "%~f0" & rd "%thor_work%" & "%ComSpec%" /d /c exit %thor_status%

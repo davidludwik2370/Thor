@@ -8,7 +8,7 @@ function installationRecord({env = process.env, home = os.homedir(), platform = 
     const file = platform === 'win32'
         ? path.join(env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Thor', 'installation.json')
         : platform === 'darwin' ? path.join(home, 'Library', 'Application Support', 'Thor', 'installation.json')
-        : path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'thor', 'installation.json');
+        : path.join(path.posix.isAbsolute(env.XDG_CONFIG_HOME || '') ? env.XDG_CONFIG_HOME : path.join(home, '.config'), 'thor', 'installation.json');
     try {
         const record = JSON.parse(read(file));
         return record.schema === 1 && record.managed_by === 'thor-install' && typeof record.root === 'string'

@@ -70,7 +70,7 @@ pub(super) fn state(prefix:&Path)->Result<Value> {
     if value["schema"]!=1 || value["managed_by"]!="thor-install" {return Err("unrecognized setup ownership record; preserved".into());}
     Ok(value)
 }
-pub(super) fn save(prefix:&Path,value:&Value)->Result<()> {atomic_write(&state_path(prefix),&serde_json::to_vec_pretty(value).map_err(err)?)}
+pub(super) fn save(prefix:&Path,value:&Value)->Result<()> {atomic_write_with_permissions(&state_path(prefix),&serde_json::to_vec_pretty(value).map_err(err)?,false)}
 pub(super) fn track_artifact(prefix:&Path,path:&Path)->Result<()> {
     let mut value=state(prefix)?;
     if value["artifacts"].is_null(){value["artifacts"]=json!({});}
@@ -82,6 +82,13 @@ pub(super) fn track_file(prefix:&Path,path:&Path,before:Option<String>,after:&st
     let mut value=state(prefix)?;let key=path.to_str().ok_or("non-UTF-8 settings path")?;
     let entry=&mut value["files"][key];
     if entry.is_null() {*entry=json!({"before":before});}
+    else if before.as_deref()!=entry["after"].as_str() && without_managed_path(after,&prefix.join("bin")).is_some() {
+        // A reinstallation may recreate a deleted profile or upgrade a legacy
+        // block after the user edited the rest of the file.
+        entry["before"]=json!(before.as_deref().map(|text| {
+            without_managed_path(text,&prefix.join("bin")).unwrap_or_else(||text.to_owned())
+        }));
+    }
     else if path.file_name().is_some_and(|s|s=="settings.json") && before.as_deref()!=entry["after"].as_str() {
         // An upgrade must not adopt intervening user settings as installer-owned.
         // Reverse the prior managed edits in the CURRENT pre-edit document to
@@ -100,7 +107,14 @@ pub(super) fn verify_inventory(root:&Path)->Result<()> {
     }
     println!("PASS: installed file inventory and checksums");Ok(())
 }
-fn restore_files(state:&Value,dry:bool)->Result<()> {
+fn without_managed_path(text:&str,bin:&Path)->Option<String> {
+    #[cfg(unix)] {
+        shell_path::managed_blocks(bin).into_iter().find(|block|text.matches(block).count()==1)
+            .map(|block|text.replacen(&block,"",1))
+    }
+    #[cfg(windows)] { let _=(text,bin); None }
+}
+fn restore_files(state:&Value,bin:&Path,dry:bool)->Result<()> {
     if let Some(files)=state["files"].as_object() {
         for (name,record) in files {
             let path=Path::new(name);
@@ -118,15 +132,9 @@ fn restore_files(state:&Value,dry:bool)->Result<()> {
                 }
             } else {
                 // Shell profiles are additive: remove ONLY our exact marked block.
-                let lines:Vec<_>=after.lines().collect();
-                let start=lines.iter().position(|s|*s=="# >>> thor-install PATH >>>");
-                let end=lines.iter().position(|s|*s=="# <<< thor-install PATH <<<");
-                if let (Some(a),Some(b))=(start,end) {
-                    let block=lines[a..=b].join("\n");
-                    if current.matches(&block).count()==1 {
-                        println!("Remove managed PATH block, retain user edits: {}",path.display());
-                        if !dry {atomic_write(path,current.replacen(&block,"",1).as_bytes())?;}continue;
-                    }
+                if let Some(restored)=without_managed_path(&current,bin) {
+                    println!("Remove managed PATH block, retain user edits: {}",path.display());
+                    if !dry {atomic_write(path,restored.as_bytes())?;}continue;
                 }
                 println!("RETAINED: user-modified file {}",path.display());
             }
@@ -178,7 +186,7 @@ pub(super) fn uninstall(o:&Options)->Result<()> {
     println!("{}Uninstall Thor from {}",if o.dry{"Dry run: "}else{""},prefix.display());
     // Restore editor settings before removing the OLS server they reference.
     vscode::uninstall(&state,&record,o.dry)?;
-    restore_files(&state,o.dry)?;
+    restore_files(&state,Path::new(field(&record,"bin")?),o.dry)?;
     #[cfg(unix)]
     for file in shell_path::legacy_candidates()? {
         if state["files"].get(file.to_string_lossy().as_ref()).is_some() || file.is_symlink(){continue;}
@@ -255,7 +263,7 @@ fn clean_shared_cache(dry:bool)->Result<()> {
     // Never act on THOR_CACHE_DIR: it may point into a project or another tool.
     let root=if cfg!(windows){env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or(home()?.join("AppData/Local")).join("Thor/cache")}
         else if cfg!(target_os="macos"){home()?.join("Library/Caches/Thor")}
-        else{env::var_os("XDG_CACHE_HOME").map(PathBuf::from).unwrap_or(home()?.join(".cache")).join("thor")};
+        else{xdg_home("XDG_CACHE_HOME",".cache")?.join("thor")};
     if root.is_symlink()||root.join("store-v2").is_symlink(){return Ok(());}
     for digit in "0123456789abcdef".chars() {
         let bucket=root.join("store-v2").join(digit.to_string());

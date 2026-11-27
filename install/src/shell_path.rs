@@ -1,10 +1,14 @@
 //! PATH setup for login shells and fresh interactive terminal windows.
 use super::*;
 
-pub(super) fn managed_blocks(bin:&Path)->[String;2] {
+pub(super) fn managed_blocks(bin:&Path)->[String;3] {
     let quoted=shell_quote(bin);
+    // In fish single-quoted strings, a backslash before a quote or another
+    // backslash is significant. Never persist a universal fish_user_paths value.
+    let fish_bin=format!("'{}'",bin.to_string_lossy().replace('\\',"\\\\").replace('\'',"\\'"));
     [format!("# >>> thor-install PATH >>>\ncase \":${{PATH-}}:\" in\n    *:{quoted}:*) ;;\n    *) export PATH={quoted}${{PATH:+\":$PATH\"}} ;;\nesac\n# <<< thor-install PATH <<<"),
-     format!("# >>> thor-install PATH >>>\nexport PATH={quoted}:\"$PATH\"\n# <<< thor-install PATH <<<")]
+     format!("# >>> thor-install PATH >>>\nexport PATH={quoted}:\"$PATH\"\n# <<< thor-install PATH <<<"),
+     format!("# >>> thor-install PATH >>>\nif not contains -- {fish_bin} $PATH\n    set -gx PATH {fish_bin} $PATH\nend\n# <<< thor-install PATH <<<")]
 }
 fn zsh_home()->Result<PathBuf> {
     env::var_os("ZDOTDIR").filter(|s|!s.is_empty()).map(|p|absolute(Path::new(&p))).unwrap_or_else(home)
@@ -17,6 +21,9 @@ pub(super) fn legacy_candidates()->Result<Vec<PathBuf>> {
 }
 fn startup_files(shell:&str)->Result<Vec<PathBuf>> {
     let base=home()?;
+    if Path::new(shell).file_name().is_some_and(|name|name=="fish") {
+        return Ok(vec![xdg_home("XDG_CONFIG_HOME",".config")?.join("fish/conf.d/thor-path.fish")]);
+    }
     if shell.ends_with("zsh") {let base=zsh_home()?;return Ok(vec![base.join(".zprofile"),base.join(".zshrc")]);}
     if shell.ends_with("bash") {
         // Bash reads the first existing login file, whereas desktop terminals
@@ -28,10 +35,15 @@ fn startup_files(shell:&str)->Result<Vec<PathBuf>> {
 }
 pub(super) fn add(bin:&Path)->Result<()> {
     let shell=env::var("SHELL").unwrap_or_default();
-    if shell.ends_with("fish") {return Err(format!("PATH was not edited. In fish, run: fish_add_path {}",shell_quote(bin)));}
-    let [block,legacy]=managed_blocks(bin);let mut edits=vec![];
+    let [posix,legacy,fish]=managed_blocks(bin);
+    let block=if Path::new(&shell).file_name().is_some_and(|name|name=="fish") {fish}else{posix};
+    let mut edits=vec![];
     // Validate every destination before changing any of the startup files.
     for file in startup_files(&shell)? {
+        // Dotfile managers commonly link both login and interactive profiles.
+        // Record the real file so uninstall can undo the edit without replacing the link.
+        let file=if file.is_symlink() {fs::canonicalize(&file).map_err(|e|format!("Cannot resolve shell profile {}: {e}",file.display()))?} else {file};
+        if edits.iter().any(|(path,_,_,_)|path==&file){continue;}
         let existed=file.exists();
         let text=match fs::read_to_string(&file){Ok(s)=>s,Err(e) if e.kind()==std::io::ErrorKind::NotFound=>String::new(),Err(e)=>return Err(err(e))};
         let after=if text.contains("# >>> thor-install PATH >>>") {
@@ -47,7 +59,7 @@ pub(super) fn add(bin:&Path)->Result<()> {
             let backup=file.with_file_name(format!("{}.thor-backup-{}",file.file_name().unwrap().to_string_lossy(),unique()));
             fs::copy(&file,&backup).map_err(err)?;lifecycle::track_artifact(&prefix,&backup)?;
         }
-        fs::write(&file,&after).map_err(err)?;
+        atomic_write(&file,after.as_bytes())?;
         lifecycle::track_file(&prefix,&file,if existed{Some(before)}else{None},&after)?;
         println!("PATH configured in {} (existing content retained).",file.display());
     }

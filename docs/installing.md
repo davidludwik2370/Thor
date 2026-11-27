@@ -92,8 +92,11 @@ manager. Windows uses built-in PowerShell HTTPS downloads.
 
 The source-install host matrix follows Odin: Windows x64; macOS and Linux x64 or
 ARM64; FreeBSD and NetBSD x64 or ARM64; OpenBSD x64. Windows ARM64 and 32-bit x86
-are not native Odin hosts. macOS/Linux ARM64 have been validated locally; other
-hosts need native validation before equivalent support can be claimed. The
+are not native Odin hosts. Native installation runs cover [Windows 10 x64](validation/windows10-dell-2026-11-26.md),
+[Windows 11 x64](validation/windows11-fresh-install-2026-11-27-results.json),
+[Linux x64](validation/windows-linux-installer-2026-11-25.md),
+[macOS and Omarchy ARM64](validation/macos-omarchy-installer-2026-11-27.md), and
+[Ubuntu ARM64](validation/fresh-ubuntu-github-2026-11-25.md). The
 installer CI covers Windows x64, macOS Intel/ARM64 and Linux x64/ARM64. BSD paths
 are implemented and covered by platform-selection tests, but have not yet been
 exercised on native BSD machines. Distribution/ABI and upstream Rust/editor
@@ -233,15 +236,20 @@ are rejected before installation; choose another prefix when needed. Versions li
 `versions/VERSION-CONTENTID/`, with stable commands under `bin/`. User-writable
 directories accommodate prepared parser caches and shared runtime output. The
 discovery record lets VS Code use the installation without environment variables
-or per-project settings. Explicit editor paths take precedence.
+or per-project settings. Explicit editor paths take precedence. On Linux, the installer
+and extension use absolute XDG base directories. An empty or relative value falls
+back to the standard directory under the user’s home.
 
-`--path` configures login and interactive startup files for zsh and bash. Zsh
+`--path` configures login and interactive startup files for zsh, bash and fish. Zsh
 uses `.zprofile` and `.zshrc` (including an exported `ZDOTDIR`). Bash uses its
 first existing login file (`.bash_profile`, `.bash_login`, or `.profile`) and
-`.bashrc`; other POSIX shells use `.profile`. The marked block adds Thor only
+`.bashrc`. Fish loads `fish/conf.d/thor-path.fish` under `$XDG_CONFIG_HOME`
+(default `~/.config`). The snippet sets PATH for the current shell and its
+children and leaves universal fish variables alone. Other POSIX shells use `.profile`. The marked block adds Thor only
 when its command directory is absent from PATH. Existing contents are retained
-and backed up; uninstall restores the owned edits. Windows adds only the new
-directory to user PATH; fish receives a `fish_add_path` instruction. Open a new
+and backed up; uninstall restores the owned edits. Symlinked startup files keep
+their links, and installer edits preserve the target file’s permissions. Windows adds only the new
+directory to user PATH. Open a new
 terminal afterward. Without `--path`, use the installed absolute command or
 configure PATH yourself. Existing desktop sessions and editor processes may
 need restarting to inherit the updated environment.
@@ -444,8 +452,9 @@ installer never rewrites VS Code's private profile registry.
 
 VS Code itself, system/developer tools (including Rust/LLVM), source checkouts,
 user projects and their local build output remain. Retained customizations are
-reported. A second uninstall is safe. On Windows a temporary installer copy
-allows its installed executable to be removed after it is no longer running.
+reported. A second uninstall is safe. On Windows use the PATH command
+`thor-install --uninstall` or the checkout’s `.\thor-install.cmd --uninstall`.
+Both start the installer outside its own inventory so Windows can remove it.
 
 ## Maintainer release builds
 

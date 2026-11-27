@@ -79,9 +79,12 @@ test('a registered record without its TLS binary does not hide a built checkout'
 });
 test('installation records follow XDG, macOS and Windows locations',()=>{
     for (const [platform,env,file] of [['linux',{XDG_CONFIG_HOME:'/config'},'/config/thor/installation.json'],
+        ['linux',{XDG_CONFIG_HOME:'relative'},'/home/user/.config/thor/installation.json'],
         ['darwin',{},'/home/user/Library/Application Support/Thor/installation.json'],
         ['win32',{LOCALAPPDATA:'/local'},'/local/Thor/installation.json']]) {
-        installationRecord({platform,env,home:'/home/user',read:p=>{assert.equal(p,path.resolve(file));return '{}';}});
+        let requested;
+        installationRecord({platform,env,home:'/home/user',read:p=>{requested=p;return '{}';}});
+        assert.equal(path.resolve(requested),path.resolve(file));
     }
 });
 test('bundled Odin is selected only when the matching executable exists',()=>{

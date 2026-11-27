@@ -30,6 +30,16 @@ class StorageCleanupTests(unittest.TestCase):
         storage.prune(self.root,apply=True,reset_builds=True)
         self.assertTrue(all(not p.exists() for p in generated))
         self.assertTrue(all(p.exists() for p in kept))
+    def test_disappearing_cache_entries_are_successfully_cleaned(self):
+        cache=self.write('.thor-cache/sdk-parser/old.ast')
+        unlink=os.unlink
+        def disappear(name,*args,**kwargs):
+            if Path(name).name==cache.name:unlink(name,*args,**kwargs)
+            return unlink(name,*args,**kwargs)
+        with patch.object(os,'unlink',side_effect=disappear):
+            storage.prune(self.root,apply=True)
+        self.assertFalse(cache.parent.exists())
+
     def test_tracked_generated_looking_file_prevents_any_removal(self):
         path=self.write('rust/target/debug/source.thor')
         subprocess.run(['git','-C',str(self.root),'add',str(path)],check=True)

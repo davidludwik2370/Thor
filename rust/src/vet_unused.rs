@@ -372,6 +372,177 @@ fn unused_imports(resolver: &mut Resolver<'_>, file: usize, names: &HashSet<Node
     fixes
 }
 
+// Removing an unused namespace can still remove the last path to a package's
+// startup or teardown code. Propagate these roots backwards once, including
+// through native project files and aliases.
+fn retain_observable_imports(project: &Project, resolver: &Resolver<'_>, fixes: &mut Vec<Fix>) {
+    use std::path::PathBuf;
+
+    // The argument can be a computed constant. Odin looks for a declared
+    // package name anywhere in the graph, regardless of directory or alias.
+    if resolver.sources.iter().any(|source| {
+        source.raw.contains("is_package_imported")
+            && (source.excluded
+                || source.nodes.iter().enumerate().any(|(i, node)| {
+                    node.kind == "Ident" && source.text(NodeId(i)) == "is_package_imported"
+                }))
+    }) {
+        fixes.retain(|fix| fix.rule != "import");
+        return;
+    }
+    let mut protected = HashSet::new();
+    let mut uncertain = HashSet::new();
+    let mut parents = HashMap::<PathBuf, Vec<PathBuf>>::new();
+    let mut project_packages = HashSet::new();
+    for (file, source) in resolver.sources.iter().enumerate() {
+        // SDK discovery for unrelated calls can be partial.
+        if source.shared_native {
+            continue;
+        }
+        let Some(directory) = source.path.parent() else {
+            continue;
+        };
+        project_packages.insert(directory.to_owned());
+        if source.excluded {
+            // Excluded files have no AST. Keep the dependency if another
+            // target could introduce a lifecycle declaration or dependency.
+            if source.raw.contains('@') || source.raw.contains("import") {
+                protected.insert(directory.to_owned());
+            }
+            continue;
+        }
+        for (index, node) in source.nodes.iter().enumerate() {
+            let id = NodeId(index);
+            if node.kind == "Import" {
+                let path = crate::lower::unquote(&node.op).ok();
+                if let Some(child) = path.as_deref().and_then(|p| Project::referenced_directory(source, p)) {
+                    parents.entry(child).or_default().push(directory.to_owned());
+                } else if !matches!(path.as_deref(), Some("base:intrinsics" | "base:builtin")) {
+                    uncertain.insert(directory.to_owned());
+                }
+            } else if node.kind == "Declaration"
+                && !source.group(id, "attributes").is_empty()
+                && resolver
+                    .attributes(Ref { file, node: id })
+                    .iter()
+                    .any(|(name, _)| is_lifecycle_attribute(name))
+            {
+                protected.insert(directory.to_owned());
+            }
+        }
+    }
+    // The compiler loads native SDK declarations on demand. An unused import
+    // (notably an image codec registering itself) need never be loaded. Inspect
+    // its original package files before discarding that dependency. Read SDK
+    // packages only for actual candidate edges or their project dependencies.
+    let mut reachable: Vec<_> = fixes
+        .iter()
+        .filter(|fix| fix.rule == "import")
+        .filter_map(|fix| Project::referenced_directory(&resolver.sources[fix.file], &fix.names))
+        .collect();
+    let mut children = HashMap::<&PathBuf, Vec<&PathBuf>>::new();
+    for (child, importers) in &parents {
+        for parent in importers {
+            children.entry(parent).or_default().push(child);
+        }
+    }
+    let mut seen = HashSet::new();
+    while let Some(directory) = reachable.pop() {
+        if !seen.insert(directory.clone()) {
+            continue;
+        }
+        if project_packages.contains(&directory) {
+            if let Some(deps) = children.get(&directory) {
+                reachable.extend(deps.iter().map(|p| (*p).clone()));
+            }
+        } else {
+            match native_package_has_hooks(project, &directory) {
+                Some(true) => { protected.insert(directory); }
+                None => { uncertain.insert(directory); }
+                Some(false) => {}
+            }
+        }
+    }
+    for roots in [&mut protected, &mut uncertain] {
+        let mut pending: Vec<_> = roots.iter().cloned().collect();
+        while let Some(child) = pending.pop() {
+            for parent in parents.get(&child).into_iter().flatten() {
+                if roots.insert(parent.clone()) {
+                    pending.push(parent.clone());
+                }
+            }
+        }
+    }
+    fixes.retain_mut(|fix| {
+        if fix.rule != "import" {
+            return true;
+        }
+        let directory = Project::referenced_directory(&resolver.sources[fix.file], &fix.names);
+        if directory.as_ref().is_some_and(|p| protected.contains(p)) {
+            return false;
+        }
+        if directory.as_ref().map_or_else(
+            || !matches!(fix.names.as_str(), "base:intrinsics" | "base:builtin"),
+            |p| uncertain.contains(p),
+        ) {
+            fix.manual = Some("the imported package or one of its dependencies may have initialization or other load-time effects");
+        }
+        true
+    });
+}
+
+// Avoid walking an entire SDK for a namespace that is unused. A native package
+// with dependencies beyond Odin's builtins and implicit runtime needs review.
+// This fast path recognizes only unambiguous imports. Unfamiliar formatting,
+// aliases and even an ambiguous mention in a comment may conservatively opt out.
+fn has_unverified_package_import(raw: &str) -> bool {
+    raw.match_indices("import").any(|(start, word)| {
+        let prefix = raw[..start].rsplit('\n').next().unwrap_or("").trim();
+        if prefix == "foreign" { return false; }
+        let rest = raw[start + word.len()..].trim_start();
+        !["\"base:builtin\"", "\"base:intrinsics\"", "\"base:runtime\""]
+            .iter().any(|path| rest.starts_with(path))
+    })
+}
+
+fn native_package_has_hooks(project: &Project, directory: &std::path::Path) -> Option<bool> {
+    let mut unverified = false;
+    for file in std::fs::read_dir(directory).ok()? {
+        let path = file.ok()?.path();
+        if path.extension().is_none_or(|ext| ext != "odin") {
+            continue;
+        }
+        let raw = std::fs::read_to_string(&path).ok()?;
+        unverified |= has_unverified_package_import(&raw);
+        if !raw.contains('@')
+            || !raw
+                .split(|c: char| c != '_' && !c.is_alphanumeric())
+                .any(is_lifecycle_attribute)
+        {
+            continue;
+        }
+        let source = project
+            .frontend
+            .parse_overlay(&path, false, Some(&raw))
+            .ok()?;
+        if source.excluded
+            || source.nodes.iter().enumerate().any(|(i, node)| {
+                node.kind == "Attribute"
+                    && source.group(NodeId(i), "elems").iter().any(|e| {
+                        is_lifecycle_attribute(source.text(source.role(*e, "field").unwrap_or(*e)))
+                    })
+            })
+        {
+            return Some(true);
+        }
+    }
+    (!unverified).then_some(false)
+}
+
+fn is_lifecycle_attribute(name: &str) -> bool {
+    matches!(name, "init" | "fini" | "require" | "export")
+}
+
 pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
     let root = if project.options.entry.is_file() {
         project.options.entry.parent().unwrap()
@@ -528,6 +699,9 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
             pending.extend(node.children.iter().map(|child| (*child, certain)));
         }
     }
+    if import_fixes.iter().any(|fix| fix.rule == "import") {
+        retain_observable_imports(project, &resolver, &mut import_fixes);
+    }
     let mut analysis = Analysis {
         fixes: import_fixes,
         ..Analysis::default()
@@ -573,11 +747,16 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
             "pos":position(source, span), "msgs":[message]}));
     }
     for fix in analysis.fixes.iter().filter(|fix| fix.rule == "import") {
+        if fix.manual.is_some() {
+            analysis.findings.push(fix.diagnostic(&project.sources, &mut HashMap::new(), false));
+            continue;
+        }
         analysis.findings.push(
             json!({"type":"warning", "stage":"vet", "code":"thor/unused-import",
             "pos":position(&project.sources[fix.file], fix.highlight), "msgs":[fix.message()]}),
         );
     }
+    analysis.fixes.retain(|fix| fix.manual.is_none());
     analysis.findings.sort_by_key(|finding| {
         (
             finding["pos"]["file"].as_str().unwrap().to_string(),

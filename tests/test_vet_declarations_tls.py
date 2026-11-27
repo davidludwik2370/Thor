@@ -10,7 +10,7 @@ class VetDeclarationTLSTests(unittest.TestCase):
     actions = base.VetTLSTests.actions
 
     def test_unused_import_warning_and_fix_and_type_warning_recover_on_source_uses(self):
-        text = '// 😀\npackage main\nimport "core:fmt"\nUnused::struct{x:int}\nmain::proc(){}\n'
+        text = '// 😀\npackage main\nimport "core:math"\nUnused::struct{x:int}\nmain::proc(){}\n'
         client, path = self.open(text, vet=True)
         errors = client.diagnostic(path.as_uri(), code='thor/unused-import')
         warnings = {error['code']: error for error in errors}
@@ -25,7 +25,7 @@ class VetDeclarationTLSTests(unittest.TestCase):
         self.assertEqual(edit['newText'], '')
         self.assertEqual(edit['range']['start'], warnings['thor/unused-import']['range']['start'])
         self.assertEqual(edit['range']['end'], self.position(text,'Unused::',0))
-        changed = text.replace('main::proc(){}','main::proc(){fmt.println(Unused{1})}')
+        changed = text.replace('main::proc(){}','main::proc(){_=math.sqrt(f64(Unused{1}.x))}')
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
             'contentChanges':[{'text':changed}]})

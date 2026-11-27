@@ -17,36 +17,38 @@ class VetProcedureTests(unittest.TestCase):
 
     def test_import_removal_consumes_complete_lines_without_collapsing_existing_spacing(self):
         for newline in ('\n','\r\n'):
-            text = ('package main\n\nimport "core:thread"\n  import "core:math";  \n'
+            text = ('package main\n\nimport "base:builtin"\n  import "core:math";  \n'
                     'main::proc(){}\n').replace('\n',newline)
             errors, updated = self.reports(text,'--apply')
             self.assertEqual(errors, [])
             self.assertEqual(updated, ('package main\n\nmain::proc(){}\n').replace('\n',newline).encode())
 
     def test_multiline_selective_and_wildcard_imports_leave_no_gaps(self):
-        text = 'package main\nimport _ "core:math" / sin,\n cos\nimport * "core:fmt"\nmain::proc(){}\n'
+        (self.app/'leaf').mkdir()
+        (self.app/'leaf/main.odin').write_text('package leaf\nValue::1\n')
+        text = 'package main\nimport _ "core:math" / sin,\n cos\nimport * "leaf"\nmain::proc(){}\n'
         errors, updated = self.reports(text,'--apply')
         self.assertEqual(errors, [])
         self.assertEqual(updated, b'package main\nmain::proc(){}\n')
 
     def test_comments_are_retained_without_an_extra_blank_line(self):
         for text, expected in [
-            ('import /* keep */ "core:thread"\n','/* keep */\n'),
+            ('import /* keep */ "base:builtin"\n','/* keep */\n'),
             ('import _ "core:math" / sin, // keep\n cos\n','// keep\n'),
-            ('import "core:thread" // keep\n',' // keep\n'),
+            ('import "base:builtin" // keep\n',' // keep\n'),
         ]:
             errors, updated = self.reports('package main\n'+text+'main::proc(){}\n','--apply')
             self.assertEqual(errors, [])
             self.assertEqual(updated, ('package main\n'+expected+'main::proc(){}\n').encode())
 
     def test_shared_lines_preserve_used_imports_and_their_newline(self):
-        text = 'package main\nimport "core:thread"; import "core:fmt"\nmain::proc(){fmt.println("ok")}\n'
+        text = 'package main\nimport "base:builtin"; import "core:fmt"\nmain::proc(){fmt.println("ok")}\n'
         errors, updated = self.reports(text,'--apply')
         self.assertEqual(errors, [])
         self.assertEqual(updated, b'package main\n import "core:fmt"\nmain::proc(){fmt.println("ok")}\n')
 
     def test_final_import_without_trailing_newline_is_completely_removed(self):
-        text = 'package main\nmain::proc(){}\n  import "core:thread"'
+        text = 'package main\nmain::proc(){}\n  import "base:builtin"'
         errors, updated = self.reports(text,'--apply')
         self.assertEqual(errors, [])
         self.assertEqual(updated, b'package main\nmain::proc(){}\n')
@@ -162,7 +164,7 @@ main::proc(){}
             self.assertEqual(self.source.read_text(),text.replace('answer::proc','answer::fn'))
 
     def test_procedure_warning_positions_follow_removed_import_lines(self):
-        text = '// 😀\npackage main\nimport "core:thread"\nunused::proc(){}\nmain::proc(){}\n'
+        text = '// 😀\npackage main\nimport "base:builtin"\nunused::proc(){}\nmain::proc(){}\n'
         errors, updated = self.reports(text,'--apply')
         self.assertEqual([error['code'] for error in errors],['thor/unused-procedure'])
         self.assertEqual(errors[0]['pos']['offset'],updated.index(b'unused'))

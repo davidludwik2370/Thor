@@ -133,6 +133,23 @@ fi
         self.assertEqual(json.loads(self.registry.read_text())['root'],str(root))
         self.invoke(None,'--doctor')
 
+    @unittest.skipUnless(platform.system()=='Linux','Linux XDG install layout')
+    def test_relative_or_empty_xdg_directories_work_across_shell_directories(self):
+        bundle=self.bundle()
+        elsewhere=self.root/'other';elsewhere.mkdir()
+        for value in ('relative',''):
+            env={**self.env,**{key:value for key in ('XDG_DATA_HOME','XDG_CONFIG_HOME','XDG_CACHE_HOME')}}
+            for args,cwd in [(['--bundle',str(bundle),'--path','--no-install-deps'],self.root),
+                             (['--doctor'],elsewhere),(['--uninstall'],elsewhere)]:
+                result=subprocess.run([str(ROOT/'thor-install'),*args],cwd=cwd,env=env,
+                                      capture_output=True,text=True,timeout=30)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                if args[0]=='--bundle':
+                    self.assertTrue((self.home/'.local/share/thor/bin/thor').is_file())
+                    self.assertTrue((self.home/'.config/thor/installation.json').is_file())
+            self.assertFalse((self.home/'.local/share/thor/bin/thor').exists())
+            self.assertFalse((self.root/'relative').exists())
+
     def test_dry_run_leaves_home_and_prefix_untouched(self):
         self.invoke(self.bundle(),'--dry-run')
         self.assertFalse(self.prefix.exists())
@@ -264,6 +281,46 @@ fi
         self.assertIsNotNone(shell_path,result.stdout+result.stderr)
         self.assertEqual(shell_path.split(os.pathsep).count(str(self.prefix/'bin')),1)
 
+    def test_fish_path_is_reversible_and_keeps_user_edits(self):
+        self.env['SHELL']='/usr/bin/fish'
+        config=self.home/'config with spaces'
+        self.env['XDG_CONFIG_HOME']=str(config)
+        if platform.system()!='Darwin':self.registry=config/'thor/installation.json'
+        snippet=config/'fish/conf.d/thor-path.fish'
+        snippet.parent.mkdir(parents=True)
+        snippet.write_text('# original fish settings\n')
+        bundle=self.bundle()
+        self.invoke(bundle,'--path')
+        installed=snippet.read_bytes()
+        self.invoke(bundle,'--path')
+        self.assertEqual(snippet.read_bytes(),installed)
+        self.assertEqual(installed.count(b'# >>> thor-install PATH >>>'),1)
+        with snippet.open('a') as file:file.write('# keep user edit\n')
+        self.invoke(None,'--uninstall')
+        self.assertIn('# original fish settings',snippet.read_text())
+        self.assertIn('# keep user edit',snippet.read_text())
+        self.assertNotIn(str(self.prefix),snippet.read_text())
+
+    def test_fish_login_and_interactive_shells_find_thor(self):
+        shell=shutil.which('fish')
+        if not shell:self.skipTest('fish is not installed on this host')
+        self.env['SHELL']=shell
+        snippet=self.home/'.config/fish/conf.d/thor-path.fish'
+        self.invoke(self.bundle(),'--path')
+        for mode in ('-lic','-ic'):
+            result=subprocess.run([shell,mode,'source "$argv[1]"; command -s thor; printf "%s\\n" $PATH',
+                                   str(snippet)],env=self.env,capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout.splitlines()[0],str(self.prefix/'bin/thor'))
+            self.assertEqual(result.stdout.splitlines().count(str(self.prefix/'bin')),1)
+            fresh=subprocess.run([shell,mode,'command -s thor'],env=self.env,capture_output=True,text=True,timeout=15)
+            self.assertEqual(fresh.stdout.strip(),str(self.prefix/'bin/thor'),fresh.stderr)
+        self.invoke(None,'--uninstall')
+        self.assertFalse(snippet.exists())
+        result=subprocess.run([shell,'-c','contains -- "$argv[1]" $fish_user_paths',str(self.prefix/'bin')],
+                              env=self.env,capture_output=True,timeout=15)
+        self.assertEqual(result.returncode,1)
+
     def test_zsh_login_and_nonlogin_shells_find_thor_without_duplicate_path(self):
         shell=shutil.which('zsh')
         if not shell:self.skipTest('zsh is not installed on this host')
@@ -323,6 +380,35 @@ fi
         self.assertIn('case ":${PATH-}:" in',profile.read_text())
         self.invoke(None,'--uninstall')
         self.assertEqual(profile.read_text(),'# original config\n')
+
+    def test_path_roundtrip_preserves_linked_dotfiles_and_permissions(self):
+        target=self.home/'dotfiles'/'bash';target.parent.mkdir()
+        target.write_text('# shell settings\n');target.chmod(0o600)
+        links=[self.home/name for name in ('.profile','.bashrc')]
+        for path in links:path.symlink_to(target)
+        self.invoke(self.bundle(),'--path')
+        self.assertEqual(target.read_text().count('# >>> thor-install PATH >>>'),1)
+        self.assertEqual((self.prefix/'setup-state.json').stat().st_mode & 0o077,0)
+        target.write_text(target.read_text()+'# user edit\n')
+        self.invoke(None,'--uninstall')
+        self.assertTrue(all(path.is_symlink() for path in links))
+        self.assertNotIn('thor-install',target.read_text())
+        self.assertIn('# user edit',target.read_text())
+        self.assertEqual(target.stat().st_mode & 0o777,0o600)
+
+    def test_reinstall_preserves_rewritten_profile_on_uninstall(self):
+        self.invoke(self.bundle(),'--path')
+        state=self.prefix/'setup-state.json';state.chmod(0o644)
+        profile=self.home/'.profile';profile.write_text('# replacement\n')
+        self.invoke(None,'--path')
+        self.assertEqual(state.stat().st_mode & 0o777,0o600)
+        self.invoke(None,'--uninstall')
+        self.assertEqual(profile.read_text(),'# replacement\n')
+
+    def test_newline_in_option_value_is_rejected_before_bootstrap(self):
+        result=self.invoke(None,'--from-source','--dry-run','--code','a\nb',bootstrap=True,ok=False)
+        self.assertIn('newline in argument',result.stderr)
+        self.assertFalse(self.prefix.exists())
 
     def test_profile_requires_vscode_and_color_changes_require_named_new_profile(self):
         for args in [('--profile','Thor'),('--colors',),('--vscode','--profile','')]:
@@ -555,6 +641,21 @@ if '--new-window' in a:
         self.env.pop('FAIL_CODE_EXTENSION')
         self.invoke(None,*flags)
         self.assertEqual((profile/'settings.json').read_bytes(),before)
+
+    def test_partial_editor_install_only_owns_successful_extensions(self):
+        code,data,_,_=self.fake_code()
+        flags=('--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        self.env['FAIL_CODE_EXTENSION']='DanielGavin.ols'
+        self.invoke(self.bundle(),*flags,ok=False)
+        inventory=data/'installed-extensions.json'
+        owned=json.loads((self.prefix/'setup-state.json').read_text())['editors'][0]['owned']
+        self.assertEqual(owned,['thor-local.thor-language'])
+        manual=['danielgavin.ols','vadimcn.vscode-lldb']
+        inventory.write_text(json.dumps(owned+manual))
+        self.env.pop('FAIL_CODE_EXTENSION')
+        self.invoke(None,*flags)
+        self.invoke(None,'--uninstall')
+        self.assertEqual(json.loads(inventory.read_text()),manual)
 
     def test_editor_launch_path_deduplicates_only_the_installed_bin(self):
         code,data,extensions,profile=self.fake_code(existing=True)

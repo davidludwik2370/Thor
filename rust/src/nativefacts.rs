@@ -548,7 +548,7 @@ impl Project {
         }
         Ok(())
     }
-    fn referenced_directory(source: &Source, path: &str) -> Option<PathBuf> {
+    pub(crate) fn referenced_directory(source: &Source, path: &str) -> Option<PathBuf> {
         if matches!(path, "base:intrinsics" | "base:builtin") {
             return None;
         }

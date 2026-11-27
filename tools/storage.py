@@ -97,7 +97,10 @@ def candidates(root,*,reset_builds=False):
                 # Report text can quote binary signatures. Only native output
                 # filenames are disposable in the stage's evidence directory.
                 if artifacts==root/'windows-results' and path.suffix.lower() not in {'.exe','.dll','.pdb','.o','.obj','.a','.lib'}:continue
-                with path.open('rb') as stream:head=stream.read(32)
+                try:
+                    with path.open('rb') as stream:head=stream.read(32)
+                except FileNotFoundError:
+                    continue
                 if head[:4] in MAGIC or head.startswith((b'!<arch>\n',b'Microsoft C/C++ MSF')) or head[:2]==b'MZ':result.append(path)
     return sorted(set(result))
 
@@ -140,8 +143,13 @@ def prune(root,*,apply=False,reset_builds=False):
                 # Cargo coordinates with active builds using its native locks.
                 subprocess.run(['cargo','clean','--profile','dev','--manifest-path',str(path.parent.parent/'Cargo.toml'),
                                 '--target-dir',str(path.parent)],check=True)
-            elif path.is_dir():shutil.rmtree(path)
-            elif path.exists():path.unlink()
+            elif path.is_dir():
+                # Other validation processes can retire the same disposable cache.
+                # Preserve permission and I/O errors, even inside a partially removed tree.
+                def on_error(function, name, info):
+                    if not isinstance(info[1],FileNotFoundError):raise info[1]
+                shutil.rmtree(path,onerror=on_error)
+            else:path.unlink(missing_ok=True)
     return {'applied':apply,'time':time.time(),'root':str(root),'removed' if apply else 'candidates':records}
 
 def main():

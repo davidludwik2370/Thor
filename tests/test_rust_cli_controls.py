@@ -72,6 +72,14 @@ class RustCliControlTests(unittest.TestCase):
     invoke=native.RustCompilerTests.invoke
     program=native.RustCompilerTests.program
 
+    @unittest.skipUnless(os.name=='posix','POSIX child signal status')
+    def test_run_returns_the_shell_status_for_a_terminated_program(self):
+        import signal
+        self.source.write_text(self.program('posix.kill(posix.getpid(),.SIGTERM)','import "core:sys/posix"'))
+        for flags in ([],['-disable-assert'],native.UNCHECKED):
+            result=self.invoke('rust','run',flags=flags)
+            self.assertEqual(result.returncode,128+signal.SIGTERM,result.stderr)
+
     def test_no_arguments_shows_short_help_through_native_launchers(self):
         compilers=(native.RUST,) if os.name=='nt' else (native.ROOT/'thor',native.ROOT/'thor-rust',native.RUST)
         for compiler in compilers:

@@ -29,7 +29,7 @@ class VetDeclarationTests(unittest.TestCase):
 
     def test_unused_imports_and_types_have_distinct_codes_and_only_import_fixes(self):
         text = '''package main
-import "core:thread"
+import "base:builtin"
 import unused "core:math"
 Unused::struct{x:int}
 Choice::enum{a,b}
@@ -51,9 +51,11 @@ main::proc(){Local::distinct int}
         self.assertEqual([error['code'] for error in remaining], ['thor/unused-type']*3)
 
     def test_selective_and_wildcard_imports_are_removed_only_when_wholly_unused(self):
+        (self.app/'leaf').mkdir()
+        (self.app/'leaf/main.odin').write_text('package leaf\nA::1\nB::2\n')
         text = '''package main
 import * "core:math"
-import _ "core:fmt" / print, println
+import _ "leaf" / A, B
 main::proc(){}
 '''
         errors, updated = self.reports(text, '--apply')
@@ -88,14 +90,14 @@ main::proc(){
 
     def test_shadowed_names_and_field_labels_do_not_keep_imports_alive(self):
         text = '''package main
-import "core:thread"
-import _ "core:fmt" / print
-Record::struct{thread,print:int}
+import thread "base:builtin"
+import _ "core:math" / sin
+Record::struct{thread,sin:int}
 main::proc(){
-    thread,print:=1,2
-    item:=Record{thread=thread,print=print}
+    thread,sin:=1,2
+    item:=Record{thread=thread,sin=sin}
     _=item.thread
-    _=item.print
+    _=item.sin
 }
 '''
         errors, updated = self.reports(text, '--apply')
@@ -165,7 +167,7 @@ main::proc(){value:Alias;_=value}
 
     def test_removal_preserves_comments_crlf_neighbors_and_updates_warning_ranges(self):
         text = ('// 😀\r\npackage main\r\n'
-                'import "core:thread"; import "core:fmt" // keep comment\r\n'
+                'import "base:builtin"; import "core:fmt" // keep comment\r\n'
                 'import _ "core:math" / /* middle */ sin,\r\n cos // tail\r\n'
                 'Unused::struct{x:int}\r\nmain::proc(){fmt.println("ready")}\r\n')
         errors, updated = self.reports(text, '--apply')
@@ -195,7 +197,7 @@ main::proc(){value:Alias;_=value}
             self.assertNotIn('[y/N]', result.stdout)
             self.assertEqual(self.source.read_text(), text)
             self.assertEqual([error['code'] for error in errors], ['thor/unused-type'])
-            imported = text.replace('Unused::', 'import "core:thread"\nUnused::')
+            imported = text.replace('Unused::', 'import "base:builtin"\nUnused::')
             for answer in ('n\n','y\n'):
                 self.write(imported)
                 result, errors = self.invoke(engine, '--vet=unused', '--ask', input=answer)
@@ -203,7 +205,7 @@ main::proc(){value:Alias;_=value}
                 self.assertEqual('import ' in self.source.read_text(), answer=='n\n')
 
     def test_warning_policy_and_opt_in_behavior_match_other_vet_rules(self):
-        text = 'package main\nimport "core:thread"\nUnused::struct{x:int}\nmain::proc(){}\n'
+        text = 'package main\nimport "base:builtin"\nUnused::struct{x:int}\nmain::proc(){}\n'
         for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine, command='check')
@@ -218,7 +220,7 @@ main::proc(){value:Alias;_=value}
             self.assertEqual(errors, [])
 
     def test_default_apply_coalesces_import_and_semicolon_edits(self):
-        text = 'package main\nimport "core:thread";\nUnused::struct{x:int}\nmain::proc(){\nvalue:>1;\n_=value\n}\n'
+        text = 'package main\nimport "base:builtin";\nUnused::struct{x:int}\nmain::proc(){\nvalue:>1;\n_=value\n}\n'
         for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine, '--apply')
@@ -240,11 +242,12 @@ main::proc(){_=VALUE}
         self.assertNotIn(b'import first', updated)
         self.assertIn(b'import second', updated)
 
-    def test_generated_set_support_does_not_keep_an_unused_source_import_alive(self):
+    def test_generated_set_support_does_not_count_as_source_import_usage(self):
         text = 'package main\nimport "thor:sets"\nmain::proc(){s:=set[int]{1};delete(s)}\n'
         errors, updated = self.reports(text, '--apply')
-        self.assertEqual(errors, [])
-        self.assertNotIn(b'import ', updated)
+        self.assertEqual([error['code'] for error in errors],['thor/unused-import'])
+        self.assertIn('manual_review',errors[0])
+        self.assertEqual(updated,text.encode())
 
     def test_import_removals_share_one_compiler_validation_batch(self):
         (self.app/'library').mkdir()
@@ -263,7 +266,7 @@ main::proc(){_=VALUE}
     def test_apply_preserves_runtime_and_intentional_init_imports_in_unchecked_builds(self):
         (self.app/'startup').mkdir()
         (self.app/'startup/main.thor').write_text('package startup\nimport "core:fmt"\nimport "base:runtime"\n@(init) start::proc "contextless"(){context=runtime.default_context();fmt.println("initialized")}\n')
-        text = ('package main\nimport "core:thread"\nimport _ "startup"\nimport "core:fmt"\n'
+        text = ('package main\nimport "base:builtin"\nimport _ "startup"\nimport "core:fmt"\n'
                 'Unused::struct{x:int}\nmain::proc(){fmt.println("ready")}\n')
         for engine in compiler_engines():
             self.write(text)
@@ -272,6 +275,64 @@ main::proc(){_=VALUE}
                 result, errors = self.invoke(engine,'--vet=unused',*flags,command='run')
                 self.assertEqual(result.stdout, 'initialized\nready\n')
                 self.assertEqual([error['code'] for error in errors], ['thor/unused-type'])
+
+    def test_unused_namespace_preserves_transitive_native_init_and_fini(self):
+        hooks=self.app/'hooks';hooks.mkdir()
+        (hooks/'hooks.odin').write_text('''package hooks
+import "core:fmt"
+import "base:runtime"
+@(init) start::proc "contextless"(){context=runtime.default_context();fmt.println("start")}
+@(fini) stop::proc "contextless"(){context=runtime.default_context();fmt.println("stop")}
+''')
+        wrapper=self.app/'wrapper';wrapper.mkdir()
+        (wrapper/'wrapper.thor').write_text('package wrapper\nimport hooks "../hooks"\n')
+        self.write('package main\nimport w "wrapper"\nimport "core:math"\nimport "core:fmt"\nmain::proc(){fmt.println("main")}\n')
+        self.invoke('rust','--vet=unused','--apply')
+        self.assertIn('import w "wrapper"',self.source.read_text())
+        self.assertNotIn('"core:math"',self.source.read_text())
+        for flags in ([], ['-disable-assert'],native.UNCHECKED):
+            result,_=self.invoke('rust',*flags,command='run')
+            self.assertEqual(result.stdout,'start\nmain\nstop\n')
+
+    def test_query_of_loaded_package_keeps_an_otherwise_unused_import(self):
+        plugin=self.app/'plugin';plugin.mkdir()
+        (plugin/'plugin.odin').write_text('package sample_plugin\nValue::17\n')
+        self.write('package main\nimport "plugin"\nimport intr "base:intrinsics"\n'
+                   'import "core:fmt"\nName::"sample_plugin"\n'
+                   'main::proc(){fmt.println(intr.is_package_imported(Name))}\n')
+        self.invoke('rust','--vet=unused','--apply')
+        self.assertIn('import "plugin"',self.source.read_text())
+        for flags in ([], ['-disable-assert'],native.UNCHECKED):
+            result,_=self.invoke('rust',*flags,command='run')
+            self.assertEqual(result.stdout,'true\n')
+
+    def test_sdk_wrapper_and_project_importer_stay_manual(self):
+        wrapper=self.app/'wrapper';wrapper.mkdir()
+        (wrapper/'wrapper.odin').write_text('package wrapper\nimport "core:thread"\n')
+        text=('package main\nimport w "wrapper"\nimport t "core:thread"\n'
+              'import "core:math"\nmain::proc(){}\n')
+        errors,updated=self.reports(text,'--apply')
+        self.assertEqual(updated,text.replace('import "core:math"\n','').encode())
+        self.assertEqual(len(errors),2,errors)
+        for error in errors:
+            self.assertEqual(error['code'],'thor/unused-import')
+            self.assertIn('dependencies',error['manual_review'])
+            self.assertNotIn('fix',error)
+        self.assertEqual(self.reports(updated.decode(),'--apply')[1],updated)
+
+    def test_registration_only_sdk_codec_import_is_retained(self):
+        text='package main\nimport png "core:image/png"\nmain::proc(){}\n'
+        _,updated=self.reports(text,'--apply')
+        self.assertEqual(updated,text.encode())
+
+    def test_apply_reports_native_warnings_in_the_edited_file(self):
+        self.write('// 😀\r\npackage main\r\nimport "core:math"\r\n'
+                   '@(deprecated="use newer") old::proc(){}\r\nmain::proc(){old()}\r\n')
+        _,applied=self.invoke('rust','--vet=unused','--apply')
+        _,fresh=self.invoke('rust','--vet=unused')
+        self.assertEqual(len(fresh),1)
+        self.assertIn('deprecated',fresh[0]['msgs'][0])
+        self.assertEqual(applied,fresh)
 
 
 if __name__ == '__main__':

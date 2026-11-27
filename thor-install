@@ -20,6 +20,8 @@ trap 'rm -rf "$forward"' EXIT HUP INT TERM
 # Keep original arguments in "$@"; acquisition options are consumed below using
 # a second pass before invoking the native installer.
 for arg do
+    case "$arg" in *'
+'*) echo 'thor-install: newline in argument' >&2; exit 1;; esac
     case "$arg" in --help|-h)
         cat <<'HELP'
 Thor installer (macOS/Linux)
@@ -69,9 +71,7 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -gt 0 ] || { echo "thor-install: $arg requires a value" >&2; exit 1; }
             case "$arg" in --release-base) base=$1;; --version) version=$1;; --bundle) bundle=$1;; --sha256) checksum=$1;; esac
             shift;;
-        *) case "$arg" in *'
-'*) echo 'thor-install: newline in argument' >&2; exit 1;; esac
-           printf '%s\n' "$arg" >> "$forward/args";;
+        *) printf '%s\n' "$arg" >> "$forward/args";;
     esac
 done
 case "$version" in ''|*[!a-zA-Z0-9._-]*) echo 'thor-install: invalid version' >&2; exit 1;; esac
@@ -104,8 +104,10 @@ if [ -n "$maintenance" ]; then
     $from_source && { echo '--from-source cannot be used with maintenance' >&2; exit 1; }
     [ -z "$bundle$checksum" ] || { echo 'Maintenance cannot use --bundle/--sha256' >&2; exit 1; }
     if [ -z "$prefix" ]; then
-        case "$os" in macos) prefix="$HOME/Library/Application Support/Thor";; *) prefix="${XDG_DATA_HOME:-$HOME/.local/share}/thor";; esac
-        case "$os" in macos) record="$HOME/Library/Application Support/Thor/installation.json";; *) record="${XDG_CONFIG_HOME:-$HOME/.config}/thor/installation.json";; esac
+        case "${XDG_DATA_HOME:-}" in /*) data_home=$XDG_DATA_HOME;; *) data_home=$HOME/.local/share;; esac
+        case "${XDG_CONFIG_HOME:-}" in /*) config_home=$XDG_CONFIG_HOME;; *) config_home=$HOME/.config;; esac
+        case "$os" in macos) prefix="$HOME/Library/Application Support/Thor";; *) prefix="$data_home/thor";; esac
+        case "$os" in macos) record="$HOME/Library/Application Support/Thor/installation.json";; *) record="$config_home/thor/installation.json";; esac
         if [ -f "$record" ]; then
             # Native records use pretty JSON and installation paths reject
             # quotes/backslashes/control characters. No eval or shell expansion.
@@ -174,7 +176,7 @@ if [ -z "$bundle" ]; then
         slug=
         if [ -e "$root/.git" ]; then
             origin=$(git -C "$root" remote get-url origin 2>/dev/null || :)
-            case "$origin" in https://github.com/*) slug=${origin#https://github.com/};; git@github.com:*) slug=${origin#git@github.com:};; esac
+            case "$origin" in https://github.com/*|ssh://git@github.com/*) slug=${origin#*github.com/};; git@github.com:*) slug=${origin#git@github.com:};; esac
             slug=${slug%.git}
         elif [ -f "$root/release/repository" ]; then
             slug=$(tr -d '\r' < "$root/release/repository")

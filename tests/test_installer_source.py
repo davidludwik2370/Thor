@@ -465,7 +465,8 @@ try { & """+quote(bootstrap)+' '+ ' '.join(map(quote,options))+" } catch {Write-
 
     def test_checkout_origin_overrides_archive_metadata(self):
         for repository in ('Fork','.Thor','_Thor','-Thor'):
-            for origin in ('https://github.com/fixture/'+repository+'.git','git@github.com:fixture/'+repository+'.git'):
+            for origin in ('https://github.com/fixture/'+repository+'.git','git@github.com:fixture/'+repository+'.git',
+                           'ssh://git@github.com/fixture/'+repository+'.git'):
                 with self.subTest(origin=origin):
                     result,url,git=self.resolve(checkout=True,origin=origin)
                     self.assertIn('https://github.com/fixture/'+repository+'/releases/download/v',url,result.stdout+result.stderr)
