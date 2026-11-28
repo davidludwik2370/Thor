@@ -416,7 +416,10 @@ class LifetimeVetTests(unittest.TestCase):
 
 
     def test_apply_updates_primary_and_related_origin_offsets(self):
-        findings=self.vet('main::proc(){v:=make([]int,2);delete(v);_=v[0]}',prefix='import "core:thread"',checks='unused,lifetime,leak',apply=True)
+        library=self.app/'helpers'
+        library.mkdir()
+        (library/'helpers.thor').write_text('package helpers\nVALUE::1\n')
+        findings=self.vet('main::proc(){v:=make([]int,2);delete(v);_=v[0]}',prefix='import "helpers"',checks='unused,lifetime,leak',apply=True)
         text=self.source.read_bytes()
         fault=next(f for f in findings if f.get('code')=='thor/lifetime')
         pos=fault['pos']

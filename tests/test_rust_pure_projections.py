@@ -71,15 +71,19 @@ Row::struct{values:[]int}
 work::fn(input:[]int)->int{using row:=Row{};values=input;values[0]=9;return values[0]}
 '''),command='check',fail='borrowed from an input')
 
-    def test_returned_promoted_borrowed_views_are_independent_results(self):
-        self.checked_and_unchecked(self.program('''
+    def test_returned_promoted_views_require_an_explicit_clone(self):
+        program = self.program('''
 source:=[3,4];row:>Row{source[:]}
 values:=copy(row);defer delete(values);values[0]=9
 if source[0]!=3||values[0]!=9{panic("promoted result ownership")}
-''','''Row::struct{values:[]int}
+''','''import "thor:pure"
+Row::struct{values:[]int}
 view::proc(using row:Row)->[]int{return values}
-copy::fn(row:Row)->[]int{return view(row)}
-'''))
+copy::fn(row:Row)->[]int{return pure.clone(view(row))}
+''')
+        self.checked_and_unchecked(program)
+        self.compare(program.replace('pure.clone(view(row))', 'view(row)'),
+                     command='check', fail='cannot return borrowed storage')
 
     def test_promoted_global_read_is_still_external_runtime_storage(self):
         self.compare(self.program('n:=3;_=work(n)','''

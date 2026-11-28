@@ -1,6 +1,7 @@
 """Automatic constant evaluation, generic scheduling, and ownership acceptance."""
 import json
 import subprocess
+import tempfile
 import unittest
 
 from tests import test_thor as base
@@ -162,14 +163,17 @@ ZERO::zero()
 
     def test_auto_calls_use_persistent_cache_and_keep_validation(self):
         source=self.program('assert(VALUE==25)','square::fn(n:int)->int{return n*n}\nVALUE::square(5)\n')
-        root,first=self.invoke(source,flags=['--cache-report'])
+        cache = tempfile.TemporaryDirectory(prefix='thor-auto-cache-')
+        self.addCleanup(cache.cleanup)
+        flags = ['--cache-dir', cache.name, '--cache-report']
+        root,first=self.invoke(source,flags=flags)
         report=lambda r:next(json.loads(s)['thor_cache'] for s in r.stdout.splitlines() if s.startswith('{"thor_cache"'))
-        second=subprocess.run([str(base.THOR),'run',str(root/'input/main.thor'),'--output-dir',str(root/'output'),'--cache-report'],capture_output=True,text=True,timeout=40)
+        second=subprocess.run([str(base.THOR),'run',str(root/'input/main.thor'),'--output-dir',str(root/'output'),*flags],capture_output=True,text=True,timeout=40)
         self.assertEqual(second.returncode,0,second.stderr)
         self.assertGreater(report(first)['writes'],0)
         self.assertGreater(report(second)['hits'],0)
         (root/'input/main.thor').write_text(source.replace('return n*n','_=context;return n*n'))
-        bad=subprocess.run([str(base.THOR),'check',str(root/'input/main.thor')],capture_output=True,text=True,timeout=40)
+        bad=subprocess.run([str(base.THOR),'check',str(root/'input/main.thor'),*flags],capture_output=True,text=True,timeout=40)
         self.assertNotEqual(bad.returncode,0)
         self.assertIn('ambient context',bad.stderr)
 

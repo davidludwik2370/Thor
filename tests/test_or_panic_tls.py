@@ -13,6 +13,23 @@ class OrPanicTLSTests(unittest.TestCase):
     unused_imports = base.TLSTests.unused_imports
     assert_original_identifier_tokens = base.TLSTests.assert_original_identifier_tokens
 
+    def test_migrated_member_hover_and_postfix_keyword_are_distinct(self):
+        text = '''package main
+Item :: struct { or_panic: int }
+get :: proc() -> (Item, bool) { return Item{or_panic=7}, true }
+main :: proc() {
+    item := get() or_panic
+    _ = item.or_panic
+}
+'''
+        client, main = self.open(text)
+        for token, offset, expected in [('item.or_panic', 6, 'int'), ('get() or_panic', 7, 'Unwraps an optional result')]:
+            with self.subTest(token=token):
+                result = client.request('textDocument/hover', {
+                    'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, token, offset)})
+                self.assertIsNotNone(result)
+                self.assertIn(expected, result['contents']['value'])
+
     def test_inferred_types_immutability_and_keyword_hover(self):
         text = '''package main
 get::proc()->(int,bool){return 7,true}

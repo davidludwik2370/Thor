@@ -36,8 +36,9 @@ impl Lower<'_, '_> {
             self.helpers.insert(key,self.g(format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid){{when {meta}.type_is_pointer(T){{{name}({meta}.type_elem_type(T))}}else when T=={module}.Integer||T=={module}.Rational{{#panic({})}}}}\n",json!(token)),base));
         }
         let value = self.query_value(base)?;
+        let type_of = self.native("type_of");
         Ok(Code::concat([
-            self.g(format!("{name}(type_of("), base),
+            self.g(format!("{name}({type_of}("), base),
             value,
             self.g("))\n", base),
         ]))

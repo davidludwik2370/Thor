@@ -108,8 +108,9 @@ assert(repeat("ab",3)=="ababab" && repeat("x",0)=="")
 assert(AUTO=="abab" && EXPLICIT=="abab" && COMBINED=="ababababz")
 assert("x"*NUMBER=="xxx")
 ''','''
+import "thor:pure"
 repeat::proc($text:string,$n:int)->string{return text*n}
-make_text::fn()->string{return "ab"*2}
+make_text::fn()->string{return pure.clone("ab"*2)}
 three::fn()->int{return 3}
 AUTO::make_text()
 EXPLICIT::#run make_text()

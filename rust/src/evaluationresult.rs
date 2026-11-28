@@ -167,7 +167,9 @@ impl Lower<'_, '_> {
         } else {
             typ.finish().text
         };
-        let mut literal = crate::values::expression_with_big(value, &type_code, &meta, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(|error| {
+        self.builtin = true;
+        let builtin = format!("{}builtin.", self.prefix);
+        let mut literal = crate::values::expression_in(value, &type_code, &meta, &builtin, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(|error| {
             Error::at(
                 self.source,
                 self.source.node(id).span,
@@ -210,7 +212,7 @@ impl Lower<'_, '_> {
             self.source.node(id).span.start
         );
         let result = format!("{}Result", self.prefix);
-        let body = crate::values::materialize_with_big(value, &result, &meta, &module, &prefix, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(
+        let body = crate::values::materialize_in(value, &result, &meta, &module, &prefix, &builtin, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(
             |error| Error::at(self.source, self.source.node(id).span, error.to_string()),
         )?;
         let flavor = format!(

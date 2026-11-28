@@ -267,15 +267,16 @@ pair::proc()->(int,string,bool){return 0,"",false}
 ''')
         self.invoke(source)
 
-    def test_pure_borrowed_slice_fallback_results_become_independent_copies(self):
+    def test_pure_slice_fallback_results_can_return_independent_clones(self):
         source=self.program('''
 frozen:>[]int{1,2}
 left,right:=choose(frozen)
 left[0]=7;right[0]=8
 if frozen[0]!=1||left[0]!=7||right[0]!=8{panic("fallback ownership")}
 delete(left);delete(right)
-''','''get::proc()->([]int,[]int,bool){return nil,nil,false}
-choose::fn(values:[]int)->([]int,[]int){return get() or_else (values,values)}
+''','''import "core:slice"
+get::proc()->([]int,[]int,bool){return nil,nil,false}
+choose::fn(values:[]int)->([]int,[]int){return get() or_else (slice.clone(values),slice.clone(values))}
 ''')
         _,result=self.invoke(source,flags=['-debug'])
         self.assertNotIn('still allocated',result.stderr)

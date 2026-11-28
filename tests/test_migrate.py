@@ -391,6 +391,38 @@ int inspect(void){return native_fn+native_set+native_Integer()+native_Rational()
                 cwd=self.output,capture_output=True,text=True,timeout=60)
             self.assertEqual((compatible.returncode,compatible.stdout),(0,'7 8 9 10 34 78\n'),compatible.stderr)
 
+    def test_reflected_or_panic_members_and_colliding_type_references(self):
+        self.write('''#+feature using-stmt
+#+feature dynamic-literals
+package main
+import "core:fmt"
+import "core:reflect"
+Integer :: distinct i16
+Rational :: 12
+Kind :: enum { zero, or_panic = Rational }
+Item :: struct { or_panic, second: Integer }
+Bits :: bit_field u8 { or_panic: u8 | 3, set: u8 | 2 }
+pick :: proc(x: $T) -> Integer { return x.or_panic }
+make_item :: proc($T: typeid) -> T { return T{or_panic=8} }
+map_value :: proc(or_panic: int) -> int {
+    table := map[int]int{or_panic=17}
+    defer delete(table)
+    return table[or_panic]
+}
+main :: proc() {
+    item := Item{or_panic=3, second=4}
+    using item
+    or_panic += 2
+    k: Kind = .or_panic
+    bits := Bits{or_panic=6}
+    fmt.println(reflect.struct_field_names(Item)[0], k, int(k), size_of(item.second), pick(item))
+    fmt.println(reflect.bit_field_names(Bits)[0], bits.or_panic, make_item(Item).or_panic, map_value(3))
+}
+''')
+        self.migrate()
+        for flags in ([], UNCHECKED):
+            self.compare_builds(flags, expected='or_panic or_panic 12 2 5\nor_panic 6 8 17\n')
+
     def test_member_names_preserve_reflection_and_generic_sdk_interoperability(self):
         self.write('''#+feature using-stmt
 package main

@@ -1,9 +1,19 @@
 # Thor language specification
 
+## Executable extension contracts
+
+Start with the [Odin compatibility requirement](extension-contracts.md#odin-compatibility-and-migration),
+[ownership of fn results](extension-contracts.md#ownership-of-fn-results),
+[required evaluation and cache consistency](extension-contracts.md#required-evaluation-and-cache-consistency),
+and [vet edits across configurations](extension-contracts.md#vet---apply-across-configurations).
+Their [conformance tests](../tests/test_extension_contracts.py) compile the examples printed in the specification.
+The [extension index](../README.md#thor-extensions) links each remaining feature to an example exercised by the [README suite](../tests/test_readme_examples.py).
+
+## Feature references
+
 The accepted Integer/Rational extension and its staged implementation are
-specified separately in [Arbitrary precision](arbitrary-precision.md). Its
-runtime, predefined types, exact literals, direct-copy ownership, and operators are
-implemented (stages 1–3); compile-time big values and formatting follow in stages 4–5.
+specified separately in [Arbitrary precision](arbitrary-precision.md). All five
+stages are implemented, including compile-time evaluation and formatting.
 
 This is the canonical plain-text reference for the original T01–T23 tasks,
 moved out of the former root `thor.odin` so playground edits cannot remove the
@@ -27,6 +37,19 @@ and macOS debug memory checks. Their current contracts are in the
 [memory guide](memory-debugging.md). [DEVELOPMENT.md](../DEVELOPMENT.md) records
 implementation checkpoints and the compiler → TLS → diagnostics workflow.
 
+| Extension family | Observable contract | Executable examples or boundary tests |
+| --- | --- | --- |
+| Imports, bindings and slice parameters | Selected names have file scope. Immutable bindings and readonly parameters protect writes through the designated view. Writable parameters require suitable storage. | [Imports](../tests/test_imports.py), [slice permissions](../tests/test_slice_access.py) |
+| Arrays, intervals and operators | Inferred array literals produce fixed arrays. Membership evaluates its operands once. Struct operators require eligible fields, preserve their field order, and skip explicit padding. | [Expression rules](language-guide.md#expressions-arrays-and-ranges), [struct operations](struct-arithmetic.md), [padding tests](../tests/test_struct_padding.py) |
+| Strings, sets and comprehensions | Formatting evaluates each interpolated expression once. A set deduplicates keys. A comprehension evaluates its output for each iteration that passes its filter. | [String lifetimes](fstring-lifetimes.md), [comprehensions](comprehensions.md), [executable feature tour](../tests/test_readme_examples.py) |
+| Control flow and optional results | A switch expression yields the selected arm's values. An optional fallback runs only on failure. Discards in a multi-value fallback must match the destination. | [Switch results](../tests/test_switch_results.py), [optional fallback lists](../tests/test_or_else_lists.py) |
+| Generic calls and callbacks | Type and callback defaults may depend on earlier arguments. Passing a callback as a value must preserve the declared purity contract. A multi-result type query preserves named outputs. | [Callback tests](../tests/test_pure_callbacks.py), [dependent defaults and named pmap results](../tests/test_readme_examples.py) |
+| Ownership, cleanup and allocation | A scoped binding schedules shallow cleanup at scope exit. Big-number values and pure results have their documented ownership rules. An allocation-free contract checks ordinary call paths and exempts fatal reporting. | [Scoped owners](scoped-owners.md), [arbitrary precision](arbitrary-precision.md), [allocation-free rules](no-alloc.md) |
+| Attributes, directives and vet | Automatic caller metadata refers to the call site. A runtime barrier controls optional folding. A vet suppression applies to its named checks. Definite and unverified memory findings have distinct reporting rules. | [Attribute and directive reference](attributes-and-directives.md), [vet rules](lifetime-vet.md), [conformance suite](../tests/test_extension_contracts.py) |
+| Standard-library additions | `basic.pmap` preserves job order, including with a runtime callback. The basic API defines argument order, result shape, allocation and cleanup for each helper. | [Basic API](../runtime/basic/README.md), [parallel mapping](../tests/test_rust_parallel.py), [tested README examples](../tests/test_readme_examples.py) |
+
+## Original implementation requirements
+
 The numbered task order below is retained as the implementation history; all
 T01–T23 are complete. Current limitations are described in the guides and
 [audit report](hardening-2026-10.md).
@@ -37,9 +60,10 @@ T01–T23 are complete. Current limitations are described in the guides and
 This is the numbered implementation reference for v1. It supersedes the earlier
 exploratory notes. Later additions are linked above and documented in README.md.
 
-Thor is a source-language superset of Odin plus the additions specified here.
-Existing Odin constructs remain accepted in Thor source. Thor additions do not
-replace Odin's original syntax. Thor transpiles to ordinary Odin
+The compatibility baseline is Odin. Native .odin dependencies retain Odin
+semantics. For .thor source with colliding names or ambiguous syntax, use
+thor migrate. The post-migration compatibility requirement and its tested
+boundaries are specified in the executable contracts above. Thor emits Odin
 and invokes the existing Odin compiler. Odin remains responsible for ordinary
 type checking, machine-code generation, linking, and its existing runtime rules.
 

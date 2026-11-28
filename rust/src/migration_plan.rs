@@ -121,16 +121,6 @@ fn record_owner(typ: &Type) -> Option<Ref> {
     }
 }
 
-fn member_owned(resolver: &mut Resolver<'_>, typ: &Type, name: &str, root: &Path) -> Option<bool> {
-    let mut typ = typ.clone();
-    if let Some(path) = resolver.member_path(&typ, name) {
-        for component in &path[..path.len().saturating_sub(1)] {
-            typ = resolver.member_type(&typ, component);
-        }
-    }
-    record_owner(&typ).map(|owner| resolver.sources[owner.file].path.starts_with(root))
-}
-
 fn annotation_type(resolver: &mut Resolver<'_>, site: Ref, depth: usize) -> Type {
     if depth > 32 {
         return Type::Unknown;
@@ -326,6 +316,23 @@ fn metadata_key(source: &Source, node: NodeId) -> bool {
             .any(|owner| source.node(owner).kind == "Attribute")
 }
 
+fn declared_member(source: &Source, node: NodeId, parent: NodeId) -> bool {
+    match source.node(parent).kind.as_str() {
+        "EnumType" => source.group(parent, "members").contains(&node),
+        "FieldValue" => source.role(parent, "field") == Some(node)
+            && source.node(parent).parent.is_some_and(|owner| source.node(owner).kind == "EnumType"),
+        "Field" if source.group(parent, "names").contains(&node) => {
+            let owner = source.ancestors(parent).find(|owner| matches!(
+                source.node(*owner).kind.as_str(), "BitFieldType" | "StructType" | "UnionType" | "ProcedureType"
+            ));
+            owner.is_some_and(|owner| source.node(owner).kind == "BitFieldType"
+                || source.node(owner).kind == "StructType" && source.node(owner).spans.get("fields")
+                    .is_some_and(|fields| fields.contains(source.node(node).span)))
+        }
+        _ => false,
+    }
+}
+
 fn rename_identifier(
     resolver: &mut Resolver<'_>,
     file: usize,
@@ -333,31 +340,15 @@ fn rename_identifier(
     root: &Path,
 ) -> Result<bool> {
     let source = &resolver.sources[file];
-    let name = source.slice(span);
     let Some(node) = source.at(span, NodeId(0)) else {
         return Ok(true);
     };
     let site = Ref { file, node };
     let parent = source.node(node).parent;
     if let Some(parent) = parent {
-        if name != "or_panic"
-            && (source.node(parent).kind == "EnumType"
-                || source.node(parent).kind == "Field"
-                    && source
-                        .ancestors(parent)
-                        .find(|owner| {
-                            matches!(
-                                source.node(*owner).kind.as_str(),
-                                "StructType" | "ProcedureType"
-                            )
-                        })
-                        .is_some_and(|owner| source.node(owner).kind == "StructType")
-                || source.node(parent).kind == "FieldValue"
-                    && source
-                        .node(parent)
-                        .parent
-                        .is_some_and(|owner| source.node(owner).kind == "EnumType"))
-        {
+        // Only the declared member is metadata. Its type or explicit enum
+        // value is an ordinary expression and follows the referenced binding.
+        if declared_member(source, node, parent) {
             return Ok(false);
         }
         if matches!(
@@ -383,8 +374,8 @@ fn rename_identifier(
             }
             if let Some(base) = source.role(parent, "expr") {
                 let typ = resolver.type_of(Ref { node: base, ..site });
-                if let Some(owned) = member_owned(resolver, &typ, name, root) {
-                    return Ok(owned && name == "or_panic");
+                if record_owner(&typ).is_some() {
+                    return Ok(false);
                 }
                 if source.node(base).kind == "Ident"
                     && resolver.lookup(site, source.text(base)).is_none()
@@ -408,26 +399,11 @@ fn rename_identifier(
                         }
                     }
                 }
-                if name != "or_panic" {
-                    return Ok(false);
-                }
+                return Ok(false);
             }
         }
         if source.node(parent).kind == "ImplicitSelector" {
-            if name != "or_panic" {
-                return Ok(false);
-            }
-            let typ = context_type(
-                resolver,
-                Ref {
-                    node: parent,
-                    ..site
-                },
-                0,
-            );
-            if let Some(owned) = member_owned(resolver, &typ, name, root) {
-                return Ok(owned);
-            }
+            return Ok(false);
         }
         if source.node(parent).kind == "FieldValue" && source.role(parent, "field") == Some(node) {
             if let Some(container) = source.node(parent).parent {
@@ -456,8 +432,16 @@ fn rename_identifier(
                                 0,
                             )
                         });
-                    if let Some(owned) = member_owned(resolver, &typ, name, root) {
-                        return Ok(owned && name == "or_panic");
+                    if record_owner(&typ).is_some() {
+                        return Ok(false);
+                    }
+                    // T{key=value} may be a record literal before T is known.
+                    // An expression key requires a binding in the original Odin
+                    // scope (e.g. a map key). An unbound identifier names a field.
+                    if resolver.lookup(site, source.text(node)).is_none()
+                        && resolver.symbol(site).is_none()
+                    {
+                        return Ok(false);
                     }
                 }
             }
@@ -465,11 +449,8 @@ fn rename_identifier(
     }
     if let Some(symbol) = resolver.symbol(site) {
         let symbol = resolver.symbols[symbol].clone();
-        if let Some(projection) = &symbol.projection {
-            let typ = resolver.type_of(projection.owner);
-            if let Some(owned) = member_owned(resolver, &typ, name, root) {
-                return Ok(owned && name == "or_panic");
-            }
+        if symbol.projection.is_some() {
+            return Ok(false);
         }
         return Ok(resolver.sources[symbol.reference.file]
             .path
@@ -604,7 +585,7 @@ pub(super) fn create(
                 }
                 if rename_identifier(&mut resolver, file, span, &settings.source)? {
                     edits.push((span, replacement.clone()));
-                } else if matches!(name, "fn" | "set") {
+                } else if matches!(name, "fn" | "set" | "or_panic") {
                     if let Some(node) = source
                         .at(span, NodeId(0))
                         .filter(|node| source.node(*node).kind == "Ident")
@@ -757,25 +738,6 @@ fn compatibility_edits(
         let id = NodeId(index);
         if node.kind == "Declaration" {
             preserve_link_names(source, id, edits, messages)?;
-        }
-        if matches!(node.kind.as_str(), "Field" | "Declaration")
-            && source
-                .group(id, "names")
-                .iter()
-                .any(|name| source.text(*name) == "or_panic")
-        {
-            if source.ancestors(id).any(|ancestor| {
-                matches!(
-                    source.node(ancestor).kind.as_str(),
-                    "StructType" | "EnumType"
-                )
-            }) {
-                messages.push(format!(
-                    "{}: review reflected/serialized/foreign names in '{}'",
-                    source.path.display(),
-                    source.text(id).lines().next().unwrap_or("")
-                ));
-            }
         }
     }
     Ok(())

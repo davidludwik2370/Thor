@@ -103,7 +103,7 @@ fn integer(value: &Value) -> Result<String> {
             .map_err(|_| error("Integer result is out of range."))
     }
 }
-fn numeric(value: &Value, typ: &str, float: bool) -> Result<String> {
+fn numeric(value: &Value, typ: &str, float: bool, builtin: &str) -> Result<String> {
     let raw = bytes(value)?;
     if ![1, 2, 4, 8, 16].contains(&raw.len()) {
         return Err(error("Unsupported numeric result width."));
@@ -136,7 +136,7 @@ fn numeric(value: &Value, typ: &str, float: bool) -> Result<String> {
         Ok(format!("{typ}(0h{number:0width$x})", width = 2 * raw.len()))
     } else {
         Ok(format!(
-            "(transmute({typ})u{}(0x{number:x}))",
+            "(transmute({typ}){builtin}u{}(0x{number:x}))",
             8 * raw.len()
         ))
     }
@@ -158,27 +158,37 @@ pub fn expression_with_big(
     meta: &str,
     big: &mut NumericView<'_>,
 ) -> Result<String> {
-    expression_at(value, typ, meta, 0, big)
+    expression_in(value, typ, meta, "", big)
+}
+pub(crate) fn expression_in(
+    value: &Value,
+    typ: &str,
+    meta: &str,
+    builtin: &str,
+    big: &mut NumericView<'_>,
+) -> Result<String> {
+    expression_at(value, typ, meta, 0, builtin, big)
 }
 fn expression_at(
     value: &Value,
     typ: &str,
     meta: &str,
     depth: usize,
+    builtin: &str,
     big: &mut NumericView<'_>,
 ) -> Result<String> {
     if depth > MAX_DEPTH {
         return Err(error("Invalid nested compile-time value."));
     }
     let variant = kind(value)?;
-    let mut child = |v: &Value, t: &str| expression_at(v, t, meta, depth + 1, big);
+    let mut child = |v: &Value, t: &str| expression_at(v, t, meta, depth + 1, builtin, big);
     match variant {
         "specialized" => {
             for name in list(value, "types", "Invalid specialization metadata.")? {
                 if kind(name)? != "string" {
                     return Err(error("Invalid specialization metadata."));
                 }
-                child(name, "string")?;
+                child(name, &format!("{builtin}string"))?;
             }
             child(&value["value"], typ)
         }
@@ -205,7 +215,7 @@ fn expression_at(
             text.push_str("\")");
             Ok(text)
         }
-        "float" | "bits" => numeric(value, typ, variant == "float"),
+        "float" | "bits" => numeric(value, typ, variant == "float", builtin),
         "complex" | "quaternion" => {
             let parts = list(value, "values", "Invalid complex/quaternion result.")?;
             if parts.len() != if variant == "complex" { 2 } else { 4 } {
@@ -214,14 +224,14 @@ fn expression_at(
             let mut components = vec![];
             for (index, part) in parts.iter().enumerate() {
                 let width = 8 * bytes(part)?.len();
-                let text = child(part, &format!("f{width}"))?;
+                let text = child(part, &format!("{builtin}f{width}"))?;
                 components.push(if variant == "quaternion" {
                     format!("{}={text}", ["real", "imag", "jmag", "kmag"][index])
                 } else {
                     text
                 });
             }
-            Ok(format!("{typ}({variant}({}))", components.join(",")))
+            Ok(format!("{typ}({builtin}{variant}({}))", components.join(",")))
         }
         "sequence" => {
             let items = list(value, "values", "Invalid sequence result.")?;
@@ -256,7 +266,7 @@ fn expression_at(
             if nil && !zero {
                 return Err(error("A nil sequence cannot have nonzero-sized elements."));
             }
-            let element = if value["soa"] == true {format!("type_of((cast(^{typ})nil)^[0])")} else {format!("{meta}.type_elem_type({typ})")};
+            let element = if value["soa"] == true {format!("{builtin}type_of((cast(^{typ})nil)^[0])")} else {format!("{meta}.type_elem_type({typ})")};
             let texts = items
                 .iter()
                 .map(|v| child(v, &element))
@@ -283,7 +293,7 @@ fn expression_at(
                     .filter(|v| identifier(v) && seen.insert(*v))
                     .ok_or_else(|| error("Invalid record field."))?;
                 let field = if variant == "record" {
-                    format!("type_of(({typ}{{}}).{name})")
+                    format!("{builtin}type_of(({typ}{{}}).{name})")
                 } else {
                     format!("{meta}.type_elem_type({typ})")
                 };
@@ -396,11 +406,23 @@ pub fn materialize_with_big(
     prefix: &str,
     big: &mut NumericView<'_>,
 ) -> Result<String> {
-    expression_with_big(value, typ, meta, big)?;
+    materialize_in(value, typ, meta, module, prefix, "", big)
+}
+pub(crate) fn materialize_in(
+    value: &Value,
+    typ: &str,
+    meta: &str,
+    module: &str,
+    prefix: &str,
+    builtin: &str,
+    big: &mut NumericView<'_>,
+) -> Result<String> {
+    expression_in(value, typ, meta, builtin, big)?;
     let mut materializer = Materializer {
         meta,
         module,
         prefix,
+        builtin,
         big,
         statements: vec![],
         serial: 0,
@@ -413,6 +435,7 @@ struct Materializer<'a, 'b> {
     meta: &'a str,
     module: &'a str,
     prefix: &'a str,
+    builtin: &'a str,
     big: &'a mut NumericView<'b>,
     statements: Vec<String>,
     serial: usize,
@@ -420,27 +443,28 @@ struct Materializer<'a, 'b> {
 impl Materializer<'_, '_> {
     fn build(&mut self, value: &Value, typ: &str) -> Result<String> {
         if !has_owned(value, false) {
-            return expression_with_big(value, typ, self.meta, self.big);
+            return expression_in(value, typ, self.meta, self.builtin, self.big);
         }
         let module = self.module;
+        let builtin = self.builtin;
         match kind(value)? {
             "specialized" => self.build(&value["value"], typ),
             "string" | "big_integer" | "big_rational" => Ok(format!(
                 "{module}.clone({})",
-                expression_with_big(value, typ, self.meta, self.big)?
+                expression_in(value, typ, self.meta, self.builtin, self.big)?
             )),
             "sequence" => {
                 let storage = value["storage"].as_str().unwrap_or("array");
                 let soa = value["soa"] == true;
-                let element = if soa {format!("type_of((cast(^{typ})nil)^[0])")} else {format!("{}.type_elem_type({typ})", self.meta)};
+                let element = if soa {format!("{builtin}type_of((cast(^{typ})nil)^[0])")} else {format!("{}.type_elem_type({typ})", self.meta)};
                 if storage == "dynamic" || storage == "slice" || value["nil"] == true {
                     self.serial += 1;
                     let name = format!("{}{}", self.prefix, self.serial);
                     let length = value["values"].as_array().unwrap().len();
                     let non_nil = value["nil"] != true;
                     let allocate = if soa && storage == "dynamic" {
-                        format!("make({typ},{length},{})",value["capacity"])
-                    } else if soa {format!("make({typ},{length})")} else if storage == "dynamic" {
+                        format!("{builtin}make({typ},{length},{})",value["capacity"])
+                    } else if soa {format!("{builtin}make({typ},{length})")} else if storage == "dynamic" {
                         format!(
                             "{module}.allocate_dynamic({typ},{length},{},{non_nil})",
                             value["capacity"]
@@ -471,7 +495,7 @@ impl Materializer<'_, '_> {
                     let field = if enumeration {
                         format!("{}.type_elem_type({typ})", self.meta)
                     } else {
-                        format!("type_of(({typ}{{}}).{name})")
+                        format!("{builtin}type_of(({typ}{{}}).{name})")
                     };
                     let text = self.build(&pair[1], &field)?;
                     parts.push(format!(
@@ -495,7 +519,7 @@ impl Materializer<'_, '_> {
                     )
                 )?
             )),
-            _ => expression_with_big(value, typ, self.meta, self.big),
+            _ => expression_in(value, typ, self.meta, self.builtin, self.big),
         }
     }
 }

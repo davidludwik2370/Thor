@@ -35,6 +35,9 @@ struct Path {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Aspect {
     Data,
+    // A generic Rational component is owned, but a record field may borrow.
+    // The native specialization decides at this exact selector.
+    NumericProperty(Ref),
     Storage,
     Inline,
     All,
@@ -57,7 +60,7 @@ struct Origin {
 impl Origin {
     fn for_checked_copy(mut self) -> Self {
         self.aspect = match self.aspect {
-            Aspect::Data => Aspect::CopiedData,
+            Aspect::Data | Aspect::NumericProperty(_) => Aspect::CopiedData,
             Aspect::Storage | Aspect::Inline => Aspect::CopiedStorage,
             Aspect::References => Aspect::CopiedReferences,
             Aspect::All => Aspect::CopiedAll,
@@ -144,6 +147,7 @@ pub struct Facts {
     pub readonly: BTreeSet<Ref>,
     pub invalid: HashMap<Ref, String>,
     pub borrowed_results: BTreeMap<Ref, Ref>,
+    pub owned_numeric_properties: BTreeSet<Ref>,
     pub pure_faults: BTreeMap<Ref, Vec<Issue>>,
     pub unresolved: BTreeMap<Ref, Ref>,
     pub editor_info: Vec<serde_json::Value>,
@@ -470,7 +474,13 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     || !this.r.owns_result_storage(&typ, &mut HashSet::new())
                     || this.type_property(&typ, queries::Property::Unresolved) { continue; }
                 let copy = this.copied(value);
-                if let Some(origin) = this.refs(copy).iter().find(|origin| origin.seed.is_none() || origin.aspect == Aspect::NonOwner) {
+                for origin in this.refs(copy).iter().filter(|origin| origin.seed.is_none() || origin.aspect == Aspect::NonOwner) {
+                    if let Aspect::NumericProperty(selector) = origin.aspect {
+                        // The selected getter creates an Integer even when its
+                        // value occupies one field of a larger owned result.
+                        this.facts.owned_numeric_properties.insert(selector);
+                        continue;
+                    }
                     let site = this.r.fields(sig, "results").get(index)
                         .and_then(|(_, annotation)| *annotation).unwrap_or(sig);
                     let seed = origin.seed.or_else(|| params.get(origin.path.index).map(|p| p.0)).unwrap_or(proc);
@@ -986,6 +996,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let target = self.deref(v);
             return self.member(target, name);
         }
+        if self.pure_depth > 0 && matches!(base_type(&self.values[v].typ), Type::BigRational)
+            && matches!(name, "numerator" | "denominator") {
+            // A Rational property produces an independent Integer. An ordinary
+            // record field with the same spelling still follows its owner.
+            return self.value(Type::BigInteger);
+        }
         if let Some(path) = self.member_path(&self.values[v].typ.clone(), name) {
             if path.len() > 1 {
                 let mut child = v;
@@ -1453,7 +1469,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .find(|control| self.kind(*control) == "When")
                 .and_then(|control| self.role(control, "cond"))
         });
-        for origin in origins {
+        for mut origin in origins {
+            if matches!(origin.aspect, Aspect::NumericProperty(_)) { origin.aspect = Aspect::Data; }
             if origin.aspect == Aspect::NonOwner || origin.copy_provenance() { continue; }
             if let Some(seed) = origin.seed {
                 if origin.aspect == Aspect::Inline {
@@ -1537,7 +1554,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if origin.aspect == Aspect::References {
             return self.refs(v);
         }
-        if origin.aspect == Aspect::Data {
+        if matches!(origin.aspect, Aspect::Data | Aspect::NumericProperty(_)) {
             self.values[v].data.clone()
         } else {
             let mut storage = self.values[v].storage.clone();
@@ -1574,7 +1591,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         } else if let Some(value) = self.resolve_path(&origin.path, args, paths) {
             match origin.aspect {
                 Aspect::References | Aspect::CopiedReferences => self.refs(value),
-                Aspect::Data | Aspect::CopiedData => self.values[value].data.clone(),
+                Aspect::Data | Aspect::CopiedData | Aspect::NumericProperty(_) => self.values[value].data.clone(),
                 _ => {
                     let mut storage = self.values[value].storage.clone();
                     if let Some((Step::Field(_), prefix)) = origin.path.steps.split_last() {
@@ -2110,11 +2127,41 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.value(Type::Unknown)
         }
     }
+    // Empty slice literals and their concatenations have nil backing. An empty
+    // slice of an existing allocation can still point into that allocation.
+    fn nil_slice_constant(&self, site: Ref, seen: &mut HashMap<Ref, bool>) -> bool {
+        if let Some(&empty) = seen.get(&site) { return empty; }
+        if seen.len() >= 128 { return false; }
+        seen.insert(site, false);
+        let empty = match self.kind(site) {
+            "Compound" => self.s(site).group(site.node, "elems").is_empty(),
+            "Paren" => self.role(site, "expr").is_some_and(|inner| self.nil_slice_constant(inner, seen)),
+            "Binary" if self.s(site).node(site.node).op == "++" => ["left", "right"].iter().all(|role|
+                self.role(site, role).is_some_and(|child| self.nil_slice_constant(child, seen))),
+            "Ident" | "Selector" => self.r.symbol(site).is_some_and(|index| {
+                let symbol = &self.r.symbols[index];
+                symbol.constant && self.kind(symbol.reference) == "Declaration" && symbol.value.is_some_and(|node|
+                    self.nil_slice_constant(Ref { file: symbol.reference.file, node }, seen))
+            }),
+            _ => false,
+        };
+        seen.insert(site, empty);
+        empty
+    }
     fn global_read(&mut self, value: V, site: Ref) -> V {
         if self.pure_depth == 0 { return value; }
         let typ = self.values[value].typ.owned();
         if !self.r.owns_result_storage(&typ, &mut HashSet::new()) {
             return value;
+        }
+        if matches!(base_type(&typ), Type::Slice(_)) && self.nil_slice_constant(site, &mut HashMap::new()) {
+            return self.value(typ);
+        }
+        if typ.is_string() && self.r.symbol(site).is_some_and(|index| self.r.symbols[index].constant)
+            && matches!(self.r.constant_value(site, &Substitutions::new(), None),
+                Some(crate::semantics::Constant::Text(text)) if text.is_empty()) {
+            // Returning a named empty constant carries no allocation to release.
+            return self.value(typ);
         }
         let copy = self.copied(value);
         let copy = self.snapshot(copy, &mut HashMap::new());
@@ -2191,7 +2238,22 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .role(r, "field")
                     .map(|r| self.text(r))
                     .unwrap_or_default();
-                let v = self.member(v, &field);
+                let generic_component = self.pure_depth > 0 && self.values[v].typ.is_unknown()
+                    && matches!(field.as_str(), "numerator" | "denominator")
+                    && self.r.logical_enabled(r.file)
+                    && self.r.logical_dynamic_property(r)
+                    && self.contexts[c].proc.is_some_and(|p| self.s(p).node(p.node).data["pure"] == true);
+                let mut v = self.member(v, &field);
+                if generic_component && self.values[v].data.iter().any(|o| o.seed.is_none() && o.aspect == Aspect::Data) {
+                    let read = self.value(self.values[v].typ.clone());
+                    self.values[read] = self.values[v].clone();
+                    self.values[read].base = Some(v);
+                    self.values[read].data = self.values[v].data.iter().cloned().map(|mut o| {
+                        if o.seed.is_none() && o.aspect == Aspect::Data { o.aspect = Aspect::NumericProperty(r); }
+                        o
+                    }).collect();
+                    v = read;
+                }
                 if self.values[v].storage.iter().any(|o| o.seed.is_some()) {
                     if let Some(field) = self.role(r, "field") {
                         self.fact_event(cached::FactEvent::Readonly(field));
@@ -2425,17 +2487,25 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
             "SwitchExpr" | "CompileSwitchExpr" => {
                 self.eval_role(r, "selector", c);
-                let selected = if kind == "CompileSwitchExpr" {
-                    self.r.selected_compile_switch_value(r, &self.contexts[c].bindings)
-                } else { None };
-                if kind == "SwitchExpr" {
+                let matches = if kind == "SwitchExpr" || self.vet_seeds.is_some() {
                     let source = self.s(r);
-                    let matches: Vec<_> = source.node(r.node).data["cases"].as_array().into_iter().flatten()
+                    source.node(r.node).data["cases"].as_array().into_iter().flatten()
                         .flat_map(|case| case["matches"].as_array().into_iter().flatten())
                         .filter_map(crate::ast::Span::from_wire)
-                        .filter_map(|span| source.at(span, r.node)).collect();
-                    for node in matches { self.eval(Ref { node, ..r }, c); }
-                }
+                        .filter_map(|span| source.at(span, r.node))
+                        .map(|node| Ref { node, ..r }).collect::<Vec<_>>()
+                } else { Vec::new() };
+                let selected = if kind == "SwitchExpr" {
+                    for operand in matches { self.eval(operand, c); }
+                    None
+                } else if self.vet_seeds.is_some() && self.role(r, "selector").into_iter()
+                    .chain(matches).any(|test| !self.stable_condition(test, &mut HashSet::new())) {
+                    // An immutable edit must preserve every target/configuration.
+                    // Join the result aliases of all potentially selected arms.
+                    None
+                } else {
+                    self.r.selected_compile_switch_value(r, &self.contexts[c].bindings)
+                };
                 let arms: Vec<Ref> = selected.map(|arm| vec![arm]).unwrap_or_else(|| {
                     let source = self.s(r);
                     source.node(r.node).data["cases"].as_array().into_iter().flatten()
@@ -2458,6 +2528,34 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .map(|arg| self.eval(arg, c))
                     .collect();
                 self.record(r, c, values, false)
+            }
+            "Binary" if self.pure_depth > 0 && (self.s(r).node(r.node).op == "++"
+                || (typ.is_string() || typ.is_unknown() || matches!(typ, Type::Generic))
+                    && matches!(self.s(r).node(r.node).op.as_str(), "+" | "*")) => {
+                let left = self.eval_role(r, "left", c);
+                let right = self.eval_role(r, "right", c);
+                let result = self.value(typ.clone());
+                if self.op(r) == "++" {
+                    // Constant concatenation copies inline elements; references
+                    // inside those elements still refer to their original storage.
+                    let a = self.item(left);
+                    let b = self.item(right);
+                    let elem = self.copied(a);
+                    self.merge(elem, b);
+                    self.values[result].element = Some(elem);
+                    if matches!(base_type(&typ), Type::Slice(_)) && !self.nil_slice_constant(r, &mut HashMap::new()) {
+                        self.values[result].data.insert(Origin::non_owner(r));
+                    }
+                } else if typ.is_string() || self.values[left].typ.is_string() || self.values[right].typ.is_string() {
+                    let zero_repetitions = self.op(r) == "*" && ["left", "right"].iter().any(|role|
+                        self.role(r, role).is_some_and(|arg| self.r.context_integer(arg, &self.contexts[c].bindings) == Some(0)));
+                    if !zero_repetitions {
+                        self.values[result].data = self.values[left].data.clone();
+                        let other = self.values[right].data.clone();
+                        self.values[result].data.extend(other.iter().cloned());
+                    }
+                }
+                result
             }
             "Comprehension" => {
                 if let Some(loop_) = self.role(r, "loop") {
@@ -2647,7 +2745,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .unwrap_or_else(|| self.value(Type::Unknown));
                     // Compound numeric assignment computes an independent value.
                     // Its RHS supplies digits, never a result storage header.
-                    let v = if self.op(r) != "=" && self.values[target].typ.big_name().is_some() {
+                    let replaces_number = self.op(r) != "=" && self.values[target].typ.big_name().is_some();
+                    let v = if replaces_number {
                         self.value(self.values[target].typ.clone())
                     } else { self.copied(v) };
                     if self.kind(site) == "Index" {
@@ -2706,7 +2805,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             vec![],
                         );
                     }
-                    self.write(target, v, c, site, self.op(r) == "=");
+                    self.write(target, v, c, site, self.op(r) == "=" || replaces_number);
                 }
             }
             "IncDec" => {
@@ -2872,7 +2971,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.values[result].element = None;
             self.values[result].target = None;
         }
-        if !reference_data(&typ) {
+        if !reference_data(&typ) && !(self.pure_depth > 0 && (typ.is_string() || typ.big_name().is_some())) {
             self.values[result].data.clear();
         }
         if matches!(
@@ -3014,6 +3113,17 @@ impl<'a, 'r> Privileges<'a, 'r> {
             .map(|arg| self.eval(*arg, c))
             .collect::<Vec<_>>();
         let typ = self.typ(r, c);
+        if self.pure_depth > 0 && self.kind(callee) == "Directive" && self.text(callee) == "#config" && args.len() == 2 {
+            let fallback = values[1];
+            if self.values[fallback].typ.is_string() {
+                let concrete = self.r.constant_value(r, &self.contexts[c].bindings, None);
+                let result = self.value(self.values[fallback].typ.clone());
+                if !matches!(concrete, Some(crate::semantics::Constant::Text(ref text)) if text.is_empty()) {
+                    self.values[result].data.insert(Origin::non_owner(r));
+                }
+                return result;
+            }
+        }
         let name = self
             .builtin_name(callee, &mut HashSet::new())
             .unwrap_or_else(|| self.text(callee));

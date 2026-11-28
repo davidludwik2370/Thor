@@ -561,7 +561,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let name=source.names.get(source.node(node.node).name);
                 if ["file","line","directory","caller_location","defined"].contains(&name) {
                     self.fault(root,node,via,"Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.");
-                } else if !["assert","config","type","procedure","soa"].contains(&name) {
+                } else if !["assert","config","type","procedure","soa","sparse"].contains(&name) {
                     self.fault(root,node,via,format!("Directive '#{name}' is not permitted in pure code."));
                 }
             }

@@ -30,7 +30,7 @@ emit_specialized :: proc(value:$T,names:[]string) {
     strings.write_string(&builder,`],"value":`)
     write(&builder,value,0)
     strings.write_string(&builder,`}}`)
-    fmt.println(strings.to_string(builder))
+    print_packet(builder)
 }
 
 write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
@@ -95,7 +95,7 @@ write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
 // Runtime RTTI is used only by the compiler-owned serializer. Fields are
 // encoded individually; padding and process addresses never enter the packet.
 write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
-    assert(depth<=32,"Compile-time value nesting limit exceeded")
+    if depth>32 {panic("Compile-time value nesting limit exceeded")}
     if value.id==typeid_of(big.Integer){write_big(builder,(cast(^big.Integer)value.data)^);return}
     if value.id==typeid_of(big.Rational){write_big(builder,(cast(^big.Rational)value.data)^);return}
     info:=runtime.type_info_base(type_info_of(value.id))
@@ -129,8 +129,15 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
     case typeinfo.Type_Info_Bit_Set:
         strings.write_string(builder,`{"kind":"bitset","values":[`)
         count:=0
+        big_endian:=ODIN_ENDIAN==.Big
+        if variant.underlying!=nil {
+            base:=runtime.type_info_base(variant.underlying)
+            if integer,ok:=base.variant.(typeinfo.Type_Info_Integer);ok && integer.endianness!=.Platform {
+                big_endian=integer.endianness==.Big
+            }
+        }
         for bit in 0..<info.size*8 {
-            byte_index:=bit/8 if ODIN_ENDIAN==.Little else info.size-1-bit/8
+            byte_index:=info.size-1-bit/8 if big_endian else bit/8
             if (bytes[byte_index]&(u8(1)<<uint(bit%8)))!=0 {
                 if count>0 {strings.write_byte(builder,',')};count+=1
                 write(builder,int(variant.lower)+bit,0)
@@ -146,7 +153,7 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
         if variant.endianness==.Big||(variant.endianness==.Platform&&ODIN_ENDIAN==.Big){order="big"}
         strings.write_string(builder,order);strings.write_string(builder,`"}`)
     case typeinfo.Type_Info_String:
-        assert(!variant.is_cstring&&variant.encoding==.UTF_8,"Unsupported compile-time string type")
+        if variant.is_cstring || variant.encoding!=.UTF_8 {panic("Unsupported compile-time string type")}
         text:=(cast(^string)value.data)^
         strings.write_string(builder,`{"kind":"string","bytes":"`)
         hex(builder,transmute([]u8)text);strings.write_string(builder,`"}`)
@@ -159,7 +166,9 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
         for i in 0..<count {
             if i>0 {strings.write_byte(builder,',')}
             strings.write_string(builder,`{"kind":"float","bytes":"`)
-            hex(builder,bytes[i*width:(i+1)*width]);strings.write_string(builder,`"}`)
+            // Odin stores quaternion lanes as (i,j,k,real); packets use (real,i,j,k).
+            lane:=(i+3)%4 if count==4 else i
+            hex(builder,bytes[lane*width:(lane+1)*width]);strings.write_string(builder,`"}`)
         }
         strings.write_string(builder,` ]}`)
     case typeinfo.Type_Info_Struct:
@@ -167,7 +176,7 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
             write_soa(builder,value.data,variant,depth)
             return
         }
-        assert(.raw_union not_in variant.flags,"Raw unions cannot be serialized")
+        if .raw_union in variant.flags {panic("Raw unions cannot be serialized")}
         strings.write_string(builder,`{"kind":"record","fields":[`)
         written:=0
         for i in 0..<int(variant.field_count) {
@@ -193,7 +202,7 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
             for v,j in enum_info.values {if int(v)==key {name=enum_info.names[j];break}}
             item:=any{rawptr(uintptr(value.data)+uintptr(i*variant.elem_size)),variant.elem.id}
             if name=="" {
-                for byte in (cast([^]u8)item.data)[:variant.elem_size] {assert(byte==0,"Nonzero unnamed enum-array slots cannot be represented as constants")}
+                for byte in (cast([^]u8)item.data)[:variant.elem_size] {if byte!=0 {panic("Nonzero unnamed enum-array slots cannot be represented as constants")}}
                 continue
             }
             if count>0 {strings.write_byte(builder,',')};count+=1
@@ -285,8 +294,13 @@ emit :: proc(value:$T) {
     strings.write_string(&builder,`{"thor_value":1,"value":`)
     write(&builder,value,0)
     strings.write_byte(&builder,'}')
-    assert(len(strings.to_string(builder))<=16*1024*1024,"Compile-time result is too large")
-    fmt.println(strings.to_string(builder))
+    print_packet(builder)
+}
+
+print_packet :: proc(builder:strings.Builder) {
+    text:=strings.to_string(builder)
+    if len(text)>16*1024*1024 {panic("Compile-time result is too large")}
+    fmt.println(text)
 }
 
 // Canonical decimal contents, independent of backend limb width and allocators.

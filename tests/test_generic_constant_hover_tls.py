@@ -94,7 +94,7 @@ main::proc(){_=GOOD}
         client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
         for name in ['AUTO_LATER','AUTO_FIRST','PURE_NEXT']:
             with self.subTest(name=name):
-                value=self.hover(client,main,text,name+' ::')
+                value=self.hover(client,main,text,'\n'+name)
                 self.assertIsNotNone(value,name)
                 self.assertIn(name+' ::',value['contents']['value'])
                 self.assertNotIn('__thor_',json.dumps(value))

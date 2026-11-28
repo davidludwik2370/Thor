@@ -84,11 +84,12 @@ impl Lower<'_, '_> {
             }
             if let Some(first) = properties.first().copied() {
                 let module = self.module("big");
+                let type_of = self.native("type_of");
                 let mut predicates = vec![];
                 for property in properties {
                     let base = self.role(property, "expr")?;
                     let value = self.query_value(base)?.finish().text;
-                    predicates.push(format!("(type_of({value})=={module}.Rational || type_of({value})==^{module}.Rational)"));
+                    predicates.push(format!("({type_of}({value})=={module}.Rational || {type_of}({value})==^{module}.Rational)"));
                 }
                 let predicate = predicates.join(" || ");
                 let error=self.error_token(first,"Rational numerator and denominator properties are read-only; use big.set_fraction to change both together.");
@@ -119,7 +120,13 @@ impl Lower<'_, '_> {
             let field = self.source.text(self.role(id, "field")?).to_string();
             let value = self.query_value(base)?.finish().text;
             let module = self.module("big");
-            let result=self.g(format!("type_of(({module}.Integer{{}} when type_of({value})=={module}.Rational || type_of({value})==^{module}.Rational else ({value}).{field}))"),id);
+            let type_of = self.native("type_of");
+            let record_value = if self.owned_numeric_properties.contains(&id) {
+                self.error_token(id, "This fn cannot return borrowed storage from a record field. Explicitly clone the field or return an independently allocated result.").finish().text
+            } else {
+                format!("({value}).{field}")
+            };
+            let result=self.g(format!("{type_of}(({module}.Integer{{}} when {type_of}({value})=={module}.Rational || {type_of}({value})==^{module}.Rational else {record_value}))"),id);
             if self.temporary_producer(base) {
                 let (name, mut args) = self.closed(id, "big_component", Some(""), |this| {
                     let mut code = vec![];

@@ -188,8 +188,9 @@ VALUE::#run work(7)
 a,a_ok:=work(yes);defer delete(a)
 b,b_ok:=work(no);defer delete(b)
 if a!="text"||!a_ok||b!=""||b_ok||VALUE!=4{panic("or_return")}
-''','''read::proc(ok:bool)->(string,bool)#optional_ok{return "text",ok}
-work::fn(ok:bool)->(string,bool){text:=read(ok) or_return;return text,true}
+''','''import "thor:pure"
+read::proc(ok:bool)->(string,bool)#optional_ok{return "text",ok}
+work::fn(ok:bool)->(string,bool){text:=read(ok) or_return;return pure.clone(text),true}
 consume::fn()->int{text,ok:=work(true);return ok?len(text):0}
 VALUE::#run consume()
 ''')
@@ -234,14 +235,17 @@ VALUE::#run consume()
 
     def test_generic_numeric_properties_transfer_their_existing_copy(self):
         for kind in ['proc','fn']:
+            numerator = ('when T==Rational{return (value.numerator)}else{return pure.clone(value.numerator)}'
+                         if kind == 'fn' else 'return (value.numerator)')
             text=self.program('''r:=Rational(22,13);defer delete(r)
 a:=numer(r);defer delete(a)
 b:=denom(r);defer delete(b)
 record:=Record{Integer(7)};defer delete(record.numerator)
 c:=numer(record);defer delete(c)
 if a!=22||b!=13||c!=7||r!=Rational(22,13){panic("property copy")}
-''','''Record::struct{numerator:Integer}
-numer::'''+kind+'''(value:$T)->Integer{return (value.numerator)}
+''','''import "thor:pure"
+Record::struct{numerator:Integer}
+numer::'''+kind+'(value:$T)->Integer{'+numerator+'''}
 denom::'''+kind+'''(value:$T)->Integer{
     local:=value.denominator;defer delete(local)
     alias:=local;defer delete(alias)

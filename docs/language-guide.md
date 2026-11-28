@@ -131,7 +131,10 @@ retains its own constant-expression restrictions.
 
 TLS supports result types, immutable highlighting, keyword help/completion,
 references/rename, and diagnostics. Original-source debug mapping applies as
-usual. `or_panic` is reserved in Thor; native `.odin` files remain unchanged.
+usual. Thor reserves `or_panic` in ordinary binding positions. Member names
+can retain that spelling, for example `item.or_panic`. In a scope with a
+promoted member, `(or_panic)` explicitly reads that member. Native `.odin`
+files use Odin syntax.
 
 
 ## Multiple-value `or_else` defaults

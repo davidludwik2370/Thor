@@ -202,6 +202,7 @@ impl Scheduler<'_> {
         let inventory = self.prepared_inputs();
         Some(sha256(&canonical(
             &json!({"schema":3,"identity":identity,"entry":self.project.options.entry,
+            "odin_compatible":self.project.options.odin_compatible,
             "flags":self.project.options.flags,"comptime":self.project.options.comptime.name(),"test":self.project.frontend.test,"expression":source.text(node.node),
             "headers":inventory.headers,"dependencies":dependencies,"native":inventory.native,"support":inventory.support,
             "previous":previous,"queries":queries,"scopes":scopes,"resources":resources}),

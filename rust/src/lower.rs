@@ -164,10 +164,12 @@ pub struct Lower<'a, 'r> {
     prefix: String,
     checked_mode: bool,
     pub override_runtime: bool,
+    pub odin_sequence_bounds: bool,
     checked_targets: BTreeMap<NodeId, Vec<Ref>>,
     emitting_variants: HashSet<NodeId>,
     emitting_callbacks: HashSet<NodeId>,
     mutating_params: HashSet<NodeId>,
+    owned_numeric_properties: HashSet<NodeId>,
     captures: Vec<HashMap<usize, Capture>>,
     fstring_plans: HashMap<NodeId, HashSet<NodeId>>,
     fstring_frames: Vec<(String, HashSet<NodeId>)>,
@@ -269,10 +271,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             prefix: source.prefix.clone(),
             checked_mode: false,
             override_runtime: false,
+            odin_sequence_bounds: false,
             checked_targets: BTreeMap::new(),
             emitting_variants: HashSet::new(),
             emitting_callbacks: HashSet::new(),
             mutating_params: HashSet::new(),
+            owned_numeric_properties: HashSet::new(),
             captures: vec![],
             fstring_plans: HashMap::new(),
             struct_math_busy: HashSet::new(),
@@ -464,6 +468,8 @@ impl<'a, 'r> Lower<'a, 'r> {
         &mut self,
         facts: &'f crate::privileges::Facts,
     ) -> Vec<(String, Vec<&'f crate::privileges::Issue>)> {
+        self.owned_numeric_properties.extend(facts.owned_numeric_properties.iter()
+            .filter(|site| site.file == self.file).map(|site| site.node));
         self.mutating_params.extend(
             facts
                 .mutating

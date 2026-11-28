@@ -34,11 +34,19 @@ normalize_signed :: proc "contextless"(length: int, index: $I, location:=#caller
     // Odin's machine index conversion can truncate very wide integers. Check
     // the wide result first; the final access distinguishes index < len from
     // the inclusive upper bound allowed by slicing.
-    if checked { assert_contextless(result >= 0 && result <= i128(length), "Bounds check failed: normalized sequence bound is out of range",location) }
+    when !ODIN_NO_BOUNDS_CHECK {
+        if checked && (result<0 || result>i128(length)) {
+            runtime.panic_contextless("Bounds check failed: normalized sequence bound is out of range",location)
+        }
+    }
     return result
 }
 normalize_unsigned :: proc "contextless"(length: int, index: $I, location:=#caller_location, checked:=true) -> I where intrinsics.type_is_integer(I) && intrinsics.type_is_unsigned(I) {
-    if checked { assert_contextless(u128(index)<=u128(length), "Bounds check failed: sequence bound is out of range",location) }
+    when !ODIN_NO_BOUNDS_CHECK {
+        if checked && u128(index)>u128(length) {
+            runtime.panic_contextless("Bounds check failed: sequence bound is out of range",location)
+        }
+    }
     return index
 }
 normalize_enum :: proc "contextless"(length: int, index: $I, location:=#caller_location, checked:=true) -> I where intrinsics.type_is_enum(I) {

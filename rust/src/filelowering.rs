@@ -131,6 +131,7 @@ impl Job {
 pub(super) struct Inputs<'a> {
     native_checks: bool,
     override_runtime: bool,
+    odin_sequence_bounds: bool,
     sources: &'a [Source],
     type_probes: &'a BTreeMap<crate::semantics::Ref, Vec<String>>,
     type_probe_imports: &'a BTreeMap<usize, BTreeMap<String, String>>,
@@ -167,6 +168,7 @@ impl<'a> Inputs<'a> {
         Self {
             native_checks: nativechecks::active(project),
             override_runtime: project.options.comptime.overrides_runtime(),
+            odin_sequence_bounds: project.options.odin_compatible,
             sources: &project.sources,
             type_probes: &project.type_probes,
             type_probe_imports: &project.type_probe_imports,
@@ -192,6 +194,7 @@ impl<'a> Inputs<'a> {
         let mut related = HashMap::new();
         let mut lower = Lower::new_with_view(file, resolver, job.view.clone())?;
         lower.override_runtime = self.override_runtime;
+        lower.odin_sequence_bounds = self.odin_sequence_bounds;
         if self.native_checks { lower.strip_native_vet_tags(); }
         lower.remap_imports(job.imports.clone());
         lower.apply_type_probes(

@@ -310,6 +310,7 @@ fn projection<'a>(
             resolver
         });
         let mut lower = crate::lower::Lower::new(file, resolver)?;
+        lower.odin_sequence_bounds = project.options.odin_compatible;
         lower.apply_evaluation_results(
             project
                 .evaluated

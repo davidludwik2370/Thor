@@ -1716,7 +1716,7 @@ See the [editor guide](editors/vscode/README.md), [debugger guide](editors/vscod
 
 Thor is experimental; [platform validation](docs/validation/installer-compatibility-2026-11-26.md) records tested configurations and limits. Native `.odin` dependencies retain Odin semantics; `.thor` files add the documented extensions. Unsafe native operations and unverified foreign contracts remain outside any general safety guarantee. Compile-time execution currently runs on the host; cross-target evaluation has documented limits.
 
-Try the [commented tour](examples/demo/demo.thor) with `thor run examples/demo`. Feature-specific runnable programs live under [examples](examples). The [language guide](docs/language-guide.md), [language specification](docs/language-spec.md), [attribute/directive inventory](docs/attributes-and-directives.md) and [compiler guide](docs/compiler-guide.md) provide detailed contracts and limits.
+Try the [commented tour](examples/demo/demo.thor) with `thor run examples/demo`. Feature-specific runnable programs live under [examples](examples). The [language guide](docs/language-guide.md), [language specification](docs/language-spec.md), [executable extension contracts](docs/extension-contracts.md), [attribute/directive inventory](docs/attributes-and-directives.md) and [compiler guide](docs/compiler-guide.md) provide detailed contracts and limits.
 
 For compiler development:
 

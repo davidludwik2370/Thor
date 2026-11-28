@@ -60,7 +60,7 @@ choose::proc{runes,strings}
         self.invoke('''package integration
 import _ "thor:basic" / range, filter, sum, to_set, to_slice
 import "core:testing"
-leaf::proc(n:int)->string{if n==0 do return "zero";return f"value {n ** 2}"}
+leaf::proc(n:int)->string{if n==0 do return f"zero";return f"value {n ** 2}"}
 report::fn(n:int)->string{return leaf(n)}
 SEED::#run sum([]int{1,2,3})
 Color::enum{Red,Blue}

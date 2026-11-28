@@ -156,7 +156,7 @@ pub fn render(command: Option<&str>, full: bool, odin: &str) -> String {
                     | "strip-semicolon"
             )
         }) {
-            text.push_str("\nAdvanced toolchain and editor options:\n  --editor-info                Include editor metadata in JSON diagnostics\n  --odin-compatible            Preserve Odin command defaults and native policy checks\n  --capabilities               Print native compiler capabilities as JSON\n\n");
+            text.push_str("\nAdvanced toolchain and editor options:\n  --editor-info                Include editor metadata in JSON diagnostics\n  --odin-compatible            Preserve Odin command defaults, sequence bounds, and native policy checks\n  --capabilities               Print native compiler capabilities as JSON\n\n");
         }
     }
     text.push_str("Help and version:\n  thor help [command] [-full]   Show standard or exhaustive help\n  -help                        Compatible command-help spelling\n  --version                    Same as thor version\n");

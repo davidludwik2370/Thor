@@ -102,6 +102,7 @@ impl Scheduler<'_> {
             self.source(call).text(call.node),
             self.project.options.flags,
             self.project.options.comptime.name(),
+            self.project.options.odin_compatible,
             self.project.frontend.test,
             identity
         ]))))

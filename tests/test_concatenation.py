@@ -236,7 +236,9 @@ import "thor:big"
 ALL::[Integer(1)] ++ [Integer(2)]
 '''),command='check',fail='requires compile-time constant arrays or slices')
 
-    def test_pure_slice_results_promote_the_constant_backing_to_independent_owners(self):
+    def test_pure_slice_results_require_cloning_the_constant_backing(self):
+        self.invoke(self.program('', 'make_values::fn()->[]int{return []int{1} ++ []int{2}}'),
+                    command='check', fail='cannot return borrowed storage')
         self.invoke(self.program('''
 a:=#run make_values()
 b:=#run make_values()
@@ -244,7 +246,7 @@ if len(a)!=2 || a[1]!=2 || raw_data(a)==raw_data(b) {panic("owned result")}
 a[0]=9
 if b[0]!=1 {panic("independent storage")}
 delete(a);delete(b)
-''','make_values::fn()->[]int{return []int{1} ++ []int{2}}\n'),flags=['-debug'])
+''','import "core:slice"\nmake_values::fn()->[]int{return slice.clone([]int{1} ++ []int{2})}\n'),flags=['-debug'])
 
     def test_large_first_literal_is_not_duplicated_in_every_type_query(self):
         first='['+','.join(str(i) for i in range(1000))+']'

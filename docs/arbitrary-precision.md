@@ -299,6 +299,10 @@ As with other array lists, every element is evaluated before testing membership.
 Generic `r.numerator`/`r.denominator` reads dispatch by actual type, preserving
 ordinary fields with the same names. Generic writes/address-taking reject actual
 Rational properties while ordinary mutable record fields remain usable.
+A `fn` can return `r.numerator` or `r.denominator` directly when `r` is a
+`Rational`. Each getter creates an independent `Integer`. If `r` is an input
+record with an `Integer` field of that name, explicitly clone the field to
+return it. This distinction also applies through generic callbacks and `#run`.
 
 Runtime value switches also accept Integer/Rational selectors, including ranges,
 multiple results, and skipped assignments. The selector is snapshotted once before

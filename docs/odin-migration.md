@@ -34,12 +34,14 @@ number added when necessary. Their references, import aliases, named arguments,
 and labels follow the rename. Comments and ordinary string contents retain their
 text. Existing external SDK declarations remain in their original packages.
 
-The compatible struct-field and enum-member spellings `fn`, `set`, `Integer`, and
-`Rational` remain intact. This preserves reflection names and generic SDK
-interoperability. Unqualified promoted `fn` and `set` references receive
-parentheses where needed to disambiguate Thor syntax. Members named `or_panic`
-require renaming, with a review notice for reflected or serialized field names.
+Struct, enum and bit-field member spellings, including `or_panic`, remain intact.
+This preserves their reflection names and generic SDK
+interoperability. Unqualified promoted `fn`, `set`, and `or_panic` references receive
+parentheses where needed to disambiguate Thor syntax. A reference to a renamed
+type or constant in a member declaration follows that binding.
 Foreign and exported declarations retain their original native link names.
+A type declaration renamed during migration can still expose its new name
+through `typeid_of` and formatting. See the [compatibility contract and example](extension-contracts.md#odin-compatibility-and-migration).
 Configuration keys and package headers retain their original spellings, including
 parenthesized reserved configuration names, so existing `-define` and package
 policy switches continue to select their values.
@@ -108,7 +110,11 @@ argument quoting and do not execute a shell.
 ### Native policy compatibility
 
 Translated compilation commands include `--odin-compatible`. This compiler
-option preserves Odin's default output naming and native debug defaults.
+option preserves Odin's default output naming, native debug defaults and native
+sequence indexing. Signed indices and slice endpoints go directly to Odin,
+including in generic code and compile-time calls. For example, a runtime
+index of `-1` in a checked build triggers Odin's bounds check. Running the
+same converted file with a plain `thor run` uses Thor's from-the-end indexing.
 Native vet/style policies and source restrictions such as `-bedrock` are checked
 against a source-preserving Odin view. The ordinary Thor lowering then checks
 and compiles the program with Thor's purity and immutable-slice rules.

@@ -87,7 +87,9 @@ of optional `fn` evaluation. Explicit `aggressive` or `override` requests are
 honored even with `-debug`.
 
 The policy is part of the evaluation request, prepared-helper and scalar cache
-identity, so a cached override result cannot bypass a retained runtime barrier
+identity. Native sequence bounds selected by `--odin-compatible` also participate
+in cache identity. A cached from-the-end access cannot bypass native bounds
+checking, and a cached override result cannot bypass a retained runtime barrier
 in another mode. Normal caching and `--no-cache` remain available. Eligible
 independent scalar calls can share bounded helper batches; verification is
 cached by procedure specialization and argument shape, including captured generic

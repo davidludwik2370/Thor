@@ -276,7 +276,7 @@ main::proc(){
                 '"wrong"', message='Cannot')
 
     def test_owned_do_return_error_is_original_token_not_generated_block(self):
-        source='package main\nwork::fn(flag:bool)->string{if flag do return "yes";return 10}\nmain::proc(){flag:=false;text:=work(flag);delete(text)}\n'
+        source='package main\nwork::fn(flag:bool)->string{if flag do return f"yes";return 10}\nmain::proc(){flag:=false;text:=work(flag);delete(text)}\n'
         errors=self.at(source,'10',flags=('-debug',),message='Cannot')
         self.assertNotIn('Syntax Error',json.dumps(errors))
         self.assertNotIn('__thor_',json.dumps(errors))

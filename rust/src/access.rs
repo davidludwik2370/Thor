@@ -34,6 +34,11 @@ impl Lower<'_, '_> {
         false
     }
     fn needs_bound(&mut self, mut id: NodeId) -> bool {
+        // Translated Odin commands leave both index arithmetic and its checking
+        // policy to the backend, including in generic code and slice endpoints.
+        if self.odin_sequence_bounds {
+            return false;
+        }
         while self.source.node(id).kind == "Paren" {
             let Some(expr) = self.source.role(id, "expr") else {
                 break;

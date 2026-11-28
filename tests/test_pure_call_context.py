@@ -73,7 +73,7 @@ work::fn(n:int)->int{local:=n;middle(&local);return local}
 leaf::proc(value:$T)->T{when T==int{return state}else{return value}}
 ordinary::proc(value:int)->int{return leaf(value)}
 bad::fn(n:int)->int{return leaf(n)}
-good::fn(n:string)->string{return leaf(n)}
+good::fn(n:string)->int{return len(leaf(n))}
 ''')
         errors=self.errors(text)
         self.assertEqual(len(errors),1,errors)
