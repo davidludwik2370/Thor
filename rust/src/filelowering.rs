@@ -194,7 +194,7 @@ impl<'a> Inputs<'a> {
         let mut related = HashMap::new();
         let mut lower = Lower::new_with_view(file, resolver, job.view.clone())?;
         lower.override_runtime = self.override_runtime;
-        lower.odin_sequence_bounds = self.odin_sequence_bounds;
+        lower.odin_sequence_bounds |= self.odin_sequence_bounds;
         if self.native_checks { lower.strip_native_vet_tags(); }
         lower.remap_imports(job.imports.clone());
         lower.apply_type_probes(

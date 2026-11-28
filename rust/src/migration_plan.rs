@@ -333,6 +333,53 @@ fn declared_member(source: &Source, node: NodeId, parent: NodeId) -> bool {
     }
 }
 
+/// Odin derives RTTI from declaration spelling, including the parameter labels
+/// of specialized records. Keep these names throughout the converted tree:
+/// references in inactive branches and named arguments need the same spelling.
+fn reflected_spellings(sources: &[Source]) -> HashSet<String> {
+    let mut keep = HashSet::new();
+    for source in sources {
+        for (index, node) in source.nodes.iter().enumerate() {
+            let id = NodeId(index);
+            if node.kind == "PolyType" {
+                let name = source.names.get(node.name);
+                if NAMES.contains(&name) { keep.insert(name.to_owned()); }
+            } else if node.kind == "Declaration" && !node.mutable {
+                // A constant expression can denote a type through an alias,
+                // specialization or conditional. No configuration is privileged.
+                for (name, value) in source.group(id, "names").iter().zip(source.group(id, "values")) {
+                    let name = source.text(*name);
+                    if NAMES.contains(&name) && !matches!(source.node(*value).kind.as_str(), "Literal" | "Procedure") {
+                        keep.insert(name.to_owned());
+                    }
+                }
+            } else if matches!(node.kind.as_str(), "StructType" | "UnionType") {
+                // Odin also accepts record parameters without a leading dollar.
+                if let Some(params) = source.role(id, "params") {
+                    for field in &source.node(params).children {
+                        for name in source.group(*field, "names") {
+                            let name = source.text(*name);
+                            if NAMES.contains(&name) { keep.insert(name.to_owned()); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    keep
+}
+
+fn ambiguous_native_operand(source: &Source, span: Span) -> bool {
+    let Some(id) = source.at(span, NodeId(0)) else { return false; };
+    let Some(parent) = source.node(id).parent else { return false; };
+    match source.slice(span) {
+        "fn" => source.node(parent).kind == "Call" && source.role(parent, "callee") == Some(id),
+        "set" => matches!(source.node(parent).kind.as_str(), "Index" | "Slice" | "MatrixIndex")
+            && source.role(parent, "expr") == Some(id),
+        _ => false,
+    }
+}
+
 fn rename_identifier(
     resolver: &mut Resolver<'_>,
     file: usize,
@@ -542,6 +589,7 @@ pub(super) fn create(
     }
     let flags = super::rebased_flags(settings, &settings.source)?;
     // Resolve only packages needed to identify a collision's declaration/type.
+    let preserved = reflected_spellings(&sources);
     let (mut decisions, names) = loop {
         let mut occupied = HashSet::new();
         for source in &sources {
@@ -555,6 +603,7 @@ pub(super) fn create(
         }
         let mut names = BTreeMap::new();
         for name in NAMES {
+            if preserved.contains(name) { continue; }
             let mut replacement = format!("{name}_odin");
             let mut index = 2;
             while occupied.contains(&replacement) {
@@ -574,37 +623,19 @@ pub(super) fn create(
                     continue;
                 }
                 let name = source.slice(span);
-                let Some(replacement) = names.get(name) else {
-                    continue;
-                };
-                if source
-                    .at(span, NodeId(0))
-                    .is_some_and(|node| metadata_key(source, node))
+                if !NAMES.contains(&name)
+                    || source.at(span, NodeId(0)).is_some_and(|node| metadata_key(source, node))
                 {
                     continue;
                 }
-                if rename_identifier(&mut resolver, file, span, &settings.source)? {
-                    edits.push((span, replacement.clone()));
-                } else if matches!(name, "fn" | "set" | "or_panic") {
-                    if let Some(node) = source
-                        .at(span, NodeId(0))
-                        .filter(|node| source.node(*node).kind == "Ident")
-                    {
-                        let parent = source.node(node).parent;
-                        let member = parent.is_some_and(|parent| {
-                            matches!(
-                                source.node(parent).kind.as_str(),
-                                "Field"
-                                    | "EnumType"
-                                    | "Selector"
-                                    | "ImplicitSelector"
-                                    | "FieldValue"
-                            )
-                        });
-                        if !member {
-                            edits.push((span, format!("({name})")));
-                        }
+                if let Some(replacement) = names.get(name) {
+                    if rename_identifier(&mut resolver, file, span, &settings.source)? {
+                        edits.push((span, replacement.clone()));
+                        continue;
                     }
+                }
+                if ambiguous_native_operand(source, span) {
+                    edits.push((span, format!("({name})")));
                 }
             }
             decisions.push(edits);
@@ -678,7 +709,7 @@ pub(super) fn create(
                 *counts.entry(description).or_default() += 1;
             }
         }
-        compatibility_edits(source, &mut edits, &mut messages)?;
+        compatibility_edits(source, &names, &mut edits, &mut messages)?;
         edits.sort_by_key(|(span, _)| (span.start, span.end));
         edits.dedup();
         let mut result = Vec::new();
@@ -716,9 +747,13 @@ pub(super) fn create(
 
 fn compatibility_edits(
     source: &Source,
+    renames: &BTreeMap<&str, String>,
     edits: &mut Vec<Edit>,
     messages: &mut Vec<String>,
 ) -> Result<()> {
+    if let Some(name) = source.node(NodeId(0)).spans.get("package").filter(|_| !source.has_odin_bounds_marker()) {
+        edits.push((Span::new(name.end, name.end), format!(" {}", Source::ODIN_BOUNDS_MARKER)));
+    }
     for span in source.info["migration_file_tags"]
         .as_array()
         .into_iter()
@@ -736,7 +771,8 @@ fn compatibility_edits(
     }
     for (index, node) in source.nodes.iter().enumerate() {
         let id = NodeId(index);
-        if node.kind == "Declaration" {
+        if node.kind == "Declaration" && source.group(id, "names").iter()
+            .any(|name| renames.contains_key(source.text(*name))) {
             preserve_link_names(source, id, edits, messages)?;
         }
     }
@@ -1057,9 +1093,6 @@ fn preserve_link_names(
     messages: &mut Vec<String>,
 ) -> Result<()> {
     let names = source.group(declaration, "names");
-    if !names.iter().any(|name| NAMES.contains(&source.text(*name))) {
-        return Ok(());
-    }
     let mut owners = source.ancestors(declaration).collect::<Vec<_>>();
     owners.reverse();
     owners.push(declaration);

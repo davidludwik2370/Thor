@@ -189,6 +189,18 @@ impl std::ops::Deref for Source {
     fn deref(&self) -> &SourceSyntax { &self.syntax }
 }
 impl Source {
+    /// An inline marker keeps the original line numbers and leading build tags.
+    pub(crate) const ODIN_BOUNDS_MARKER: &str = "/*odin-bounds*/";
+
+    pub(crate) fn has_odin_bounds_marker(&self) -> bool {
+        self.node(NodeId(0)).spans.get("package").is_some_and(|name| {
+            self.raw[name.end..].trim_start_matches([' ', '\t']).starts_with(Self::ODIN_BOUNDS_MARKER)
+        })
+    }
+
+    pub(crate) fn uses_odin_bounds(&self) -> bool {
+        !self.thor || self.has_odin_bounds_marker()
+    }
     pub(crate) fn shares_syntax(&self, other: &Source) -> bool {
         Arc::ptr_eq(&self.syntax, &other.syntax)
     }

@@ -108,6 +108,18 @@ main::proc(){
         for flags in [[],UNCHECKED]:
             self.compare_builds(flags,expected='8  7 7 99 98\n')
 
+    def test_package_marker_preserves_existing_header_and_line_endings(self):
+        source = ('// package decoy /*odin-bounds*/\r\n'
+                  'package main // existing comment\r\n'
+                  'main :: proc() {}')
+        already = 'package main\t/*odin-bounds*/\r\nhelper :: proc() {}'
+        (self.source / 'main.odin').write_bytes(source.encode())
+        (self.source / 'helper.odin').write_bytes(already.encode())
+        self.migrate()
+        self.assertEqual((self.output / 'main.thor').read_bytes(),
+                         source.replace('main //', 'main /*odin-bounds*/ //').encode())
+        self.assertEqual((self.output / 'helper.thor').read_bytes(), already.encode())
+
     def test_cross_package_import_aliases_promoted_fields_enums_and_tests(self):
         self.write('''#+feature using-stmt
 package main
@@ -527,7 +539,8 @@ world`
 main::proc(){fmt.println(TEXT)}
 ''')
         self.migrate()
-        self.assertEqual((self.output/'main.thor').read_text(),(self.source/'main.odin').read_text())
+        self.assertEqual((self.output/'main.thor').read_text(),
+                         (self.source/'main.odin').read_text().replace('package main', 'package main /*odin-bounds*/', 1))
         self.compare_builds()
 
     def test_shell_editor_tasks_convert_commands_and_keep_literal_text(self):

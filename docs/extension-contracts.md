@@ -4,7 +4,7 @@ These rules describe what a Thor program, its caller, or its build can observe. 
 
 ## Odin compatibility and migration
 
-Odin is the baseline. A native `.odin` dependency uses the selected Odin compiler's language. When reading the same text as `.thor`, additional syntax can give an Odin identifier another meaning. The audited spellings are `fn`, `set`, `or_panic`, `Integer`, and `Rational`. The last two are predefined types.
+Odin is the baseline. A native `.odin` dependency uses the selected Odin compiler's language. When reading the same text as `.thor`, additional syntax can give an Odin identifier another meaning. The audited spellings are `fn`, `set`, `or_panic`, `Integer`, and `Rational`. The last two are predefined types. The parser recognizes `or_panic` as an operator after an expression. A declaration or type operand can use it as a name.
 
 The compatibility requirement is that every valid Odin program can be expressed after `thor migrate` and, with equivalent inputs, SDK, target, flags and dependencies, keeps its observable behavior. This includes which conditional branches compile, printed values, and names observed through reflection or external interfaces. Names local to the implementation can change. Unchecked operations outside Odin's defined behavior have no portable result to compare. Where a native build or debug default matters, use the command emitted by `migrate --command`.
 
@@ -25,7 +25,7 @@ main :: proc() {
 
 Both binaries must print `2 4 6`. The conversion must choose a fresh name for `fn`, preserve all references, and leave the source tree intact. Building both projects during migration verifies acceptance and linking. Running them against the same expected observations tests behavioral parity. Migration preserves reflected struct, enum and bit-field member names, including `or_panic`. [Migration guide](odin-migration.md) · [Native parity cases](../tests/test_migrate.py)
 
-The translated command includes `--odin-compatible`. In that mode, a signed sequence index or slice endpoint uses Odin bounds semantics. For a length-two array, a runtime index of `-1` fails a checked build at execution, even with assertions disabled. A plain Thor invocation counts from the end. Both forms must agree with native Odin on in-range indices. No test executes an out-of-range native access with bounds checks disabled.
+Migration writes `/*odin-bounds*/` immediately after the package name on the same line. An index or slice endpoint in that file uses Odin semantics under plain `thor run`, including inside a generic procedure or a `#run` helper. For a length-two array, a runtime index of `-1` fails the native bounds check even with assertions disabled. An unmarked Thor file in the same package can index from the end. The policy follows the file containing the access across calls in either direction. The explicit `--odin-compatible` command option selects Odin bounds across the build. Out-of-range native access with bounds checks disabled has no defined result.
 
 ### Observable name of a migrated type
 
@@ -35,10 +35,14 @@ package main
 import "core:fmt"
 
 Integer :: distinct i16
-main :: proc() { fmt.println(typeid_of(Integer)) }
+Box :: struct($Rational: typeid, $set: int) { values: [set]Rational }
+main :: proc() {
+    fmt.println(typeid_of(Integer))
+    fmt.println(Box(i16, 2){})
+}
 ```
 
-Odin prints `Integer`. The converted program currently prints `Integer_odin`. This is a known gap in the compatibility requirement. The test reports this specific discrepancy separately, passes when both outputs match, and fails on any other output or build failure. The name of a generic type parameter can also appear when Odin formats an instantiated record. Preserving an externally visible name must remain consistent even when a different declaration or specialization is active in another build. Source paths and programs that read their own source present a related design question about which source identity to expose.
+Both programs print `Integer` followed by `Box($Rational=i16, $set=2){values = [0, 0]}`. Native reflection must retain the declared type name and the labels of both type and value parameters. An alias exposes exactly the type name Odin would report. This applies across packages, conditional declarations and specializations. A pre-existing user name ending in `_odin` retains that spelling.
 
 ## Ownership of fn results
 

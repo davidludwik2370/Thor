@@ -6,7 +6,7 @@ import "core:testing"
 import "core:fmt"
 
 @(test)
-thor_or_panic_is_a_postfix_keyword_only_in_thor :: proc(t:^testing.T) {
+or_panic_is_an_identifier_until_parsed_in_postfix_position :: proc(t:^testing.T) {
     for thor in ([2]bool{false,true}) {
         lexer:Tokenizer
         init(&lexer,"value or_panic\nnext", "optional.thor")
@@ -18,7 +18,7 @@ thor_or_panic_is_a_postfix_keyword_only_in_thor :: proc(t:^testing.T) {
         next:=scan(&lexer)
         testing.expect_value(t,first.text,"value")
         testing.expect_value(t,keyword.text,"or_panic")
-        testing.expect_value(t,keyword.kind,.Or_Return if thor else .Ident)
+        testing.expect_value(t,keyword.kind,.Ident)
         testing.expect_value(t,separator.kind,.Semicolon)
         testing.expect_value(t,next.text,"next")
     }

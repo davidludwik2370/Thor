@@ -66,6 +66,8 @@ thor migrate. The post-migration compatibility requirement and its tested
 boundaries are specified in the executable contracts above. Thor emits Odin
 and invokes the existing Odin compiler. Odin remains responsible for ordinary
 type checking, machine-code generation, linking, and its existing runtime rules.
+Migrated files retain Odin sequence bounds under ordinary compiler commands.
+Reflection preserves the original type and generic parameter names.
 
 V1 includes:
 - Selective imports with file-private aliases.

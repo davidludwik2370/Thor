@@ -230,7 +230,6 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		return false
 	}
 	
-	if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 	pkg_name := expect_token_after(p, .Ident, "package")
 	if pkg_name.kind == .Ident {
 		switch name := pkg_name.text; {
@@ -751,7 +750,6 @@ new_blank_ident :: proc(p: ^Parser, pos: tokenizer.Pos) -> ^ast.Ident {
 
 parse_ident :: proc(p: ^Parser) -> ^ast.Ident {
 	tok := p.curr_tok
-	if p.thor && tok.text == "or_panic" { tok.kind = .Ident }
 	pos := tok.pos
 	name := "_"
 	if tok.kind == .Ident {
@@ -1207,7 +1205,6 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind: tokenizer.Token_Kind, docs: ^ast.Comment_Group) -> ^ast.Stmt {
 	elems: [dynamic]^ast.Expr
-	if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 
 	open, close: tokenizer.Token
 
@@ -2257,9 +2254,6 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 		if len(list) > 0 && len(p.mut_parameters) + len(p.ro_parameters) > mut_count && prefix_flags != {} {
 			error(p, p.curr_tok.pos, "Only #mut and #ro may be applied per name; put other parameter directives before the shared name list")
 		}
-		if allowed_flags == ast.Field_Flags_Struct && p.thor && p.curr_tok.text == "or_panic" {
-			p.curr_tok.kind = .Ident
-		}
 		param := parse_var_type(p, allowed_flags & {.Typeid_Token, .Ellipsis})
 		if _, ok := param.derived.(^ast.Ellipsis); ok {
 			if seen_ellipsis {
@@ -2573,11 +2567,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		open := expect_token(p, .Open_Paren)
 		prev_expr_level := p.expr_level
 		p.expr_level = max(p.expr_level, 0) + 1
-		// A migrated using declaration can expose a field with this name.
-		// The parentheses distinguish the identifier from the postfix operator.
-		if p.thor && p.curr_tok.text == "or_panic" && peek_token_kind(p, .Close_Paren) {
-			p.curr_tok.kind = .Ident
-		}
 		expr := parse_expr(p, false)
 		p.expr_level = prev_expr_level
 		close := expect_token(p, .Close_Paren)
@@ -3225,7 +3214,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		skip_possible_newline_for_literal(p)
 		open := expect_token(p, .Open_Brace)
-		fields := parse_elem_list(p, enum_members=true)
+		fields := parse_elem_list(p)
 		close := expect_closing_brace_of_field_list(p)
 
 		et := ast.new(ast.Enum_Type, tok.pos, end_pos(close))
@@ -3417,11 +3406,10 @@ parse_value :: proc(p: ^Parser) -> ^ast.Expr {
 	return parse_expr(p, false)
 }
 
-parse_elem_list :: proc(p: ^Parser, enum_members := false) -> []^ast.Expr {
+parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
 	elems: [dynamic]^ast.Expr
 
 	for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
-		if p.thor && p.curr_tok.text == "or_panic" && (enum_members || peek_token_kind(p, .Eq)) { p.curr_tok.kind = .Ident }
 		elem := parse_value(p)
 		if p.curr_tok.kind == .Eq {
 			eq := expect_token(p, .Eq)
@@ -3502,10 +3490,8 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 			}
 		}
 		previous_thor := p.tok.thor
-		if p.thor && p.curr_tok.text == "or_panic" && peek_token_kind(p, .Eq) { p.curr_tok.kind = .Ident }
 		if configuration_key {
 			p.tok.thor = false
-			if p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 		}
 		arg := parse_expr(p, false)
 		p.tok.thor = previous_thor
@@ -3663,7 +3649,6 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 		case .Period:
 			tok := expect_token(p, .Period)
-			if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 			#partial switch p.curr_tok.kind {
 			case .Ident:
 				field := parse_ident(p)
@@ -3707,7 +3692,6 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 		case .Arrow_Right:
 			tok := expect_token(p, .Arrow_Right)
-			if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 			#partial switch p.curr_tok.kind {
 			case .Ident:
 				field := parse_ident(p)
@@ -3731,6 +3715,15 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 			operand = deref
 
+		case .Ident:
+			if !p.thor || p.curr_tok.text != "or_panic" {
+				loop = false
+				break
+			}
+			// Only the postfix operator shares Odin's or_return AST.
+			// In operand and declaration positions this is an ordinary name.
+			p.curr_tok.kind = .Or_Return
+			fallthrough
 		case .Or_Return:
 			token := expect_token(p, .Or_Return)
 			oe := ast.new(ast.Or_Return_Expr, operand.pos, end_pos(token))

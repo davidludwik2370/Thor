@@ -29,19 +29,24 @@ tests, and platform-specific files. Directories retain their names. Filename
 collisions stop the conversion.
 
 Thor's five colliding identifier spellings are `fn`, `set`, `or_panic`, `Integer`,
-and `Rational`. Migrated bindings receive a fresh suffix such as `fn_odin`, with a
+and `Rational`. Bindings that need renaming receive a fresh suffix such as `fn_odin`, with a
 number added when necessary. Their references, import aliases, named arguments,
 and labels follow the rename. Comments and ordinary string contents retain their
 text. Existing external SDK declarations remain in their original packages.
 
 Struct, enum and bit-field member spellings, including `or_panic`, remain intact.
 This preserves their reflection names and generic SDK
-interoperability. Unqualified promoted `fn`, `set`, and `or_panic` references receive
-parentheses where needed to disambiguate Thor syntax. A reference to a renamed
+interoperability. A bare native call through `fn` or indexing through `set` uses
+parentheses when preserving that spelling could introduce Thor syntax. A reference to a renamed
 type or constant in a member declaration follows that binding.
 Foreign and exported declarations retain their original native link names.
-A type declaration renamed during migration can still expose its new name
-through `typeid_of` and formatting. See the [compatibility contract and example](extension-contracts.md#odin-compatibility-and-migration).
+Declared types and generic parameters keep their original names in `typeid_of`
+and formatted values. Migration keeps a spelling across the copied tree when it
+can name a reflected type or parameter, so another build configuration or a named
+argument still reaches the same declaration. [Compatibility contract and example](extension-contracts.md#observable-name-of-a-migrated-type)
+For a project converted by an older compiler, migrate the original Odin tree
+into a fresh directory to recover the spellings. A name such as `Integer_odin`
+could already have existed in the original, so the compiler treats it literally.
 Configuration keys and package headers retain their original spellings, including
 parenthesized reserved configuration names, so existing `-define` and package
 policy switches continue to select their values.
@@ -109,12 +114,14 @@ argument quoting and do not execute a shell.
 
 ### Native policy compatibility
 
-Translated compilation commands include `--odin-compatible`. This compiler
-option preserves Odin's default output naming, native debug defaults and native
-sequence indexing. Signed indices and slice endpoints go directly to Odin,
-including in generic code and compile-time calls. For example, a runtime
-index of `-1` in a checked build triggers Odin's bounds check. Running the
-same converted file with a plain `thor run` uses Thor's from-the-end indexing.
+Each converted source carries `/*odin-bounds*/` after its package name. Plain
+`thor run` therefore preserves native indexing and slicing, including in generic
+code and compile-time calls. A runtime index of `-1` in a checked build triggers
+Odin's bounds check. Newly written Thor files in the same package retain
+from-the-end indexing. To opt an existing converted file into Thor indexing,
+remove the marker. Earlier migrations can opt in to Odin bounds by adding the
+marker to the package line. Translated commands also pass `--odin-compatible`,
+which selects Odin's output naming, debug defaults and native bounds for every file.
 Native vet/style policies and source restrictions such as `-bedrock` are checked
 against a source-preserving Odin view. The ordinary Thor lowering then checks
 and compiles the program with Thor's purity and immutable-slice rules.

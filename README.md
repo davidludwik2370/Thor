@@ -612,7 +612,7 @@ values[len(values)-1] += 1
 fmt.println(values[len(values)-1], values[:len(values)-1])
 ```
 
-Applies to signed sequence indices and slice bounds, including writes and addressable access. Bounds retain their normal checks. Map keys, enum indices and pointer behavior keep their native meanings.
+Applies to signed sequence indices and slice bounds, including writes and addressable access. Bounds retain their normal checks. Map keys, enum indices and pointer behavior keep their native meanings. Files converted by `thor migrate` retain Odin indexing under plain `thor run`. [Migration rules](docs/odin-migration.md#native-policy-compatibility)
 
 [Indexing and slice rules](docs/slice-access.md).
 

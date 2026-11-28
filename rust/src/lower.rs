@@ -271,7 +271,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             prefix: source.prefix.clone(),
             checked_mode: false,
             override_runtime: false,
-            odin_sequence_bounds: false,
+            odin_sequence_bounds: source.uses_odin_bounds(),
             checked_targets: BTreeMap::new(),
             emitting_variants: HashSet::new(),
             emitting_callbacks: HashSet::new(),
