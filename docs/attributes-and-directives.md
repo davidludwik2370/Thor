@@ -54,6 +54,9 @@ Helper :: struct { value: int }
 old_helper :: proc() {}
 ```
 
+In TLS, typing `@` opens the attribute completion list with descriptions. The
+same suggestions are available inside `@(...)` while entering an attribute name.
+
 A **directive** begins with `#` and belongs to an expression, statement, type,
 parameter, or procedure signature. Placement is part of its meaning; it is not
 a general-purpose annotation. Some directives resemble calls, such as

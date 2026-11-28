@@ -890,7 +890,7 @@ request_initialize :: proc(
 	config.signature_offset_support =
 		initialize_params.capabilities.textDocument.signatureHelp.signatureInformation.parameterInformation.labelOffsetSupport
 
-	completionTriggerCharacters := []string{".", ">", "#", "\"", "/", ":", ",", " "}
+	completionTriggerCharacters := []string{".", ">", "#", "@", "\"", "/", ":", ",", " "}
 	signatureTriggerCharacters := []string{"(", ","}
 	signatureRetriggerCharacters := []string{","}
 

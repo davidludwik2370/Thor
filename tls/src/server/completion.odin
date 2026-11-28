@@ -59,7 +59,13 @@ get_completion_list :: proc(
 
 	position_context, ok := get_document_position_context(document, position, .Completion)
 
-	if !ok || position_context.abort_completion {
+	if !ok {
+		return list, true
+	}
+
+	// An unfinished attribute can be absent from the recovered declaration AST.
+	attribute_context := is_in_attribute(&position_context)
+	if position_context.abort_completion && !attribute_context {
 		return list, true
 	}
 
@@ -125,7 +131,7 @@ get_completion_list :: proc(
 		completion_type = .Directive
 	}
 
-	if is_in_attribute(&position_context) {
+	if attribute_context {
 		completion_type = .Attribute
 	}
 
@@ -836,7 +842,17 @@ is_in_attribute :: proc(position_context: ^DocumentPositionContext) -> bool {
 	for i := pos - 1; i >= 0; i -= 1 {
 		switch src[i] {
 		case '@':
-			return !position_in_comment(position_context.file, pos)
+			if position_in_comment(position_context.file, pos) {return false}
+			// A recovered f-string need not have a literal AST node. Verify the
+			// marker against source tokens before treating it as an attribute.
+			scanner: tokenizer.Tokenizer
+			tokenizer.init(&scanner, src, position_context.file.fullpath, nil)
+			for {
+				token := tokenizer.scan(&scanner)
+				if token.kind == .EOF || token.pos.offset + len(token.text) > i {
+					return token.kind == .At && token.pos.offset == i
+				}
+			}
 		case '\n', ')':
 			return false
 		case ',':
