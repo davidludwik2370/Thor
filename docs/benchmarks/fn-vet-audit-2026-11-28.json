@@ -1,0 +1,606 @@
+{
+  "date": "2026-11-28",
+  "baseline_commit": "17a0e8b468016372abb3660e3e17b5d0a95a4456",
+  "candidate_compiler_sha256": "95a13e95350fcca3adf3584cdcd0e64d800f9aea5b03daf9135b004d2b9cfb1e",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "macos": "15.6"
+  },
+  "method": {
+    "compiler_profile": "release",
+    "odin_workers": 1,
+    "runs_per_mode": 4,
+    "reported_statistic": "median of final three runs; first run reported separately",
+    "storage": "shared bounded cache; temporary outputs removed automatically",
+    "vet_flags": [
+      "--vet=lifetime,leak",
+      "--unverified"
+    ],
+    "uncached_extra_flags": [
+      "--no-cache"
+    ],
+    "notes": "Small samples do not establish speedups. Parallel warm build/vet were slower and reproduced on a profiled recheck; the memory vet cache hit, and the run compiled a #run native helper. This comparison does not isolate the cause of that wall-clock difference."
+  },
+  "before": {
+    "sandbox": {
+      "build": {
+        "cold": 2.2255501670006197,
+        "median": 0.9453466660015692,
+        "samples": [
+          2.2255501670006197,
+          0.941922167003213,
+          0.9453466660015692,
+          0.9507539579972217
+        ]
+      },
+      "vet": {
+        "cold": 0.5294896250015881,
+        "median": 0.44526245900124195,
+        "samples": [
+          0.5294896250015881,
+          0.46262908299831906,
+          0.4389988329967309,
+          0.44526245900124195
+        ]
+      },
+      "vet_uncached": {
+        "cold": 1.5769010829972103,
+        "median": 1.5541023340010724,
+        "samples": [
+          1.5769010829972103,
+          1.555647332999797,
+          1.5541023340010724,
+          1.5312600409997685
+        ]
+      }
+    },
+    "hilo_test": {
+      "build": {
+        "cold": 0.8974059159991157,
+        "median": 0.9073581660013588,
+        "samples": [
+          0.8974059159991157,
+          0.9073581660013588,
+          0.8960606250002456,
+          0.9100155000014638
+        ]
+      },
+      "vet": {
+        "cold": 0.37693162499999744,
+        "median": 0.3514863749987853,
+        "samples": [
+          0.37693162499999744,
+          0.3503087499993853,
+          0.3514863749987853,
+          0.3755869590022485
+        ]
+      },
+      "vet_uncached": {
+        "cold": 0.9591142499994021,
+        "median": 0.9567169160000049,
+        "samples": [
+          0.9591142499994021,
+          0.957730417001585,
+          0.9567169160000049,
+          0.9502025410001806
+        ]
+      }
+    },
+    "poker_pmap": {
+      "build": {
+        "cold": 4.549118625000119,
+        "median": 1.7111196660007408,
+        "samples": [
+          4.549118625000119,
+          1.7409940830002597,
+          1.7111196660007408,
+          1.6838203340012114
+        ]
+      },
+      "vet": {
+        "cold": 1.8847921659980784,
+        "median": 1.3086988750001183,
+        "samples": [
+          1.8847921659980784,
+          1.2912414589991386,
+          1.3160666660005518,
+          1.3086988750001183
+        ]
+      },
+      "vet_uncached": {
+        "cold": 7.774506124998879,
+        "median": 7.7130117080014315,
+        "samples": [
+          7.774506124998879,
+          7.677774042000237,
+          7.7130117080014315,
+          7.74707266599944
+        ]
+      }
+    },
+    "parallel": {
+      "build": {
+        "cold": 3.249719750001532,
+        "median": 1.4011608340006205,
+        "samples": [
+          3.249719750001532,
+          1.4011608340006205,
+          1.4249171250012296,
+          1.392323124997347
+        ]
+      },
+      "vet": {
+        "cold": 0.9799226660034037,
+        "median": 0.924890875001438,
+        "samples": [
+          0.9799226660034037,
+          0.924890875001438,
+          0.9505002499972761,
+          0.9214897089987062
+        ]
+      },
+      "vet_uncached": {
+        "cold": 3.3891342080023605,
+        "median": 3.4458465829993656,
+        "samples": [
+          3.3891342080023605,
+          3.470028250001633,
+          3.4458465829993656,
+          3.342716958002711
+        ]
+      }
+    }
+  },
+  "after": {
+    "sandbox": {
+      "build": {
+        "cold": 1.5260077499988256,
+        "median": 0.8514764169995033,
+        "samples": [
+          1.5260077499988256,
+          0.887809208001272,
+          0.8497419170016656,
+          0.8514764169995033
+        ]
+      },
+      "vet": {
+        "cold": 0.46566449999954784,
+        "median": 0.43541999999797554,
+        "samples": [
+          0.46566449999954784,
+          0.43949187500038533,
+          0.43541999999797554,
+          0.43304874999739695
+        ]
+      },
+      "vet_uncached": {
+        "cold": 1.4614799999981187,
+        "median": 1.4724643750014366,
+        "samples": [
+          1.4614799999981187,
+          1.454185624999809,
+          1.4724643750014366,
+          1.654810832998919
+        ]
+      }
+    },
+    "hilo_test": {
+      "build": {
+        "cold": 0.8648306670002057,
+        "median": 0.8537120839973795,
+        "samples": [
+          0.8648306670002057,
+          0.850959999999759,
+          0.8537120839973795,
+          0.8940019170004234
+        ]
+      },
+      "vet": {
+        "cold": 0.355802042002324,
+        "median": 0.3442585839984531,
+        "samples": [
+          0.355802042002324,
+          0.3507697500026552,
+          0.3442585839984531,
+          0.3395958340006473
+        ]
+      },
+      "vet_uncached": {
+        "cold": 0.9091787910001585,
+        "median": 0.90344612500121,
+        "samples": [
+          0.9091787910001585,
+          0.9031127919988649,
+          0.90344612500121,
+          0.9094915829991805
+        ]
+      }
+    },
+    "poker_pmap": {
+      "build": {
+        "cold": 3.9768195420001575,
+        "median": 1.5117436250002356,
+        "samples": [
+          3.9768195420001575,
+          1.5045802090025973,
+          1.5242083330012974,
+          1.5117436250002356
+        ]
+      },
+      "vet": {
+        "cold": 1.6985277499989024,
+        "median": 1.1572308750000957,
+        "samples": [
+          1.6985277499989024,
+          1.1873310420014604,
+          1.1525019579967193,
+          1.1572308750000957
+        ]
+      },
+      "vet_uncached": {
+        "cold": 7.357066374999704,
+        "median": 7.404526541002269,
+        "samples": [
+          7.357066374999704,
+          7.338520082998002,
+          7.404526541002269,
+          7.453663917000085
+        ]
+      }
+    },
+    "parallel": {
+      "build": {
+        "cold": 2.3374847499981115,
+        "median": 2.2301037079996604,
+        "samples": [
+          2.3374847499981115,
+          2.3058497499987425,
+          2.2301037079996604,
+          2.2199839999993856
+        ]
+      },
+      "vet": {
+        "cold": 1.8015659589982533,
+        "median": 1.7813127500012342,
+        "samples": [
+          1.8015659589982533,
+          1.7813127500012342,
+          1.7572377910000796,
+          1.7938254170003347
+        ]
+      },
+      "vet_uncached": {
+        "cold": 3.26892158299961,
+        "median": 3.2748132909982814,
+        "samples": [
+          3.26892158299961,
+          3.3037657089989807,
+          3.2748132909982814,
+          3.2611972499980766
+        ]
+      }
+    }
+  },
+  "project_findings": {
+    "before": {
+      "sandbox": [],
+      "hilo_test": [],
+      "poker_pmap": [
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 67
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 67
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 126
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 126
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 716,
+          "column": 43
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 716,
+          "column": 43
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker.thor",
+          "line": 227,
+          "column": 38
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker.thor",
+          "line": 227,
+          "column": 38
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker_test.thor",
+          "line": 298,
+          "column": 9
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker_test.thor",
+          "line": 298,
+          "column": 9
+        }
+      ]
+    },
+    "after": {
+      "sandbox": [],
+      "hilo_test": [],
+      "poker_pmap": [
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 67
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 67
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 126
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 155,
+          "column": 126
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 716,
+          "column": 43
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "judge_test.thor",
+          "line": 716,
+          "column": 43
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker.thor",
+          "line": 228,
+          "column": 24
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker.thor",
+          "line": 228,
+          "column": 24
+        },
+        {
+          "code": "thor/leak-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker_test.thor",
+          "line": 298,
+          "column": 9
+        },
+        {
+          "code": "thor/lifetime-unknown",
+          "certainty": "unverified",
+          "reason": "analysis-limit",
+          "file": "poker_test.thor",
+          "line": 298,
+          "column": 9
+        }
+      ]
+    }
+  },
+  "validation": {
+    "compiler_vet_tests": 256,
+    "tls_tests": 17,
+    "rust_unit_tests": 136,
+    "assertion_hygiene_tests": 7,
+    "result": "passed",
+    "runtime_oracles": [
+      "checked",
+      "disable-assert",
+      "unchecked release"
+    ]
+  },
+  "parallel_recheck": {
+    "build": {
+      "cold": 2.6318597919998865,
+      "median": 2.294916333998117,
+      "samples": [
+        2.6318597919998865,
+        2.262708875001408,
+        2.294916333998117,
+        2.463297958998737
+      ]
+    },
+    "vet": {
+      "cold": 1.8067941249973956,
+      "median": 1.7803162919990427,
+      "samples": [
+        1.8067941249973956,
+        1.7803162919990427,
+        1.7948932079998485,
+        1.7751312500004133
+      ]
+    },
+    "vet_uncached": {
+      "cold": 3.2488539580008364,
+      "median": 3.2836007090008934,
+      "samples": [
+        3.2488539580008364,
+        3.249099666998518,
+        3.2836007090008934,
+        3.3104842080028902
+      ]
+    }
+  },
+  "parallel_phase_samples": {
+    "build": {
+      "counters": {
+        "evaluation.helper_compilations": 1,
+        "evaluation.helper_preparations": 1
+      },
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.612881875,
+          "self_seconds": 0.612863292
+        },
+        "evaluation.helper_backend": {
+          "calls": 1,
+          "inclusive_seconds": 0.599854958,
+          "self_seconds": 0.599854958
+        },
+        "evaluation.native_helper": {
+          "calls": 1,
+          "inclusive_seconds": 1.102884333,
+          "self_seconds": 0.4288959579999999
+        },
+        "evaluation.schedule": {
+          "calls": 2,
+          "inclusive_seconds": 1.242723542,
+          "self_seconds": 0.13948504199999995
+        }
+      }
+    },
+    "vet": {
+      "counters": {
+        "evaluation.helper_compilations": 1,
+        "evaluation.helper_preparations": 1,
+        "vet.memory_cache_hits": 1
+      },
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.160699916,
+          "self_seconds": 0.149022749
+        },
+        "evaluation.helper_backend": {
+          "calls": 1,
+          "inclusive_seconds": 0.6046755,
+          "self_seconds": 0.6046755
+        },
+        "evaluation.native_helper": {
+          "calls": 1,
+          "inclusive_seconds": 0.883826583,
+          "self_seconds": 0.20588383199999993
+        },
+        "evaluation.schedule": {
+          "calls": 2,
+          "inclusive_seconds": 1.012055458,
+          "self_seconds": 0.12790641599999997
+        },
+        "vet.memory_cache_key": {
+          "calls": 1,
+          "inclusive_seconds": 0.001221917,
+          "self_seconds": 0.001221917
+        }
+      }
+    },
+    "vet_uncached": {
+      "counters": {
+        "evaluation.helper_compilations": 1,
+        "evaluation.helper_preparations": 1,
+        "vet.memory_cache_misses": 1
+      },
+      "stages": {
+        "backend.final": {
+          "calls": 1,
+          "inclusive_seconds": 0.183261208,
+          "self_seconds": 0.139972126
+        },
+        "evaluation.helper_backend": {
+          "calls": 1,
+          "inclusive_seconds": 0.612133375,
+          "self_seconds": 0.612133375
+        },
+        "evaluation.native_helper": {
+          "calls": 1,
+          "inclusive_seconds": 0.851576542,
+          "self_seconds": 0.165522583
+        },
+        "evaluation.schedule": {
+          "calls": 2,
+          "inclusive_seconds": 0.867471042,
+          "self_seconds": 0.01573062600000008
+        },
+        "vet.lifetime": {
+          "calls": 1,
+          "inclusive_seconds": 0.038044791,
+          "self_seconds": 0.010235127999999986
+        },
+        "vet.lifetime_result_facts": {
+          "calls": 1,
+          "inclusive_seconds": 0.005145458,
+          "self_seconds": 0.0039686240000000005
+        }
+      }
+    }
+  }
+}

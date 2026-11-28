@@ -21,6 +21,8 @@ mod foreign;
 mod loops;
 #[path = "lifetime_models.rs"]
 mod models;
+#[path = "lifetime_pure_callbacks.rs"]
+mod pure_callbacks;
 #[path = "lifetime_recursive.rs"]
 mod recursive;
 #[path = "lifetime_resources.rs"]
@@ -133,6 +135,7 @@ struct Value {
     file_status: Option<Id>,
     choice: bool,
     may_nil: bool,
+    nil_procedure: bool,
     absent_when:BTreeMap<Place,BTreeSet<Id>>,
     byte:Option<u8>,
     number:Option<memory::Number>,
@@ -158,6 +161,7 @@ impl Value {
         self.choice = (!self.unknown || self.choice) && (!v.unknown || v.choice)
             && (self.choice || v.choice || self.refs != v.refs);
         self.may_nil |= v.may_nil;
+        self.nil_procedure |= v.nil_procedure;
         if self.truth != v.truth {self.truth=None;}
         if self.file_status != v.file_status {self.file_status=None;}
         self.unknown |= self.refs != v.refs && (!self.refs.is_empty() || !v.refs.is_empty());
@@ -234,6 +238,7 @@ impl Value {
         self.choice = (!self.unknown || self.choice) && (!v.unknown || v.choice)
             && (self.choice || v.choice || self.refs != v.refs);
         self.may_nil |= v.may_nil || self.refs.is_empty()!=v.refs.is_empty();
+        self.nil_procedure |= v.nil_procedure;
         if self.truth != v.truth {self.truth=None;}
         if self.file_status != v.file_status {self.file_status=None;}
         self.unknown |=
@@ -822,6 +827,13 @@ impl Analysis<'_, '_> {
                                     return self.r.specialized_type(annotation,&plan.bindings);
                                 }
                             }
+                        }
+                    }
+                } else if self.kind(parent) == "Return" {
+                    if let Some(index) = self.group(parent, "values").iter().position(|value| *value == child) {
+                        if let Some(annotation) = self.role(f.procedure, "type")
+                            .and_then(|signature| self.r.fields(signature, "results").get(index).and_then(|(_, typ)| *typ)) {
+                            return self.r.specialized_type(annotation, &f.bindings);
                         }
                     }
                 } else if self.kind(parent) == "Declaration" {
@@ -1715,6 +1727,7 @@ impl Analysis<'_, '_> {
         ]),..Value::default()};}
         match kind.as_str() {
             "Ident" => {
+                if self.r.native_builtin(at, "nil") { return Value { nil_procedure: true, ..Value::default() }; }
                 let ps = self.member_places(state, f, at);
                 let mut v = self.read_many(state, &ps, at, false);
                 if v == Value::default() {
@@ -3075,9 +3088,18 @@ impl Analysis<'_, '_> {
         // arguments are evaluated once, before binding defaults and parameters.
         let mut plans = self.r.call_plans(at, &f.bindings);
         let callable = self.value(state, f, callee, depth + 1);
-        let mut targets = callable.procedures;
+        if callable.nil_procedure {
+            let definite = callable.procedures.is_empty() && !callable.unknown;
+            self.report(at, None, definite, "lifetime", if definite { "call through a nil procedure value" } else { "runtime procedure target may be nil" });
+            if definite { state.terminated = true; return vec![]; }
+        }
+        let closed_targets = !callable.unknown || callable.choice;
+        let mut targets = if closed_targets { callable.procedures } else { BTreeSet::new() };
+        // A constant declaration keeps its identity when the value interpreter
+        // runs out of work. Invalidation of runtime storage has no such proof.
         if plans.len() == 1
-            && (targets.is_empty() || crate::parallelcompile::known_callback(self.r, callee))
+            && (crate::parallelcompile::known_callback(self.r, callee)
+                || closed_targets && targets.is_empty())
         {
             targets.clear();
             targets.insert(plans[0].procedure);
@@ -3088,143 +3110,45 @@ impl Analysis<'_, '_> {
             }
         }
         if targets.len() == 1 {
-            let procedure = *targets.first().unwrap();
-            let source = &self.r.sources[procedure.file];
-            if !source.shared_native && self.role(procedure, "body").is_some() {
-                if self.active.len() >= MAX_DEPTH
-                    || self.active.iter().any(|(p, _)| *p == procedure)
-                {
-                    let v = self.unknown_call(
-                        state,
-                        at,
-                        &vs,
-                        "recursive call requires a lifetime summary that did not converge",
-                    );
-                    return vec![v];
-                }
-                let signature = self.role(procedure, "type").unwrap();
-                let fields = self.r.fields(signature, "params");
-                let mut inputs = vec![];
-                for (i, (name, _)) in fields.iter().enumerate() {
-                    let mut v = Value::default();
-                    if let Some(plan) = plans.iter().find(|p| p.procedure == procedure) {
-                        for actual in plan.arguments.get(i).into_iter().flatten() {
-                            let value = if let Some(v) = evaluated.get(actual) {
-                                v.clone()
-                            } else {
-                                self.value(state, f, *actual, depth + 1)
-                            };
-                            v.merge(&value);
-                        }
-                    } else {
-                        let arg = args
-                            .iter()
-                            .position(|a| {
-                                self.argument_name(*a)
-                                    .is_some_and(|field| self.text(field) == name)
-                            })
-                            .unwrap_or(i);
-                        if let Some(value) = vs.get(arg) {
-                            v = value.clone();
-                        }
-                    }
-                    inputs.push(v);
-                }
-                let bindings = plans
-                    .iter()
-                    .find(|p| p.procedure == procedure)
-                    .map(|p| p.bindings.clone())
-                    .unwrap_or_default();
-                let before_allocator = state.allocator.clone();
-                let before_temp_allocator=state.temp_allocator.clone();
-                let fresh_start = self.objects.len();
-                self.active.push((procedure, at));
-                let captured_inputs = inputs.clone();
-                let results = self.procedure(state.clone(), procedure, inputs, bindings);
-                self.active.pop();
-                let mut result = vec![];
-                let mut after = None;
-                for exit in results {
-                    if exit.control == Control::Stop {
-                        continue;
-                    }
-                    let mut s = exit.state;
-                    self.normalize_failed_allocations(&mut s,&exit.values,fresh_start);
-                    s.allocator = before_allocator.clone();
-                    s.temp_allocator=before_temp_allocator.clone();
-                    if let Some(after) = &mut after {
-                        State::merge(after, &s);
-                    } else {
-                        after = Some(s);
-                    }
-                    result.resize(result.len().max(exit.values.len()), Value::default());
-                    for (i, v) in exit.values.iter().enumerate() {
-                        result[i].merge(v);
-                    }
-                }
-                if let Some(after) = after {
-                    *state = after;
-                } else {
-                    state.terminated = true;
-                }
-                let declaration = self.r.sources[procedure.file]
-                    .node(procedure.node)
-                    .parent
-                    .map(|node| Ref { node, ..procedure })
-                    .unwrap_or(procedure);
-                for (name, effect) in self.r.attributes(declaration) {
-                    if !matches!(
-                        name.as_str(),
-                        "deferred_none" | "deferred_in" | "deferred_out" | "deferred_in_out"
-                    ) {
-                        continue;
-                    }
-                    let mut values = vec![];
-                    if matches!(name.as_str(), "deferred_in" | "deferred_in_out") {
-                        values.extend(captured_inputs.iter().cloned());
-                    }
-                    if matches!(name.as_str(), "deferred_out" | "deferred_in_out") {
-                        values.extend(result.iter().cloned());
-                    }
-                    let targets = effect
-                        .map(|effect| self.r.candidates(effect))
-                        .unwrap_or_default();
-                    if targets.len() == 1
-                        && self.role(targets[0], "body").is_some()
-                        && !self.r.sources[targets[0].file].shared_native
-                    {
-                        state
-                            .cleanups
-                            .entry((f.id, f.scope))
-                            .or_default()
-                            .push(Pending {
-                                action: Cleanup::Procedure {
-                                    procedure: targets[0],
-                                    inputs: values,
-                                    call: at,
-                                },
-                                conditional: false,
-                                allocator:state.allocator.clone(),
-                                temp_allocator:state.temp_allocator.clone(),
-                            });
-                    } else {
-                        self.unknown_call(
-                            state,
-                            at,
-                            &values,
-                            "native deferred cleanup callback cannot be inspected",
-                        );
-                    }
-                }
-                for id in state.reachable(result.iter().cloned()) {
-                    if id >= fresh_start && matches!(self.objects[id].storage, Storage::Heap(_)) {
-                        self.objects[id].owner = None;
-                    }
-                }
-                return result;
+            if let Some(values) = self.invoke_procedure(state, f, at, *targets.first().unwrap(), &plans, &args, &evaluated, &vs, depth) {
+                return values;
             }
+        } else if (2..=8).contains(&targets.len()) && targets.iter().all(|target| {
+            !self.r.sources[target.file].shared_native && self.role(*target, "body").is_some()
+        }) {
+            // The callback expression and actual arguments were evaluated once.
+            // Follow each bounded runtime alternative with the same input state.
+            let before = state.clone();
+            let mut after = None;
+            let mut results = vec![];
+            for target in &targets {
+                let mut branch = before.clone();
+                let target_plans = self.r.call_plans_for_targets(at, &f.bindings, &[*target]);
+                let values = self.invoke_procedure(&mut branch, f, at, *target, &target_plans, &args, &evaluated, &vs, depth)
+                    .expect("inspectable callback target");
+                if branch.terminated { continue; }
+                results.resize(results.len().max(values.len()), Value::default());
+                for (result, value) in results.iter_mut().zip(values) { result.merge(&value); }
+                if let Some(after) = &mut after { State::merge(after, &branch); }
+                else { after = Some(branch); }
+            }
+            if let Some(after) = after {
+                let callable_type = self.typ(callee, f);
+                if callable_type.pure_callable() && results.iter().any(Value::has_refs) {
+                    // The inspected alternatives all obey the same fresh-result
+                    // contract. Use one result graph without losing branch-body
+                    // diagnostics or inventing aliases between exclusive owners.
+                    *state = before;
+                    if let Some(values) = self.pure_callback(state, f, at, &args, &vs, &callable_type) { return values; }
+                }
+                *state = after;
+            }
+            else { state.terminated = true; }
+            crate::profile::count("lifetime.callback_alternatives", targets.len() as u64);
+            return results;
         }
         let callable_type = self.typ(callee, f);
+        if let Some(values) = self.pure_callback(state, f, at, &args, &vs, &callable_type) { return values; }
         // A checked fn callback cannot affect external mutable reference state.
         // Its body and any argument/result storage still get their own checks.
         if matches!(base(&callable_type), Type::Procedure(_))
@@ -3265,6 +3189,154 @@ impl Analysis<'_, '_> {
         } else {
             vec![Value::default()]
         }
+    }
+    fn invoke_procedure(
+        &mut self,
+        state: &mut State,
+        f: &mut Frame,
+        at: Ref,
+        procedure: Ref,
+        plans: &[crate::semantics::CallPlan],
+        args: &[Ref],
+        evaluated: &HashMap<Ref, Value>,
+        vs: &[Value],
+        depth: usize,
+    ) -> Option<Vec<Value>> {
+        let source = &self.r.sources[procedure.file];
+        if !source.shared_native && self.role(procedure, "body").is_some() {
+            if self.active.len() >= MAX_DEPTH
+                || self.active.iter().any(|(p, _)| *p == procedure)
+            {
+                let v = self.unknown_call(
+                    state,
+                    at,
+                    &vs,
+                    "recursive call requires a lifetime summary that did not converge",
+                );
+                return Some(vec![v]);
+            }
+            let signature = self.role(procedure, "type").unwrap();
+            let fields = self.r.fields(signature, "params");
+            let mut inputs = vec![];
+            for (i, (name, _)) in fields.iter().enumerate() {
+                let mut v = Value::default();
+                if let Some(plan) = plans.iter().find(|p| p.procedure == procedure) {
+                    for actual in plan.arguments.get(i).into_iter().flatten() {
+                        let value = if let Some(v) = evaluated.get(actual) {
+                            v.clone()
+                        } else {
+                            self.value(state, f, *actual, depth + 1)
+                        };
+                        v.merge(&value);
+                    }
+                } else {
+                    let arg = args
+                        .iter()
+                        .position(|a| {
+                            self.argument_name(*a)
+                                .is_some_and(|field| self.text(field) == name)
+                        })
+                        .unwrap_or(i);
+                    if let Some(value) = vs.get(arg) {
+                        v = value.clone();
+                    }
+                }
+                inputs.push(v);
+            }
+            let bindings = plans
+                .iter()
+                .find(|p| p.procedure == procedure)
+                .map(|p| p.bindings.clone())
+                .unwrap_or_default();
+            let before_allocator = state.allocator.clone();
+            let before_temp_allocator=state.temp_allocator.clone();
+            let fresh_start = self.objects.len();
+            self.active.push((procedure, at));
+            let captured_inputs = inputs.clone();
+            let results = self.procedure(state.clone(), procedure, inputs, bindings);
+            self.active.pop();
+            let mut result = vec![];
+            let mut after = None;
+            for exit in results {
+                if exit.control == Control::Stop {
+                    continue;
+                }
+                let mut s = exit.state;
+                self.normalize_failed_allocations(&mut s,&exit.values,fresh_start);
+                s.allocator = before_allocator.clone();
+                s.temp_allocator=before_temp_allocator.clone();
+                if let Some(after) = &mut after {
+                    State::merge(after, &s);
+                } else {
+                    after = Some(s);
+                }
+                result.resize(result.len().max(exit.values.len()), Value::default());
+                for (i, v) in exit.values.iter().enumerate() {
+                    result[i].merge(v);
+                }
+            }
+            if let Some(after) = after {
+                *state = after;
+            } else {
+                state.terminated = true;
+            }
+            let declaration = self.r.sources[procedure.file]
+                .node(procedure.node)
+                .parent
+                .map(|node| Ref { node, ..procedure })
+                .unwrap_or(procedure);
+            for (name, effect) in self.r.attributes(declaration) {
+                if !matches!(
+                    name.as_str(),
+                    "deferred_none" | "deferred_in" | "deferred_out" | "deferred_in_out"
+                ) {
+                    continue;
+                }
+                let mut values = vec![];
+                if matches!(name.as_str(), "deferred_in" | "deferred_in_out") {
+                    values.extend(captured_inputs.iter().cloned());
+                }
+                if matches!(name.as_str(), "deferred_out" | "deferred_in_out") {
+                    values.extend(result.iter().cloned());
+                }
+                let targets = effect
+                    .map(|effect| self.r.candidates(effect))
+                    .unwrap_or_default();
+                if targets.len() == 1
+                    && self.role(targets[0], "body").is_some()
+                    && !self.r.sources[targets[0].file].shared_native
+                {
+                    state
+                        .cleanups
+                        .entry((f.id, f.scope))
+                        .or_default()
+                        .push(Pending {
+                            action: Cleanup::Procedure {
+                                procedure: targets[0],
+                                inputs: values,
+                                call: at,
+                            },
+                            conditional: false,
+                            allocator:state.allocator.clone(),
+                            temp_allocator:state.temp_allocator.clone(),
+                        });
+                } else {
+                    self.unknown_call(
+                        state,
+                        at,
+                        &values,
+                        "native deferred cleanup callback cannot be inspected",
+                    );
+                }
+            }
+            for id in state.reachable(result.iter().cloned()) {
+                if id >= fresh_start && matches!(self.objects[id].storage, Storage::Heap(_)) {
+                    self.objects[id].owner = None;
+                }
+            }
+            return Some(result);
+        }
+        None
     }
     fn optional_exit(&mut self, state: &mut State, f: &Frame, at: Ref) {
         let mut protected = BTreeSet::new();
@@ -3677,6 +3749,7 @@ impl Analysis<'_, '_> {
             "Declaration" => {
                 let names = self.group(at, "names");
                 let expressions = self.group(at, "values");
+                let uninitialized = expressions.is_empty();
                 let mut values = if expressions.len() == 1 {
                     self.results(&mut state, f, expressions[0], names.len())
                 } else {
@@ -3687,7 +3760,8 @@ impl Analysis<'_, '_> {
                 };
                 values.resize(names.len(), Value::default());
                 let owners = crate::scoped::names(&self.r.sources[at.file], at.node);
-                for (name, v) in names.into_iter().zip(values) {
+                for (name, mut v) in names.into_iter().zip(values) {
+                    if uninitialized && matches!(base(&self.typ(name, f)), Type::Function(..) | Type::Procedure(_)) { v.nil_procedure = true; }
                     for id in state.reachable([v.clone()]) {
                         if let Some(object) = self.objects.get_mut(id) {
                             if object.owner.is_none() && matches!(object.storage, Storage::Heap(_))
@@ -4150,7 +4224,9 @@ impl Analysis<'_, '_> {
         let mut v = value.clone();
         v.refs.clear();
         v.fields.clear();
+        self.direct(state, value, at);
         for (key, item) in &value.fields {
+            if matches!(key, Key::Field(name) if name == "_") { continue; }
             v.fields.insert(
                 key.clone(),
                 self.promote_seen(state, item, allocator, at, seen, depth + 1),
@@ -4173,27 +4249,17 @@ impl Analysis<'_, '_> {
                     id,
                     Cell {
                         value: Value::default(),
-                        life: LIVE,
+                        life: LIVE | state.cells.get(&p.id).map(|cell| cell.life & ABSENT).unwrap_or(0),
                         uncertain: false,
                         released: None,
                     },
                 );
                 let contents = state.read(p);
-                if state.cells.get(&p.id).is_some_and(|c| c.life == DEAD)
-                    && matches!(self.objects[p.id].storage, Storage::Heap(_))
-                {
-                    self.report(
-                        at,
-                        Some(p.id),
-                        true,
-                        "lifetime",
-                        "pure result promotion reads storage that was explicitly released",
-                    );
-                }
                 let cloned = self.promote_seen(state, &contents, allocator, at, seen, depth + 1);
                 if let Some(c) = state.cells.get_mut(&id) {
                     c.value = cloned;
                 }
+                seen.remove(&p.id);
                 id
             };
             v.refs.insert(Place::root(id));

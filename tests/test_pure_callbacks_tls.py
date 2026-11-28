@@ -75,6 +75,7 @@ main::proc(){_=apply(3,square)}
 '''
         client,main=self.open(text,checker_args='--vet=lifetime,leak --unverified --comptime=required')
         client.diagnostic(main.as_uri(),empty=True)
+
         changed=text.replace('Callback::fn','Callback::proc')
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
@@ -86,6 +87,40 @@ main::proc(){_=apply(3,square)}
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},
                                              'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_vet_checks_conditional_return_storage_and_unsaved_recovery(self):
+        text='''package main
+copy::fn(flag:bool)->[]int {
+    values:=make([]int,2)
+    if flag {delete(values)}
+    return values
+}
+main::proc(){}
+'''
+        client,main=self.open(text,checker_args='--vet=lifetime,leak --unverified --comptime=required')
+        findings=client.diagnostic(main.as_uri(),code='thor/lifetime-unknown')
+        findings=[f for f in findings if f.get('code')=='thor/lifetime-unknown']
+        self.assertTrue(any(f['range']['start']==self.position(text,'return values',7) for f in findings),findings)
+        fixed=text.replace('if flag {delete(values)}','_=flag')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_vet_nil_callback_diagnostic_and_unsaved_assignment(self):
+        text='''package main
+Callback::fn(int)->int
+square::fn(x:int)->int{x*x}
+main::proc(){callback:Callback;_=callback(1)}
+'''
+        client,main=self.open(text,checker_args='--vet=lifetime,leak --unverified --comptime=required')
+        findings=client.diagnostic(main.as_uri(),code='thor/lifetime')
+        finding=next(f for f in findings if f.get('code')=='thor/lifetime')
+        self.assertIn('nil procedure',finding['message'])
+        self.assertEqual(finding['range']['start'],self.position(text,'callback(1)',0))
+        fixed=text.replace('callback:Callback;', 'callback:Callback=square;')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
         client.diagnostic(main.as_uri(),empty=True)
 
 if __name__=='__main__':unittest.main()

@@ -41,6 +41,16 @@ ownership still receive their usual checks. For example, `func(val)` with
 `func: fn(int) -> int` needs no global-effect review. An unresolved
 `proc(int) -> int` still requires that review because it can access global state.
 
+Pure callback inputs retain their borrowed ownership. Supported opaque result
+types receive independently owned result graphs, including flat slices, strings,
+dynamic arrays, ordinary records and small fixed arrays. More complex unresolved
+shapes keep unverified findings. Up to eight inspectable runtime callback targets
+are checked individually. Nil callback bindings and invalid result storage are
+checked at their original source locations.
+
+The [mandatory fn safety plan](fn-memory-safety-plan.md) records the audit,
+remaining proof boundaries and proposed split between regular builds and vet.
+
 ## Reporting incomplete analyses
 
 ```sh

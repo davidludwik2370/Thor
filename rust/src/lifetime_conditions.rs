@@ -127,6 +127,13 @@ impl Analysis<'_, '_> {
                 continue;
             };
             if self.r.native_builtin(other, "nil") {
+                if matches!(base(&self.typ(value, f)), Type::Function(..) | Type::Procedure(_)) {
+                    if !equal && v.nil_procedure && v.procedures.is_empty() && !v.unknown
+                        || equal && !v.nil_procedure && !v.procedures.is_empty() && !v.unknown { return false; }
+                    v.nil_procedure = equal;
+                    if equal { v.procedures.clear(); v.unknown = false; }
+                    if let Some(slot) = &slot { state.write(slot, &v, false); }
+                }
                 if let Some(id) = v.file_status.filter(|_| !v.unknown) {
                     if let Some(c) = state.cells.get_mut(&id) {
                         if equal {
@@ -142,6 +149,18 @@ impl Analysis<'_, '_> {
                         }
                     }
                     crate::profile::count("lifetime.resource_refinements", 1);
+                }
+                if v.may_nil && !v.unknown && v.refs.len() == 1 {
+                    let pointer = v.refs.first().unwrap();
+                    if pointer.path.is_empty() && !pointer.interior && pointer.start == Some(0) {
+                        if let Some(cell) = state.cells.get_mut(&pointer.id)
+                            .filter(|cell| cell.life == (LIVE | ABSENT) && !cell.uncertain) {
+                            cell.life = if equal { ABSENT } else { LIVE };
+                            if equal { v.refs.clear(); }
+                            v.may_nil = equal;
+                            if let Some(slot) = &slot { state.write(slot, &v, false); }
+                        }
+                    }
                 }
                 continue;
             }

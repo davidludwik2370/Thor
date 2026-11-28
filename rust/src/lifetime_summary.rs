@@ -25,6 +25,7 @@ pub(super) struct Summary {
 pub(super) struct Cache {
     pub(super) entries: HashMap<Key, Option<Summary>>,
     pub(super) owners: HashMap<Key, Vec<bool>>,
+    pub(super) callback_results: HashMap<Type, Option<Arc<super::pure_callbacks::ResultShape>>>,
     pub(super) builders: HashMap<Ref, bool>,
     nodes: usize,
     pub(super) exclusive: HashMap<(Ref, Substitutions), bool>,
