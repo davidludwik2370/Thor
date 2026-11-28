@@ -100,6 +100,7 @@ impl Project {
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
             editor_info: vec![],
+            fn_safety_diagnostics: vec![],
             evaluated: results.clone(),
             evaluation_skips: skips.clone(),
             evaluation_witnesses: self.evaluation_witnesses.clone(),

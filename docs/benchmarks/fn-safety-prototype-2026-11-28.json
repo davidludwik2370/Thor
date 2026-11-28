@@ -1,0 +1,992 @@
+{
+  "schema": 1,
+  "compiler_sha256": "1af5997e0b5fdcc66c00458346351fa133e26666a280e32fb1eb8f8f3918cef0",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "release": "24.6.0"
+  },
+  "method": {
+    "paired_repeats": 7,
+    "order": "alternating off/prototype",
+    "cold": "empty temporary compiler data cache; installed frontend and OS caches retained",
+    "warm": "one warmup per mode, independent reusable temporary caches",
+    "runtime": "generated source unchanged; no runtime instrumentation",
+    "target_percent": 5,
+    "comptime": "normal (default)",
+    "odin_workers": 1
+  },
+  "workloads": {
+    "hilo_test": {
+      "cold": {
+        "off_median_seconds": 0.8383032089986955,
+        "prototype_median_seconds": 0.8405715829976543,
+        "paired_overhead_percent": 0.5165307301937538,
+        "paired_extra_ms": 4.319498995755566,
+        "bootstrap_95_percent_interval": [
+          -0.04447296297132031,
+          0.588247429371469
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.8361702500005777,
+            "prototype": 0.8410890000013751,
+            "overhead_percent": 0.588247429371469,
+            "extra_ms": 4.918750000797445
+          },
+          {
+            "prototype": 0.8514267919999838,
+            "off": 0.8496103340003174,
+            "overhead_percent": 0.21379895311699482,
+            "extra_ms": 1.8164579996664543
+          },
+          {
+            "off": 0.8362520840018988,
+            "prototype": 0.8405715829976543,
+            "overhead_percent": 0.5165307301937538,
+            "extra_ms": 4.319498995755566
+          },
+          {
+            "prototype": 0.8389029579993803,
+            "off": 0.8392762089970347,
+            "overhead_percent": -0.04447296297132031,
+            "extra_ms": -0.3732509976543952
+          },
+          {
+            "off": 0.8355894160013122,
+            "prototype": 0.8404605420000735,
+            "overhead_percent": 0.5829568811524632,
+            "extra_ms": 4.871125998761272
+          },
+          {
+            "prototype": 0.8746982090015081,
+            "off": 0.840149042000121,
+            "overhead_percent": 4.112266428244293,
+            "extra_ms": 34.549167001387104
+          },
+          {
+            "off": 0.8383032089986955,
+            "prototype": 0.833708750000369,
+            "overhead_percent": -0.5480664930072598,
+            "extra_ms": -4.594458998326445
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 0.8315533330023754,
+        "prototype_median_seconds": 0.8301705410012801,
+        "paired_overhead_percent": -0.0227270883726427,
+        "paired_extra_ms": -0.1893760017992463,
+        "bootstrap_95_percent_interval": [
+          -0.3030975046192319,
+          0.5116565958634522
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.8296447499997157,
+            "prototype": 0.8348185830000148,
+            "overhead_percent": 0.6236202905280708,
+            "extra_ms": 5.173833000299055
+          },
+          {
+            "prototype": 0.82724641599998,
+            "off": 0.8280095420013822,
+            "overhead_percent": -0.09216391390342027,
+            "extra_ms": -0.76312600140227
+          },
+          {
+            "off": 0.8328993750001246,
+            "prototype": 0.8284515420018579,
+            "overhead_percent": -0.5340180496912983,
+            "extra_ms": -4.447832998266676
+          },
+          {
+            "prototype": 0.8330717909993837,
+            "off": 0.8332611670011829,
+            "overhead_percent": -0.0227270883726427,
+            "extra_ms": -0.1893760017992463
+          },
+          {
+            "off": 0.8326944170003117,
+            "prototype": 0.8301705410012801,
+            "overhead_percent": -0.3030975046192319,
+            "extra_ms": -2.5238759990315884
+          },
+          {
+            "prototype": 0.8299415419969591,
+            "off": 0.8257167079973442,
+            "overhead_percent": 0.5116565958634522,
+            "extra_ms": 4.22483399961493
+          },
+          {
+            "off": 0.8315533330023754,
+            "prototype": 0.833674459001486,
+            "overhead_percent": 0.255079970812222,
+            "extra_ms": 2.121125999110518
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 0.000664833,
+        "passes": 1,
+        "counters": {
+          "fn_safety.complete_summaries": 1,
+          "fn_safety.functions": 1,
+          "fn_safety.nodes": 83,
+          "fn_safety.roots": 1,
+          "fn_safety.unverified": 0
+        },
+        "gaps": []
+      }
+    },
+    "poker_pmap": {
+      "cold": {
+        "off_median_seconds": 4.0382783339955495,
+        "prototype_median_seconds": 4.036219166999217,
+        "paired_overhead_percent": 0.018243959783048602,
+        "paired_extra_ms": 0.7414579995383974,
+        "bootstrap_95_percent_interval": [
+          -1.4119383628494853,
+          0.8463170528269837
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 4.00521316600134,
+            "prototype": 4.017180874998303,
+            "overhead_percent": 0.29880329712665965,
+            "extra_ms": 11.967708996962756
+          },
+          {
+            "prototype": 4.03754391700204,
+            "off": 4.045447666001564,
+            "overhead_percent": -0.19537390301569424,
+            "extra_ms": -7.903748999524396
+          },
+          {
+            "off": 4.06412866699975,
+            "prototype": 4.064870124999288,
+            "overhead_percent": 0.018243959783048602,
+            "extra_ms": 0.7414579995383974
+          },
+          {
+            "prototype": 4.036219166999217,
+            "off": 4.002346624998609,
+            "overhead_percent": 0.8463170528269837,
+            "extra_ms": 33.87254200060852
+          },
+          {
+            "off": 4.0382783339955495,
+            "prototype": 3.981260332999227,
+            "overhead_percent": -1.4119383628494853,
+            "extra_ms": -57.01800099632237
+          },
+          {
+            "prototype": 4.037771417002659,
+            "off": 4.141112958001031,
+            "overhead_percent": -2.4955016210969516,
+            "extra_ms": -103.34154099837178
+          },
+          {
+            "off": 3.9674209160002647,
+            "prototype": 4.018777375000354,
+            "overhead_percent": 1.2944545105605831,
+            "extra_ms": 51.35645900008967
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 1.4105610830010846,
+        "prototype_median_seconds": 1.418361707997974,
+        "paired_overhead_percent": 0.43225719259287754,
+        "paired_extra_ms": 6.104583000706043,
+        "bootstrap_95_percent_interval": [
+          0.1735523839615727,
+          1.0050262282897515
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 1.4123927910040948,
+            "prototype": 1.4265877090001595,
+            "overhead_percent": 1.0050262282897515,
+            "extra_ms": 14.19491799606476
+          },
+          {
+            "prototype": 1.4307087080014753,
+            "off": 1.418065124998975,
+            "overhead_percent": 0.8916080636641732,
+            "extra_ms": 12.643583002500236
+          },
+          {
+            "off": 1.4105610830010846,
+            "prototype": 1.409397875002469,
+            "overhead_percent": -0.08246420609739902,
+            "extra_ms": -1.1632079986156896
+          },
+          {
+            "prototype": 1.434133082999324,
+            "off": 1.4017263749992708,
+            "overhead_percent": 2.3119139782234566,
+            "extra_ms": 32.406708000053186
+          },
+          {
+            "off": 1.4100687919999473,
+            "prototype": 1.4125160000039614,
+            "overhead_percent": 0.1735523839615727,
+            "extra_ms": 2.447208004014101
+          },
+          {
+            "prototype": 1.418361707997974,
+            "off": 1.412257124997268,
+            "overhead_percent": 0.43225719259287754,
+            "extra_ms": 6.104583000706043
+          },
+          {
+            "off": 1.4050518340009148,
+            "prototype": 1.4093450000000303,
+            "overhead_percent": 0.30555214371632555,
+            "extra_ms": 4.293165999115445
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 0.001851666,
+        "passes": 1,
+        "counters": {
+          "fn_safety.complete_summaries": 5,
+          "fn_safety.functions": 8,
+          "fn_safety.nodes": 558,
+          "fn_safety.roots": 8,
+          "fn_safety.summary_hits": 3,
+          "fn_safety.unverified": 4
+        },
+        "gaps": [
+          {
+            "file": "poker_test.thor",
+            "line": 165,
+            "message": "fn safety prototype cannot verify: switch path coverage and case correlations are not yet certified. This is an incomplete check, not a memory-safety certificate."
+          },
+          {
+            "file": "poker_test.thor",
+            "line": 291,
+            "message": "fn safety prototype cannot verify: reference/callback stores through indexed or indirect aliases need a heap summary. This is an incomplete check, not a memory-safety certificate."
+          },
+          {
+            "file": "poker_test.thor",
+            "line": 297,
+            "message": "fn safety prototype cannot verify: switch path coverage and case correlations are not yet certified. This is an incomplete check, not a memory-safety certificate."
+          },
+          {
+            "file": "poker_test.thor",
+            "line": 693,
+            "message": "fn safety prototype cannot verify: reference/callback stores through indexed or indirect aliases need a heap summary. This is an incomplete check, not a memory-safety certificate."
+          }
+        ]
+      }
+    },
+    "parallel": {
+      "cold": {
+        "off_median_seconds": 2.219648459002201,
+        "prototype_median_seconds": 2.2321994169979007,
+        "paired_overhead_percent": 0.4492621775043615,
+        "paired_extra_ms": 9.97204099985538,
+        "bootstrap_95_percent_interval": [
+          0.08143408075027558,
+          1.687574481955112
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 2.2020040830029757,
+            "prototype": 2.239164541999344,
+            "overhead_percent": 1.687574481955112,
+            "extra_ms": 37.16045899636811
+          },
+          {
+            "prototype": 2.2524325839985977,
+            "off": 2.246101582997653,
+            "overhead_percent": 0.281866192022151,
+            "extra_ms": 6.331001000944525
+          },
+          {
+            "off": 2.230383125002845,
+            "prototype": 2.2321994169979007,
+            "overhead_percent": 0.08143408075027558,
+            "extra_ms": 1.8162919950555079
+          },
+          {
+            "prototype": 2.442718000005698,
+            "off": 2.2075614580026013,
+            "overhead_percent": 10.652321417853795,
+            "extra_ms": 235.15654200309655
+          },
+          {
+            "off": 2.196669666998787,
+            "prototype": 2.231488500001433,
+            "overhead_percent": 1.5850736924964082,
+            "extra_ms": 34.81883300264599
+          },
+          {
+            "prototype": 2.226214041998901,
+            "off": 2.2459293749998324,
+            "overhead_percent": -0.8778251542719495,
+            "extra_ms": -19.715333000931423
+          },
+          {
+            "off": 2.219648459002201,
+            "prototype": 2.2296205000020564,
+            "overhead_percent": 0.4492621775043615,
+            "extra_ms": 9.97204099985538
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 1.3124260839977069,
+        "prototype_median_seconds": 1.3068232079967856,
+        "paired_overhead_percent": -0.3864357421675013,
+        "paired_extra_ms": -5.069584003649652,
+        "bootstrap_95_percent_interval": [
+          -0.7334986469385241,
+          0.19271484370688707
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 1.3071774580021156,
+            "prototype": 1.309696582997276,
+            "overhead_percent": 0.19271484370688707,
+            "extra_ms": 2.5191249951603822
+          },
+          {
+            "prototype": 1.3032425409983261,
+            "off": 1.3011496659964905,
+            "overhead_percent": 0.1608481373457371,
+            "extra_ms": 2.092875001835637
+          },
+          {
+            "off": 1.3363815840057214,
+            "prototype": 1.3088685420007096,
+            "overhead_percent": -2.058771411870486,
+            "extra_ms": -27.513042005011812
+          },
+          {
+            "prototype": 1.3033292079999228,
+            "off": 1.3129597500010277,
+            "overhead_percent": -0.7334986469385241,
+            "extra_ms": -9.630542001104914
+          },
+          {
+            "off": 1.311882792004326,
+            "prototype": 1.3068132080006762,
+            "overhead_percent": -0.3864357421675013,
+            "extra_ms": -5.069584003649652
+          },
+          {
+            "prototype": 1.3068232079967856,
+            "off": 1.3124260839977069,
+            "overhead_percent": -0.42690983280785355,
+            "extra_ms": -5.602876000921242
+          },
+          {
+            "off": 1.3132512919983128,
+            "prototype": 1.3163026670008549,
+            "overhead_percent": 0.2323527127773728,
+            "extra_ms": 3.051375002542045
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 5.6667e-05,
+        "passes": 1,
+        "counters": {
+          "fn_safety.roots": 0
+        },
+        "gaps": []
+      }
+    },
+    "plain": {
+      "cold": {
+        "off_median_seconds": 0.18234970799676375,
+        "prototype_median_seconds": 0.18212695799593348,
+        "paired_overhead_percent": 0.32688072180762084,
+        "paired_extra_ms": 0.593708005908411,
+        "bootstrap_95_percent_interval": [
+          -1.0276622771863253,
+          2.9603309498648755
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.18178149999585003,
+            "prototype": 0.1871628340013558,
+            "overhead_percent": 2.9603309498648755,
+            "extra_ms": 5.381334005505778
+          },
+          {
+            "prototype": 0.18106808299489785,
+            "off": 0.17956874999799766,
+            "overhead_percent": 0.8349632087525816,
+            "extra_ms": 1.4993329969001934
+          },
+          {
+            "off": 0.1816283329972066,
+            "prototype": 0.182222041003115,
+            "overhead_percent": 0.32688072180762084,
+            "extra_ms": 0.593708005908411
+          },
+          {
+            "prototype": 0.1797320830009994,
+            "off": 0.1856188339952496,
+            "overhead_percent": -3.1714190136550635,
+            "extra_ms": -5.886750994250178
+          },
+          {
+            "off": 0.18401804199675098,
+            "prototype": 0.18212695799593348,
+            "overhead_percent": -1.0276622771863253,
+            "extra_ms": -1.8910840008175
+          },
+          {
+            "prototype": 0.1817754590010736,
+            "off": 0.18234970799676375,
+            "overhead_percent": -0.3149163231455976,
+            "extra_ms": -0.5742489956901409
+          },
+          {
+            "off": 0.1838752499970724,
+            "prototype": 0.19354254200152354,
+            "overhead_percent": 5.257527592541722,
+            "extra_ms": 9.667292004451156
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 0.17794395799865015,
+        "prototype_median_seconds": 0.17844654199871002,
+        "paired_overhead_percent": -0.42223012614998057,
+        "paired_extra_ms": -0.7513329983339645,
+        "bootstrap_95_percent_interval": [
+          -2.1852560709711644,
+          1.063022806992464
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.19217129200114869,
+            "prototype": 0.18169724999461323,
+            "overhead_percent": -5.450367688880842,
+            "extra_ms": -10.474042006535456
+          },
+          {
+            "prototype": 0.1768759999977192,
+            "off": 0.1793525419998332,
+            "overhead_percent": -1.3808234745378178,
+            "extra_ms": -2.4765420021140017
+          },
+          {
+            "off": 0.1841774999993504,
+            "prototype": 0.18015274999925168,
+            "overhead_percent": -2.1852560709711644,
+            "extra_ms": -4.02475000009872
+          },
+          {
+            "prototype": 0.17719262500031618,
+            "off": 0.17794395799865015,
+            "overhead_percent": -0.42223012614998057,
+            "extra_ms": -0.7513329983339645
+          },
+          {
+            "off": 0.17335849999653874,
+            "prototype": 0.18038912499469006,
+            "overhead_percent": 4.055540973353877,
+            "extra_ms": 7.030624998151325
+          },
+          {
+            "prototype": 0.17743091699958313,
+            "off": 0.1755646249948768,
+            "overhead_percent": 1.063022806992464,
+            "extra_ms": 1.866292004706338
+          },
+          {
+            "off": 0.1778098750000936,
+            "prototype": 0.17844654199871002,
+            "overhead_percent": 0.35806054000999676,
+            "extra_ms": 0.6366669986164197
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 6.25e-07,
+        "passes": 1,
+        "counters": {
+          "fn_safety.roots": 0
+        },
+        "gaps": []
+      }
+    },
+    "fn_stress": {
+      "cold": {
+        "off_median_seconds": 0.6766875419998541,
+        "prototype_median_seconds": 0.6755381669936469,
+        "paired_overhead_percent": -0.9258313429015175,
+        "paired_extra_ms": -6.332582997856662,
+        "bootstrap_95_percent_interval": [
+          -1.2311265908349078,
+          0.5479236586344749
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.6766875419998541,
+            "prototype": 0.6786772500054212,
+            "overhead_percent": 0.29403644696734954,
+            "extra_ms": 1.9897080055670813
+          },
+          {
+            "prototype": 0.6699407909982256,
+            "off": 0.6782914169962169,
+            "overhead_percent": -1.2311265908349078,
+            "extra_ms": -8.350625997991301
+          },
+          {
+            "off": 0.6762825830010115,
+            "prototype": 0.6667734580041724,
+            "overhead_percent": -1.4060875196049372,
+            "extra_ms": -9.509124996839091
+          },
+          {
+            "prototype": 0.6797028750006575,
+            "off": 0.6759989170022891,
+            "overhead_percent": 0.5479236586344749,
+            "extra_ms": 3.7039579983684234
+          },
+          {
+            "off": 0.6839888329996029,
+            "prototype": 0.6776562500017462,
+            "overhead_percent": -0.9258313429015175,
+            "extra_ms": -6.332582997856662
+          },
+          {
+            "prototype": 0.6736275829971419,
+            "off": 0.681763583997963,
+            "overhead_percent": -1.1933757084986008,
+            "extra_ms": -8.136001000821125
+          },
+          {
+            "off": 0.6717640419956297,
+            "prototype": 0.6755381669936469,
+            "overhead_percent": 0.561823015534646,
+            "extra_ms": 3.7741249980172142
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 0.6247487090004142,
+        "prototype_median_seconds": 0.6248962500030757,
+        "paired_overhead_percent": 0.05914129948358937,
+        "paired_extra_ms": 0.36879099934594706,
+        "bootstrap_95_percent_interval": [
+          -0.5188789485402467,
+          0.7895620064880982
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.6235760839990689,
+            "prototype": 0.6239448749984149,
+            "overhead_percent": 0.05914129948358937,
+            "extra_ms": 0.36879099934594706
+          },
+          {
+            "prototype": 0.6327626250058529,
+            "off": 0.6247487090004142,
+            "overhead_percent": 1.2827423074248223,
+            "extra_ms": 8.01391600543866
+          },
+          {
+            "off": 0.6271190000043134,
+            "prototype": 0.6312507910042768,
+            "overhead_percent": 0.6588527855056148,
+            "extra_ms": 4.131790999963414
+          },
+          {
+            "prototype": 0.6248962500030757,
+            "off": 0.6200009579988546,
+            "overhead_percent": 0.7895620064880982,
+            "extra_ms": 4.895292004221119
+          },
+          {
+            "off": 0.6222709580033552,
+            "prototype": 0.619042124999396,
+            "overhead_percent": -0.5188789485402467,
+            "extra_ms": -3.228833003959153
+          },
+          {
+            "prototype": 0.6249104160015122,
+            "off": 0.6252684999999474,
+            "overhead_percent": -0.057268837057233846,
+            "extra_ms": -0.3580839984351769
+          },
+          {
+            "off": 0.627763500000583,
+            "prototype": 0.6201406660038629,
+            "overhead_percent": -1.2142843597490294,
+            "extra_ms": -7.622833996720146
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 0.001718625,
+        "passes": 1,
+        "counters": {
+          "fn_safety.complete_summaries": 200,
+          "fn_safety.functions": 200,
+          "fn_safety.nodes": 2000,
+          "fn_safety.roots": 200,
+          "fn_safety.unverified": 0
+        },
+        "gaps": []
+      }
+    },
+    "owned_callbacks": {
+      "cold": {
+        "off_median_seconds": 0.5466482499978156,
+        "prototype_median_seconds": 0.550506083003711,
+        "paired_overhead_percent": 0.2566790315164047,
+        "paired_extra_ms": 1.409416006936226,
+        "bootstrap_95_percent_interval": [
+          0.0899699514409269,
+          1.3133198806912771
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.5460702499985928,
+            "prototype": 0.5471062920041732,
+            "overhead_percent": 0.18972687224456664,
+            "extra_ms": 1.0360420055803843
+          },
+          {
+            "prototype": 0.5522744580011931,
+            "off": 0.5483727090031607,
+            "overhead_percent": 0.7115140731793757,
+            "extra_ms": 3.901748998032417
+          },
+          {
+            "off": 0.5466482499978156,
+            "prototype": 0.5565874590029125,
+            "overhead_percent": 1.8182092424400276,
+            "extra_ms": 9.939209005096927
+          },
+          {
+            "prototype": 0.552815750001173,
+            "off": 0.5456496249971678,
+            "overhead_percent": 1.3133198806912771,
+            "extra_ms": 7.166125004005153
+          },
+          {
+            "off": 0.5466191660016193,
+            "prototype": 0.5471109589998377,
+            "overhead_percent": 0.0899699514409269,
+            "extra_ms": 0.49179299821844324
+          },
+          {
+            "prototype": 0.550506083003711,
+            "off": 0.5490966669967747,
+            "overhead_percent": 0.2566790315164047,
+            "extra_ms": 1.409416006936226
+          },
+          {
+            "off": 0.5480309999984456,
+            "prototype": 0.5475300420002895,
+            "overhead_percent": -0.09141052206125266,
+            "extra_ms": -0.5009579981560819
+          }
+        ]
+      },
+      "warm": {
+        "off_median_seconds": 0.5316022909973981,
+        "prototype_median_seconds": 0.5326535839994904,
+        "paired_overhead_percent": 0.2240112250783577,
+        "paired_extra_ms": 1.188249996630475,
+        "bootstrap_95_percent_interval": [
+          0.04641401867833128,
+          0.47172655788279005
+        ],
+        "median_within_5_percent": true,
+        "pairs": [
+          {
+            "off": 0.5331461250025313,
+            "prototype": 0.5315134999982547,
+            "overhead_percent": -0.30622467794713115,
+            "extra_ms": -1.6326250042766333
+          },
+          {
+            "prototype": 0.5323174590012059,
+            "off": 0.5298181660036789,
+            "overhead_percent": 0.47172655788279005,
+            "extra_ms": 2.4992929975269362
+          },
+          {
+            "off": 0.5304421670007287,
+            "prototype": 0.5316304169973591,
+            "overhead_percent": 0.2240112250783577,
+            "extra_ms": 1.188249996630475
+          },
+          {
+            "prototype": 0.5363196669932222,
+            "off": 0.5316022909973981,
+            "overhead_percent": 0.8873881989811094,
+            "extra_ms": 4.7173759958241135
+          },
+          {
+            "off": 0.5339636659991811,
+            "prototype": 0.5342114999948535,
+            "overhead_percent": 0.04641401867833128,
+            "extra_ms": 0.2478339956724085
+          },
+          {
+            "prototype": 0.5326535839994904,
+            "off": 0.5319467919980525,
+            "overhead_percent": 0.13286892825936647,
+            "extra_ms": 0.7067920014378615
+          },
+          {
+            "off": 0.5313099999984843,
+            "prototype": 0.5330602500034729,
+            "overhead_percent": 0.32942161920415103,
+            "extra_ms": 1.7502500049886294
+          }
+        ]
+      },
+      "analysis": {
+        "seconds": 0.001798625,
+        "passes": 1,
+        "counters": {
+          "fn_safety.complete_summaries": 42,
+          "fn_safety.functions": 42,
+          "fn_safety.nodes": 809,
+          "fn_safety.roots": 42,
+          "fn_safety.summary_hits": 40,
+          "fn_safety.unverified": 0
+        },
+        "gaps": []
+      }
+    }
+  },
+  "date": "2026-11-28",
+  "source_parent_commit": "a4fee52",
+  "validation": {
+    "distinct_compiler_editor_tests": 172,
+    "runs": [
+      {
+        "report": "thor-fn-safety-regressions.json",
+        "tests": 159,
+        "seconds": 554.211484083,
+        "success": true
+      },
+      {
+        "report": "thor-fn-safety-final-pass.json",
+        "tests": 56,
+        "seconds": 72.8490101669995,
+        "success": true
+      },
+      {
+        "report": "thor-fn-safety-final-verified.json",
+        "tests": 37,
+        "seconds": 28.212354166000296,
+        "success": true
+      },
+      {
+        "report": "thor-fn-safety-release-verified.json",
+        "tests": 37,
+        "seconds": 15.057483207998303,
+        "success": true
+      }
+    ],
+    "rust_unit_tests": 136,
+    "assertion_hygiene_tests": 7,
+    "runtime_configurations": [
+      "checked",
+      "-disable-assert",
+      "-o:speed -disable-assert -no-bounds-check -no-type-assert"
+    ],
+    "selected_tests": [
+      "tests.test_comptime_modes.ComptimeModeTests.test_actual_execution_timeout_remains_an_error",
+      "tests.test_comptime_modes.ComptimeModeTests.test_aggressive_constant_context_and_required_proc_rules",
+      "tests.test_comptime_modes.ComptimeModeTests.test_aggressive_proves_local_mutation_readonly_inputs_and_recursion",
+      "tests.test_comptime_modes.ComptimeModeTests.test_captured_generic_bindings_do_not_share_allocation_proofs",
+      "tests.test_comptime_modes.ComptimeModeTests.test_constant_parameter_defaults_remain_required",
+      "tests.test_comptime_modes.ComptimeModeTests.test_debug_default_stays_runtime_and_explicit_aggressive_is_honored",
+      "tests.test_comptime_modes.ComptimeModeTests.test_explicit_runtime_in_required_context_is_only_removed_by_override",
+      "tests.test_comptime_modes.ComptimeModeTests.test_fixed_value_results_include_structs_arrays_unions_and_generics",
+      "tests.test_comptime_modes.ComptimeModeTests.test_four_modes_fold_only_their_selected_calls",
+      "tests.test_comptime_modes.ComptimeModeTests.test_help_documents_all_modes_without_loading_a_project",
+      "tests.test_comptime_modes.ComptimeModeTests.test_implicit_enum_constant_parameters_keep_their_annotation",
+      "tests.test_comptime_modes.ComptimeModeTests.test_imported_implicit_enum_specializations_and_invalid_members",
+      "tests.test_comptime_modes.ComptimeModeTests.test_ineligible_calls_keep_runtime_side_effects_and_values",
+      "tests.test_comptime_modes.ComptimeModeTests.test_input_mutation_is_ineligible_for_optional_execution",
+      "tests.test_comptime_modes.ComptimeModeTests.test_invalid_values_and_implicit_source_option_positions",
+      "tests.test_comptime_modes.ComptimeModeTests.test_lazy_and_unknown_runtime_paths_do_not_evaluate_failures",
+      "tests.test_comptime_modes.ComptimeModeTests.test_local_and_transitive_runtime_barriers",
+      "tests.test_comptime_modes.ComptimeModeTests.test_many_ordinary_scalar_calls_share_verification_and_native_batch",
+      "tests.test_comptime_modes.ComptimeModeTests.test_modes_are_not_forwarded_as_odin_flags_and_no_cache_keys_leak",
+      "tests.test_comptime_modes.ComptimeModeTests.test_override_allows_explicit_run_through_barrier_without_cache_leak",
+      "tests.test_comptime_modes.ComptimeModeTests.test_owned_fn_and_explicit_results_keep_independent_storage",
+      "tests.test_comptime_modes.ComptimeModeTests.test_panic_during_automatic_execution_is_an_error_at_the_call",
+      "tests.test_comptime_modes.ComptimeModeTests.test_polymorphic_aliases_defaults_and_nested_calls",
+      "tests.test_comptime_modes.ComptimeModeTests.test_reference_results_preserve_allocations_aliasing_and_cleanup",
+      "tests.test_comptime_modes.ComptimeModeTests.test_required_constants_and_explicit_run_still_execute",
+      "tests.test_comptime_modes.ComptimeModeTests.test_required_keeps_compile_time_control_flow_and_comprehensions",
+      "tests.test_comptime_modes.ComptimeModeTests.test_required_rejection_is_clear_and_never_executes_impure_calls",
+      "tests.test_comptime_modes.ComptimeModeTests.test_runtime_callback_void_and_multiple_results_keep_native_behavior",
+      "tests.test_comptime_modes.ComptimeModeTests.test_sdk_calls_builtin_aliases_and_struct_inputs",
+      "tests.test_comptime_modes.ComptimeModeTests.test_temporary_allocations_remain_observable_for_ordinary_procs",
+      "tests.test_comptime_modes.ComptimeModeTests.test_type_queries_do_not_execute_the_queried_call",
+      "tests.test_comptime_modes.ComptimeModeTests.test_unknown_values_remain_runtime_in_every_mode",
+      "tests.test_comptime_modes.ComptimeModeTests.test_unreviewed_fatal_reporting_sdk_keeps_ordinary_calls_at_runtime",
+      "tests.test_comptime_modes.ComptimeModeTests.test_unsupported_pure_input_can_defer_before_execution",
+      "tests.test_comptime_modes.ComptimeModeTests.test_vet_apply_validates_with_the_selected_execution_policy",
+      "tests.test_comptime_modes_tls.ComptimeModeTLSTests.test_aggressive_io_keeps_proc_type_and_has_no_purity_diagnostic",
+      "tests.test_comptime_modes_tls.ComptimeModeTLSTests.test_folded_aliased_struct_call_retains_field_completion",
+      "tests.test_comptime_modes_tls.ComptimeModeTLSTests.test_ordinary_constant_is_checked_using_the_configured_mode",
+      "tests.test_comptime_modes_tls.ComptimeModeTLSTests.test_override_ignores_barriers_in_explicit_evaluation_and_keeps_hover",
+      "tests.test_comptime_modes_tls.ComptimeModeTLSTests.test_required_suppresses_optional_work_while_normal_reports_timeout_at_call",
+      "tests.test_extension_contracts.ExtensionContracts.test_cached_run_cannot_override_native_bounds",
+      "tests.test_extension_contracts.ExtensionContracts.test_every_marked_example_has_a_verdict",
+      "tests.test_extension_contracts.ExtensionContracts.test_fn_result_ownership",
+      "tests.test_extension_contracts.ExtensionContracts.test_immutable_apply_preserves_both_configurations",
+      "tests.test_extension_contracts.ExtensionContracts.test_required_execution_replays_independent_owned_values",
+      "tests.test_extension_contracts.ExtensionContracts.test_warm_cache_observes_callees_file_bounds",
+      "tests.test_extension_contracts.ExtensionContracts.test_warm_cache_revalidates_transitive_ownership_and_values",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_migrated_native_sequence_bounds",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_original_and_migrated_colliding_names",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_plain_run_mixes_converted_and_new_files",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_reflected_names_can_also_be_import_aliases_in_another_file",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_reflected_type_name_after_migration",
+      "tests.test_extension_contracts.OdinCompatibilityContract.test_reflection_of_migrated_generic_type_and_value_parameters",
+      "tests.test_fn_result_ownership.FnResultOwnershipTests.test_borrowed_results_require_explicit_ownership",
+      "tests.test_fn_result_ownership.FnResultOwnershipTests.test_generic_specializations_callbacks_and_run_cannot_erase_borrows",
+      "tests.test_fn_result_ownership.FnResultOwnershipTests.test_owned_helpers_forward_one_payload_allocation",
+      "tests.test_fn_result_ownership.FnResultOwnershipTests.test_soa_inputs_results_and_cached_run",
+      "tests.test_fn_result_ownership.FnResultOwnershipTests.test_soa_rows_and_nested_fields_keep_input_provenance",
+      "tests.test_fn_safety.FnSafetyTests.test_aliases_views_records_and_multi_assignments",
+      "tests.test_fn_safety.FnSafetyTests.test_assertion_elision_preserves_original_user_semantics",
+      "tests.test_fn_safety.FnSafetyTests.test_budgets_and_recursive_summaries_cannot_silently_pass_strict",
+      "tests.test_fn_safety.FnSafetyTests.test_callback_aliases_defaults_and_record_initialization",
+      "tests.test_fn_safety.FnSafetyTests.test_callback_guards_short_circuit_and_record_copies",
+      "tests.test_fn_safety.FnSafetyTests.test_conditional_expression_owners_callbacks_and_release_effects",
+      "tests.test_fn_safety.FnSafetyTests.test_conditional_release_reinitialization_and_early_returns",
+      "tests.test_fn_safety.FnSafetyTests.test_default_and_explicit_off_preserve_existing_builds",
+      "tests.test_fn_safety.FnSafetyTests.test_defer_is_late_bound_and_scoped_cleanup_is_shallow",
+      "tests.test_fn_safety.FnSafetyTests.test_duplicated_fn_results_keep_independent_callers",
+      "tests.test_fn_safety.FnSafetyTests.test_generic_compile_time_conditional_expression_is_selected",
+      "tests.test_fn_safety.FnSafetyTests.test_generics_owned_helpers_and_named_arguments",
+      "tests.test_fn_safety.FnSafetyTests.test_header_only_queries_and_independent_scalar_copies",
+      "tests.test_fn_safety.FnSafetyTests.test_known_bad_run_is_rejected_before_a_native_helper_runs",
+      "tests.test_fn_safety.FnSafetyTests.test_known_panic_paths_do_not_poison_live_continuations",
+      "tests.test_fn_safety.FnSafetyTests.test_loop_source_is_evaluated_once_in_the_flow_model",
+      "tests.test_fn_safety.FnSafetyTests.test_modes_help_and_separate_value_spelling",
+      "tests.test_fn_safety.FnSafetyTests.test_named_actuals_are_evaluated_once_in_the_flow_model",
+      "tests.test_fn_safety.FnSafetyTests.test_nested_opaque_results_are_gaps_instead_of_invented_aliases",
+      "tests.test_fn_safety.FnSafetyTests.test_nil_callbacks_and_nil_guards",
+      "tests.test_fn_safety.FnSafetyTests.test_opaque_owned_slice_callbacks_and_generic_readers",
+      "tests.test_fn_safety.FnSafetyTests.test_procedure_bounds_directives_are_not_certified",
+      "tests.test_fn_safety.FnSafetyTests.test_procedure_helper_summaries_and_purity_boundary",
+      "tests.test_fn_safety.FnSafetyTests.test_prototype_does_not_change_generated_native_code",
+      "tests.test_fn_safety.FnSafetyTests.test_pure_string_results_are_owned_and_plain_proc_aliases_stay_shared",
+      "tests.test_fn_safety.FnSafetyTests.test_repeated_stack_views_are_unverified_without_false_use_after_free",
+      "tests.test_fn_safety.FnSafetyTests.test_run_checks_before_execution_and_warm_cache_revalidates",
+      "tests.test_fn_safety.FnSafetyTests.test_runtime_selected_callback_bodies_are_checked",
+      "tests.test_fn_safety.FnSafetyTests.test_selected_configuration_and_generic_when_branches",
+      "tests.test_fn_safety.FnSafetyTests.test_simple_loop_break_and_continue_have_finite_flow",
+      "tests.test_fn_safety.FnSafetyTests.test_source_positions_and_assertion_disabled_safety_errors",
+      "tests.test_fn_safety.FnSafetyTests.test_unchecked_accesses_require_an_explicit_proof_gap",
+      "tests.test_fn_safety.FnSafetyTests.test_unknowns_remain_visible_and_strict_rejects_them",
+      "tests.test_fn_safety.FnSafetyTests.test_using_field_aliases_keep_owner_and_callback_identity",
+      "tests.test_fn_safety.FnSafetyTests.test_zero_length_make_has_no_releasable_backing",
+      "tests.test_fn_safety_tls.FnSafetyTLSTests.test_alias_lifetime_error_and_unsaved_recovery",
+      "tests.test_fn_safety_tls.FnSafetyTLSTests.test_proof_gap_is_information_and_strict_gap_is_error",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_budget_exhaustion_preserves_constant_procedure_identity",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_caller_aliases_and_opaque_proc_effects_remain_checked",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_constant_callback_defaults_use_the_declared_signature",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_known_pure_callback_body_is_still_checked_for_lifetime_errors",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_known_pure_reader_still_checks_its_borrowed_arguments",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_nil_callbacks_are_errors_and_non_nil_guards_are_respected",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_opaque_fixed_array_and_dynamic_results_have_cleanup",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_opaque_owned_results_support_conditional_nil_cleanup",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_opaque_pure_readers_preserve_live_input_aliases",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_opaque_pure_results_have_independent_cleanup",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_pure_promotion_duplicates_returned_aliases",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_pure_result_padding_does_not_create_caller_owners",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_return_promotion_checks_conditional_and_deferred_release",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_runtime_aliases_record_fields_and_generic_callbacks",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_runtime_selected_callbacks_check_each_body_and_owned_results",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_selected_return_owner_keeps_possible_release_uncertain",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_unresolved_pure_callback_has_no_global_reference_effects",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_unrestricted_runtime_proc_still_requires_global_effect_review",
+      "tests.test_lifetime_pure_callbacks.PureCallbackLifetimeTests.test_unsupported_opaque_result_shapes_stay_unverified",
+      "tests.test_pure_callbacks.PureCallbackTests.test_callback_abi_and_dispatch_match_plain_proc_in_native_ir",
+      "tests.test_pure_callbacks.PureCallbackTests.test_callback_signature_cannot_hide_impure_nesting",
+      "tests.test_pure_callbacks.PureCallbackTests.test_computed_callback_can_run_inside_compile_time_expression",
+      "tests.test_pure_callbacks.PureCallbackTests.test_constant_callback_alias_and_inner_run",
+      "tests.test_pure_callbacks.PureCallbackTests.test_constant_imported_record_callbacks",
+      "tests.test_pure_callbacks.PureCallbackTests.test_constant_inline_callbacks_and_captured_types_with_inner_run",
+      "tests.test_pure_callbacks.PureCallbackTests.test_forwarded_multi_results_cannot_hide_impure_callbacks",
+      "tests.test_pure_callbacks.PureCallbackTests.test_generic_callback_type_parameters",
+      "tests.test_pure_callbacks.PureCallbackTests.test_generic_callbacks_and_run",
+      "tests.test_pure_callbacks.PureCallbackTests.test_generic_record_callback_type_arguments",
+      "tests.test_pure_callbacks.PureCallbackTests.test_generic_result_callbacks_and_type_parameter_forwarding",
+      "tests.test_pure_callbacks.PureCallbackTests.test_inferred_default_fn_and_explicit_proc_erasure",
+      "tests.test_pure_callbacks.PureCallbackTests.test_mutable_collections_cannot_erase_or_inject_purity",
+      "tests.test_pure_callbacks.PureCallbackTests.test_native_proc_trait_preserves_generic_callback_contracts",
+      "tests.test_pure_callbacks.PureCallbackTests.test_native_type_comparisons_cannot_hide_impure_callback_branches",
+      "tests.test_pure_callbacks.PureCallbackTests.test_nested_storage_and_return_contracts",
+      "tests.test_pure_callbacks.PureCallbackTests.test_ordinary_proc_cannot_enter_pure_slot",
+      "tests.test_pure_callbacks.PureCallbackTests.test_overload_selection_preserves_purity",
+      "tests.test_pure_callbacks.PureCallbackTests.test_owned_callback_results_remain_independent",
+      "tests.test_pure_callbacks.PureCallbackTests.test_owned_records_keep_callbacks_during_recursive_clone_and_destroy",
+      "tests.test_pure_callbacks.PureCallbackTests.test_readonly_callback_contracts_with_compile_time_literals",
+      "tests.test_pure_callbacks.PureCallbackTests.test_runtime_callbacks_aliases_and_literals",
+      "tests.test_pure_callbacks.PureCallbackTests.test_selected_generic_branches_and_callback_factories",
+      "tests.test_pure_callbacks.PureCallbackTests.test_type_queries_and_safe_callback_conversions",
+      "tests.test_pure_callbacks.PureCallbackTests.test_unknown_runtime_callback_is_not_compile_time_constant",
+      "tests.test_pure_callbacks.PureCallbackTests.test_using_fields_and_imported_aliases",
+      "tests.test_pure_callbacks.PureCallbackTests.test_void_fn_types_and_nil_checks",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_constant_generic_callback_signature_hides_native_witnesses",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_impure_assignment_diagnostic_and_unsaved_recovery",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_types_aliases_generics_and_result_completion",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_vet_checks_conditional_return_storage_and_unsaved_recovery",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_vet_nil_callback_diagnostic_and_unsaved_assignment",
+      "tests.test_pure_callbacks_tls.PureCallbackTLSTests.test_vet_trusts_pure_callback_global_effects_and_rechecks_unsaved_types",
+      "tests.test_rust_cli_controls.LongProcessTimeoutTests.test_cancellation_and_checked_failures_preserve_cleanup_and_output",
+      "tests.test_rust_cli_controls.LongProcessTimeoutTests.test_long_deadline_expiry_kills_the_helper_and_reports_the_full_limit",
+      "tests.test_rust_cli_controls.LongProcessTimeoutTests.test_long_deadline_retries_the_same_process_and_keeps_its_output",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_backend_signal_keeps_preceding_source_diagnostics_and_original_positions",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_backend_signal_retains_name_status_and_native_detail",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_cache_reports_cold_warm_and_disabled_execution",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_clear_cache_preserves_external_file_symlinks_where_supported",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_clear_cache_recomputes_and_preserves_unmanaged_entries",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_command_help_includes_only_applicable_option_groups",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_compiler_looking_options_after_separator_reach_the_program",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_default_timeout_allows_helpers_past_the_old_five_second_limit",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_equals_options_and_separate_runtime_arguments",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_full_help_groups_options_and_explains_modes_without_a_toolchain",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_generic_linker_collision_retries_once_without_hiding_source_or_external_errors",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_invalid_timeout_and_runtime_argument_options_have_usage_status",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_large_positive_timeouts_compile_and_execute_helpers",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_missing_project_names_and_unknown_commands_are_usage_errors",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_no_arguments_shows_short_help_through_native_launchers",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_plain_toolchain_output_obeys_warning_controls",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_raw_diagnostics_retain_generated_odin_locations",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_run_returns_the_shell_status_for_a_terminated_program",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_run_timeout_is_forwarded_and_reports_cache_counters_on_failure",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_vet_rejects_invalid_corrections_when_source_errors_precede_a_backend_crash",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_vet_validation_preserves_native_warning_policy",
+      "tests.test_rust_cli_controls.RustCliControlTests.test_zero_timeout_runs_helpers_in_both_value_option_forms"
+    ]
+  }
+}

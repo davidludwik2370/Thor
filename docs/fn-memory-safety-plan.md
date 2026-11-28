@@ -4,6 +4,10 @@ This plan follows the November 28, 2026 audit of pure-function and callback vett
 The implemented changes improve vet's diagnostics. A future mandatory compiler
 check would establish the safety contract described here.
 
+The follow-up [fast fn safety prototype](fn-safety-prototype.md) is opt-in. Its
+coverage, explicit proof gaps, regression tests and cold/warm build measurements
+are documented separately. Mandatory checking remains a future change.
+
 ## Audit findings and corrections
 
 The audit follows pure inputs and results through procedure aliases, callback

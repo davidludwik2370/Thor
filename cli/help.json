@@ -147,7 +147,7 @@
         "doc",
         "strip-semicolon"
       ],
-      "text": "Compile-time execution: transpile, check, build, run, test, vet, publish, doc, strip-semicolon\n  --comptime MODE              Select Thor compile-time execution policy\n                               required: explicit/necessary evaluation only\n                               normal: automatic fn evaluation (default)\n                               aggressive: also fold eligible value-returning procs\n                               override: aggressive, ignoring #runtime barriers\n  --run-timeout SEC            Limit each compile-time execution in seconds\n                               0 means unlimited (default)\n  --cache-report               Print compile-time cache counters as JSON\n"
+      "text": "Compile-time execution: transpile, check, build, run, test, vet, publish, doc, strip-semicolon\n  --comptime MODE              Select Thor compile-time execution policy\n                               required: explicit/necessary evaluation only\n                               normal: automatic fn evaluation (default)\n                               aggressive: also fold eligible value-returning procs\n                               override: aggressive, ignoring #runtime barriers\n  --run-timeout SEC            Limit each compile-time execution in seconds\n                               0 means unlimited (default)\n  --cache-report               Print compile-time cache counters as JSON\n  --fn-safety MODE             Experimental fn liveness checks: off (default),\n                               prototype (report gaps), strict (reject gaps)\n"
     },
     {
       "commands": [

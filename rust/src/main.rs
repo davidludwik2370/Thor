@@ -243,6 +243,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         editor_info: false,
         run_timeout: std::time::Duration::ZERO,
         comptime: Default::default(),
+        fn_safety: Default::default(),
         clear_cache: false,
         cache_report: false,
         raw_diagnostics: false,
@@ -268,6 +269,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                     | "--overlay"
                     | "--run-timeout"
                     | "--comptime"
+                    | "--fn-safety"
                     | "--track-allocations"
                     | "--app-name"
                     | "--app-id"
@@ -346,6 +348,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "--comptime" => {
                 let value=args.next().ok_or_else(||Error::usage("--comptime requires required, normal, aggressive, or override"))?;
                 options.comptime=thor_compiler::comptime::Mode::parse(&value)?;
+            }
+            "--fn-safety" => {
+                let value=args.next().ok_or_else(||Error::usage("--fn-safety requires off, prototype, or strict"))?;
+                options.fn_safety=thor_compiler::fnsafety::Mode::parse(&value)?;
             }
             "--run-timeout" => {
                 let value = args.next().ok_or_else(|| Error::usage("--run-timeout requires seconds"))?;

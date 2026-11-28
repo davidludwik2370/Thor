@@ -25,6 +25,7 @@ mod file_alias;
 mod platform_io;
 pub mod formatting;
 pub mod frontend;
+pub mod fnsafety;
 pub mod kind;
 pub mod lower;
 pub mod memory;

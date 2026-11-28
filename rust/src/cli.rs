@@ -170,6 +170,7 @@ pub fn value_option(flag: &str) -> bool {
             | "--overlay"
             | "--run-timeout"
             | "--comptime"
+            | "--fn-safety"
             | "--track-allocations"
             | "--app-name"
             | "--app-id"

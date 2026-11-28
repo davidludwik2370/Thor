@@ -70,6 +70,7 @@ pub struct Options {
     /// Zero leaves compile-time helper compilation and execution unlimited.
     pub run_timeout: std::time::Duration,
     pub comptime: crate::comptime::Mode,
+    pub fn_safety: crate::fnsafety::Mode,
     pub clear_cache: bool,
     pub cache_report: bool,
     pub raw_diagnostics: bool,
@@ -133,6 +134,7 @@ pub struct Project {
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
     pub editor_info: Vec<Value>,
+    fn_safety_diagnostics: Vec<Value>,
     pub evaluated: BTreeMap<crate::semantics::Ref, Value>,
     pub timings: BTreeMap<&'static str, f64>,
     pub specialized: crate::specialization::Cases,
@@ -399,6 +401,7 @@ impl Project {
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
             editor_info: vec![],
+            fn_safety_diagnostics: vec![],
             evaluated: BTreeMap::new(),
             timings: BTreeMap::new(),
             specialized: BTreeMap::new(),
@@ -653,6 +656,16 @@ impl Project {
             self.retain_resolver(resolver);
             (deferred, instances)
         } else {(false, Default::default())};
+        if self.options.fn_safety.enabled() {
+            let mut resolver = self.resolver();
+            resolver.prepare_contexts();
+            resolver.set_evaluations(self.evaluated.clone());
+            if let Some(plan) = &self.evaluation { crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver); }
+            resolver.callback_instances = callback_instances.clone();
+            let diagnostics = crate::fnsafety::analyze(&mut resolver, self.options.fn_safety)?;
+            self.retain_resolver(resolver);
+            self.fn_safety_diagnostics = diagnostics;
+        }
         self.schedule_evaluations()?;
         self.check_no_alloc()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root,self.options.native_policy_probe
@@ -1392,6 +1405,7 @@ impl Project {
             packet["errors"].as_array().cloned().unwrap_or_default()
         };
         errors.extend(policy_diagnostics);
+        errors.extend(self.fn_safety_diagnostics.iter().cloned());
         for source in &self.sources {
             errors.extend(
                 source.info["diagnostics"]
