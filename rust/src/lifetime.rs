@@ -3225,7 +3225,9 @@ impl Analysis<'_, '_> {
             }
         }
         let callable_type = self.typ(callee, f);
-        if matches!(base(&callable_type), Type::Procedure(_) | Type::Function(_, _))
+        // A checked fn callback cannot affect external mutable reference state.
+        // Its body and any argument/result storage still get their own checks.
+        if matches!(base(&callable_type), Type::Procedure(_))
             && !crate::parallelcompile::known_callback(self.r, callee)
             && state.reachable(vs.iter().cloned()).is_empty()
             && !vs.iter().any(|v| v.unknown)

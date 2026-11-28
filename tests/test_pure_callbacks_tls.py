@@ -66,4 +66,26 @@ main::proc(){_=ANSWER}
         self.assertNotIn('__thor_',value)
         self.assertNotIn('callback_tag',value)
 
+    def test_vet_trusts_pure_callback_global_effects_and_rechecks_unsaved_types(self):
+        text='''package main
+Callback::fn(int)->int
+square::fn(x:int)->int{x*x}
+apply::proc(value:int,callback:Callback)->int{return callback(value)}
+main::proc(){_=apply(3,square)}
+'''
+        client,main=self.open(text,checker_args='--vet=lifetime,leak --unverified --comptime=required')
+        client.diagnostic(main.as_uri(),empty=True)
+        changed=text.replace('Callback::fn','Callback::proc')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+                                             'contentChanges':[{'text':changed}]})
+        findings=client.diagnostic(main.as_uri(),code='thor/lifetime-unknown')
+        finding=next(item for item in findings if item.get('code')=='thor/lifetime-unknown')
+        self.assertIn('global reference state',finding['message'])
+        self.assertEqual(finding['range']['start'],self.position(changed,'callback(value)',0))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},
+                                             'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
 if __name__=='__main__':unittest.main()

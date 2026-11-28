@@ -33,6 +33,14 @@ JSON diagnostics expose `certainty: "definite"` or `"unverified"`. The codes are
 Messages, original-source ranges, and related storage origins are also available
 in TLS when Thor vet is enabled. Ownership findings have no automatic quick fix.
 
+A runtime callback with a checked `fn` type carries its purity contract even
+when its concrete target is unknown. Vet uses that contract to verify the
+absence of effects on mutable global reference state. Known callback bodies
+are analyzed for memory errors, and argument lifetimes and reference-result
+ownership still receive their usual checks. For example, `func(val)` with
+`func: fn(int) -> int` needs no global-effect review. An unresolved
+`proc(int) -> int` still requires that review because it can access global state.
+
 ## Reporting incomplete analyses
 
 ```sh
