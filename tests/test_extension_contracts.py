@@ -234,6 +234,20 @@ from_thor :: proc(xs: []int, i: int) -> int { return read(xs, i) }
                 self.assertNotEqual(run.returncode, 0)
                 self.assertRegex(run.stderr + run.stdout, r'(?i)(bounds|indices)')
 
+    def test_reflected_names_can_also_be_import_aliases_in_another_file(self):
+        self.write('''package main
+import Integer "core:fmt"
+import Rational "core:math"
+import "lib"
+main :: proc() {
+    Integer.println(Rational.sqrt(f64(4)), lib.Box(i8, 1){})
+}
+''', {'lib/box.odin': '''package lib
+Box :: struct($Integer: typeid, $Rational: int) { data: [Rational]Integer }
+'''})
+        self.migrate()
+        self.compare_builds(expected='2 Box($Integer=i8, $Rational=1){data = [0]}\n')
+
     def test_migrated_native_sequence_bounds(self):
         self.write('''package main
 import "core:fmt"

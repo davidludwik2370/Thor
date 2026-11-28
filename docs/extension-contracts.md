@@ -44,6 +44,8 @@ main :: proc() {
 
 Both programs print `Integer` followed by `Box($Rational=i16, $set=2){values = [0, 0]}`. Native reflection must retain the declared type name and the labels of both type and value parameters. An alias exposes exactly the type name Odin would report. This applies across packages, conditional declarations and specializations. A pre-existing user name ending in `_odin` retains that spelling.
 
+A file can also use `import Integer "core:fmt"`. In that file, `Integer.println` calls the imported package, even when another file declares a generic parameter named `Integer`.
+
 ## Ownership of fn results
 
 A `fn` may read borrowed input. At each reachable return, every result component that needs backing storage must have a proven owner created by the function or by a verified operation it calls. This holds through aliases, concrete generic substitutions, callback calls, multiple results, and implicit or named returns. Returning the length or an inline scalar read from a borrow is valid. Returning even a zero-length view into borrowed backing still needs an explicit clone. Nil and empty values without backing need no owner.

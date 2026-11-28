@@ -5,6 +5,12 @@ impl Resolver<'_> {
         let source = &self.sources[r.file];
         let node = source.node(r.node);
         if node.kind != "Ident" { return false; }
+        let name = source.text(r.node);
+        // Namespace aliases have no value symbol. They still shadow the
+        // predefined numeric types in the file that imports them.
+        if !matches!(name, "Integer" | "Rational") || self.import_shadows_builtin(r.file, name) {
+            return false;
+        }
         !node.parent.is_some_and(|parent| {
             let owner = source.node(parent);
             matches!(owner.kind.as_str(), "EnumType" | "ImplicitSelector" | "File")
